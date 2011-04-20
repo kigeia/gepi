@@ -166,7 +166,7 @@ $couleur_cellule_gen = "#F6F7EF";
 ##################################################################################
 
 // Version de GEPI
-$gepiVersion = "trunk"; // Attention : cette ligne doit conserver une valeur respectant ce schéma : trunk/1.5.1/1.5.2, etc. avec des guillemets doubles.
+$gepiVersion = "1.5.4"; // Attention : cette ligne doit conserver une valeur respectant ce schéma : trunk/1.5.1/1.5.2, etc. avec des guillemets doubles.
 $gepiVersionMaintenance = ""; // 1, 2, 3, etc. N'est plus utilisé actuellement, remplacé plutôt par le numéro de révision SVN.
 $gepiRcVersion = "";
 $gepiBetaVersion = "";
