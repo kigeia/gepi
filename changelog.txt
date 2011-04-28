@@ -169,7 +169,7 @@ Gepi-1.5.0-rc3 (25/05/2007)
 
 Nouvelles fonctionalités
 ------------------------
-- possibilité de ne pas faire appaître le lien 'contacter administrateur' sur la page de login
+- possibilité de ne pas faire apparaître le lien 'contacter administrateur' sur la page de login
 - l'export CSV lors des mots de passe régénéré est également disponible pour la réinitialisation des mots de passe des profs
 - import/export au format ODS pour les carnets de notes et outils de saisie
 - nouveaux logos PHP-powered et MySQL-powered sur la page de login
