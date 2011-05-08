@@ -98,4 +98,4 @@ de la liste de diffusion des utilisateurs.
 =======================================
 
 La documentation de Gepi se trouve à l'adresse suivante :
-http://www.sylogix.org/wiki/gepi.
+http://www.sylogix.org/projects/gepi/wiki
