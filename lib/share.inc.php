@@ -178,7 +178,8 @@ function envoi_mail($sujet, $message, $destinataire, $ajout_headers='') {
 
 	if($gepiPrefixeSujetMail!='') {$gepiPrefixeSujetMail.=" ";}
 
-	if($ajout_headers!='') {$ajout_headers="\r\n".$ajout_headers;}
+	// Si on ajoute un retour à la ligne de plus, l'ajout_headers est mis dans le corps du message
+	//if($ajout_headers!='') {$ajout_headers="\r\n".$ajout_headers;}
 
   $subject = $gepiPrefixeSujetMail."GEPI : $sujet";
   $subject = "=?ISO-8859-1?B?".base64_encode($subject)."?=\r\n";
