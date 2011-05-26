@@ -265,7 +265,12 @@ if (isset($data['new_periode']) AND isset($data['nom_periode'])) {
 	// =========== TRAITEMENT de la modification de la période =============
 if (isset($data['modif_ok']) AND isset($data['nom_periode'])) {
 	// Initialisation
-	if(!isset($classes_concernees_insert)) {$classes_concernees_insert="";}
+	if(!isset($classes_concernees_insert)) {
+		$classes_concernees_insert="";
+		for ($c=0; $c<count($data['classes_concernees']); $c++) {
+			$classes_concernees_insert .= $data['classes_concernees'][$c].";";
+		}
+	}
 
 	$jourdebut = $data['jour_dperiode'];
 	$jourfin = $data['jour_fperiode'];
