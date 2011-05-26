@@ -88,8 +88,8 @@ $test_arch=mysql_query($sql);
 if(mysql_num_rows($test_arch)>0) {
 	echo "<a href='security_panel_archives.php'>Historique des alertes sécurité</a>";
 }
-else {
-	echo "Historique des alertes sécurité";
+//else {
+//	echo "Historique des alertes sécurité";
 
 	if($tri=='nom') {
 		$sql="SELECT DISTINCT u.login, u.nom, u.prenom, u.statut, count(t.login) AS nb FROM utilisateurs u, tentatives_intrusion t WHERE t.login=u.login GROUP BY u.login ORDER BY u.nom, u.prenom;";
@@ -150,7 +150,7 @@ else {
 SELECT DISTINCT adresse_ip, count(adresse_ip) as nb FROM tentatives_intrusion GROUP BY adresse_ip ORDER BY nb DESC;
 
 */
-}
+//}
 echo "</p>\n";
 
 echo "<script type='text/javascript'>
