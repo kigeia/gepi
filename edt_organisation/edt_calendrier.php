@@ -56,7 +56,8 @@ if (param_edt($_SESSION["statut"]) != "yes") {
 }
 
 	// Initialisation des variables
-	
+
+//debug_var();
 	
 $data = Array();	
 	
@@ -206,6 +207,9 @@ if (isset($data['new_periode']) AND isset($data['nom_periode'])) {
 	}
 
 	if ($formatdatevalid) {
+		// Initialisation
+		if(!isset($classes_concernees_insert)) {$classes_concernees_insert="";}
+
 		$jourdebut = $detail_jourdeb[2]."-".$detail_jourdeb[1]."-".$detail_jourdeb[0];
 		$jourfin = $detail_jourfin[2]."-".$detail_jourfin[1]."-".$detail_jourfin[0];
 			// On insère les classes qui sont concernées (0 = toutes)
@@ -213,7 +217,7 @@ if (isset($data['new_periode']) AND isset($data['nom_periode'])) {
 				$classes_concernees_insert = "0";
 			}
 			else {
-					$classes_concernees_insert = "";
+				$classes_concernees_insert = "";
 				for ($c=0; $c<count($data['classes_concernees']); $c++) {
 					$classes_concernees_insert .= $data['classes_concernees'][$c].";";
 				}
@@ -260,6 +264,9 @@ if (isset($data['new_periode']) AND isset($data['nom_periode'])) {
 
 	// =========== TRAITEMENT de la modification de la période =============
 if (isset($data['modif_ok']) AND isset($data['nom_periode'])) {
+	// Initialisation
+	if(!isset($classes_concernees_insert)) {$classes_concernees_insert="";}
+
 	$jourdebut = $data['jour_dperiode'];
 	$jourfin = $data['jour_fperiode'];
 	// traitement du timestamp Unix GMT ainsi que des dates et heures MySql
@@ -385,7 +392,8 @@ if (isset($data['calendrier']) AND isset($data['modifier'])) {
 		$aff_heuredeb = substr($rep_modif["heuredebut_calendrier"], 0, -3);
 		$aff_heurefin = substr($rep_modif["heurefin_calendrier"], 0, -3);
 		
-		$req_periodes = mysql_query("SELECT nom_periode, num_periode FROM periodes WHERE id_classe = '1'");
+		//$req_periodes = mysql_query("SELECT nom_periode, num_periode FROM periodes WHERE id_classe = '1'");
+		$req_periodes = mysql_query("SELECT DISTINCT nom_periode, num_periode FROM periodes ORDER BY id_classe, num_periode;");
 		$nbre_periodes = mysql_num_rows($req_periodes);	
 		
 	
@@ -419,5 +427,6 @@ $utilisation_prototype = "ok";
 require_once("../lib/header.inc");
 //debug_var();
 require_once("./views/edt_calendrier_view.html");
+//require_once("./views/edt_calendrier_view.php");
 require("../lib/footer.inc.php");
 ?>
