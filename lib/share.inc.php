@@ -4178,14 +4178,7 @@ function mail_connexion() {
 			$message .= "(*) Vous ou une personne tentant d'usurper votre identité.\n";
 
 			// On envoie le mail
-			/*
-			// getSettingValue("gepiAdminAdress")
-			$envoi = mail($lig_user->email,
-				"GEPI : Connexion $date",
-				$message,
-			"From: Mail automatique Gepi\r\n"."X-Mailer: PHP/" . phpversion());
 			//fdebug_mail_connexion("\$message=$message\n====================\n");
-			*/
 			$destinataire=$lig_user->email;
 			$sujet="GEPI : Connexion $date";
 			envoi_mail($sujet, $message, $destinataire);
@@ -4254,15 +4247,7 @@ function mail_alerte($sujet,$texte,$informer_admin='n') {
 		}
 
 		// On envoie le mail
-		/*
-		// getSettingValue("gepiAdminAdress")
-		$envoi = mail($lig_user->email,
-			"GEPI : $sujet $date",
-			$message,
-		"From: Mail automatique Gepi\r\n".$ajout."X-Mailer: PHP/" . phpversion());
 		//fdebug_mail_connexion("\$message=$message\n====================\n");
-		*/
-
 		$destinataire=$lig_user->email;
 		$sujet="GEPI : $sujet $date";
 		envoi_mail($sujet, $message, $destinataire, $ajout);
