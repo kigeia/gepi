@@ -2706,11 +2706,11 @@ function eleve_suivant() {
 
 						if($click_plutot_que_survol_aff_app=="y") {
 							//echo "<area href=\"#\" onClick=\"delais_afficher_div('div_app_".$tab_imagemap[$i]."','y',-10,20,1,$largeurMat,$hauteur_rect_delais_afficher_div);return false;\" onMouseout=\"cacher_div('div_app_".$tab_imagemap[$i]."');\" shape=\"rect\" coords=\"$x0,0,$x1,$hauteur_graphe\" alt=\"\">\n";
-							echo "<area href=\"#\" onClick=\"afficher_div('div_app_".$tab_imagemap[$i]."','y',-10,20);return false;\" onMouseout=\"cacher_div('div_app_".$tab_imagemap[$i]."');\" shape=\"rect\" coords=\"$x0,0,$x1,$hauteur_graphe\" alt=\"\">\n";
+							echo "<area href=\"#\" onClick=\"affiche_eleve_afficher_div('div_app_".$tab_imagemap[$i]."','y',-10,20);return false;\" onMouseout=\"cacher_div('div_app_".$tab_imagemap[$i]."');\" shape=\"rect\" coords=\"$x0,0,$x1,$hauteur_graphe\" alt=\"\">\n";
 						}
 						else {
 							//echo "<area href=\"#\" onClick='return false;' onMouseover=\"delais_afficher_div('div_app_".$tab_imagemap[$i]."','y',-10,20,$duree_delais_afficher_div,$largeurMat,$hauteur_rect_delais_afficher_div);\" onMouseout=\"cacher_div('div_app_".$tab_imagemap[$i]."');\" shape=\"rect\" coords=\"$x0,0,$x1,$hauteur_graphe\" alt=\"\">\n";
-							echo "<area href=\"#\" onClick=\"afficher_div('div_app_".$tab_imagemap[$i]."','y',-10,20);return false;\" onMouseover=\"delais_afficher_div('div_app_".$tab_imagemap[$i]."','y',-10,20,$duree_delais_afficher_div,$largeurMat,$hauteur_rect_delais_afficher_div);\" onMouseout=\"cacher_div('div_app_".$tab_imagemap[$i]."');\" shape=\"rect\" coords=\"$x0,0,$x1,$hauteur_graphe\" alt=\"\">\n";
+							echo "<area href=\"#\" onClick=\"affiche_eleve_afficher_div('div_app_".$tab_imagemap[$i]."','y',-10,20);return false;\" onMouseover=\"affiche_eleve_delais_afficher_div('div_app_".$tab_imagemap[$i]."','y',-10,20,$duree_delais_afficher_div,$largeurMat,$hauteur_rect_delais_afficher_div);\" onMouseout=\"cacher_div('div_app_".$tab_imagemap[$i]."');\" shape=\"rect\" coords=\"$x0,0,$x1,$hauteur_graphe\" alt=\"\">\n";
 						}
 					}
 				}
@@ -2722,10 +2722,10 @@ function eleve_suivant() {
 					//echo "<area href=\"#\" onClick='return false;' onMouseover=\"afficher_div('div_avis_1','y',-10,20);\" onMouseout=\"cacher_div('div_avis_1');\" shape=\"rect\" coords=\"$x0,0,$x1,$hauteur_graphe\">";
 
 					if($click_plutot_que_survol_aff_app=="y") {
-						echo "<area href=\"#\" onClick=\"delais_afficher_div('div_avis_1','y',-10,20,1,$largeurMat,$hauteur_rect_delais_afficher_div);return false;\" onMouseout=\"cacher_div('div_avis_1');\" shape=\"rect\" coords=\"$x0,0,$x1,$hauteur_graphe\" alt=\"\">";
+						echo "<area href=\"#\" onClick=\"affiche_eleve_delais_afficher_div('div_avis_1','y',-10,20,1,$largeurMat,$hauteur_rect_delais_afficher_div);return false;\" onMouseout=\"cacher_div('div_avis_1');\" shape=\"rect\" coords=\"$x0,0,$x1,$hauteur_graphe\" alt=\"\">";
 					}
 					else {
-						echo "<area href=\"#\" onClick='return false;' onMouseover=\"delais_afficher_div('div_avis_1','y',-10,20,$duree_delais_afficher_div,$largeurMat,$hauteur_rect_delais_afficher_div);\" onMouseout=\"cacher_div('div_avis_1');\" shape=\"rect\" coords=\"$x0,0,$x1,$hauteur_graphe\" alt=\"\">";
+						echo "<area href=\"#\" onClick='return false;' onMouseover=\"affiche_eleve_delais_afficher_div('div_avis_1','y',-10,20,$duree_delais_afficher_div,$largeurMat,$hauteur_rect_delais_afficher_div);\" onMouseout=\"cacher_div('div_avis_1');\" shape=\"rect\" coords=\"$x0,0,$x1,$hauteur_graphe\" alt=\"\">";
 					}
 				}
 
@@ -2934,11 +2934,11 @@ function eleve_suivant() {
 
 						if($click_plutot_que_survol_aff_app=="y") {
 							//echo "<area href=\"#\" onClick=\"delais_afficher_div('div_app_".$tab_imagemap[$i]."','y',-10,20,1,50,50);return false;\" shape=\"rect\" coords=\"$x,$y,$x2,$y2\" alt=\"\">\n";
-							echo "<area href=\"#\" onClick=\"afficher_div('div_app_".$tab_imagemap[$i]."','y',-10,20);return false;\" shape=\"rect\" coords=\"$x,$y,$x2,$y2\" alt=\"\">\n";
+							echo "<area href=\"#\" onClick=\"affiche_eleve_afficher_div('div_app_".$tab_imagemap[$i]."','y',-10,20);return false;\" shape=\"rect\" coords=\"$x,$y,$x2,$y2\" alt=\"\">\n";
 						}
 						else {
 							//echo "<area href=\"#\" onClick='return false;' onMouseover=\"delais_afficher_div('div_app_".$tab_imagemap[$i]."','y',-10,20,$duree_delais_afficher_div,50,50);\" shape=\"rect\" coords=\"$x,$y,$x2,$y2\" alt=\"\">\n";
-							echo "<area href=\"#\" onClick=\"afficher_div('div_app_".$tab_imagemap[$i]."','y',-10,20);return false;\" onMouseover=\"delais_afficher_div('div_app_".$tab_imagemap[$i]."','y',-10,20,$duree_delais_afficher_div,50,50);\" shape=\"rect\" coords=\"$x,$y,$x2,$y2\" alt=\"\">\n";
+							echo "<area href=\"#\" onClick=\"affiche_eleve_afficher_div('div_app_".$tab_imagemap[$i]."','y',-10,20);return false;\" onMouseover=\"affiche_eleve_delais_afficher_div('div_app_".$tab_imagemap[$i]."','y',-10,20,$duree_delais_afficher_div,50,50);\" shape=\"rect\" coords=\"$x,$y,$x2,$y2\" alt=\"\">\n";
 						}
 					}
 
@@ -3049,12 +3049,12 @@ function eleve_suivant() {
 								if(in_array($tab_imagemap[$i],$tab_imagemap_commentaire_present)) {
 
 									if($click_plutot_que_survol_aff_app=="y") {
-										echo "<div onclick=\"delais_afficher_div('div_app_".$tab_imagemap[$i]."','y',-10,20,1,$largeurMat,$hauteur_rect_delais_afficher_div);\" onMouseout=\"cacher_div('div_app_".$tab_imagemap[$i]."');\" style='position: absolute; left: ".$x0."px; top: 0px; width: ".$largeurMat."px; height: ".$hauteur_graphe."px;";
+										echo "<div onclick=\"affiche_eleve_delais_afficher_div('div_app_".$tab_imagemap[$i]."','y',-10,20,1,$largeurMat,$hauteur_rect_delais_afficher_div);\" onMouseout=\"cacher_div('div_app_".$tab_imagemap[$i]."');\" style='position: absolute; left: ".$x0."px; top: 0px; width: ".$largeurMat."px; height: ".$hauteur_graphe."px;";
 										//echo " border: 1px dashed green;";
 										echo "'></div>\n";
 									}
 									else {
-										echo "<div onMouseover=\"delais_afficher_div('div_app_".$tab_imagemap[$i]."','y',-10,20,$duree_delais_afficher_div,$largeurMat,$hauteur_rect_delais_afficher_div);\" onMouseout=\"cacher_div('div_app_".$tab_imagemap[$i]."');\" style='position: absolute; left: ".$x0."px; top: 0px; width: ".$largeurMat."px; height: ".$hauteur_graphe."px;";
+										echo "<div onMouseover=\"affiche_eleve_delais_afficher_div('div_app_".$tab_imagemap[$i]."','y',-10,20,$duree_delais_afficher_div,$largeurMat,$hauteur_rect_delais_afficher_div);\" onMouseout=\"cacher_div('div_app_".$tab_imagemap[$i]."');\" style='position: absolute; left: ".$x0."px; top: 0px; width: ".$largeurMat."px; height: ".$hauteur_graphe."px;";
 										//echo " border: 1px dashed green;";
 										echo "'></div>\n";
 									}
@@ -3067,12 +3067,12 @@ function eleve_suivant() {
 							//echo "<area href=\"#\" onClick='return false;' onMouseover=\"div_info('div_avis_','1','affiche');\" onMouseout=\"div_info('div_avis_','1','cache');\" shape=\"rect\" coords=\"$x0,0,$x1,$hauteur_graphe\">";
 							if($temoin_avis_present=="y") {
 								if($click_plutot_que_survol_aff_app=="y") {
-									echo "<div onclick=\"delais_afficher_div('div_avis_1','y',-10,20,1,$largeurMat,$hauteur_rect_delais_afficher_div);\" onMouseout=\"cacher_div('div_avis_1');\" style='position: absolute; left: ".$x0."px; top: 0px; width: ".$largeurMat."px; height: ".$hauteur_graphe."px;";
+									echo "<div onclick=\"affiche_eleve_delais_afficher_div('div_avis_1','y',-10,20,1,$largeurMat,$hauteur_rect_delais_afficher_div);\" onMouseout=\"cacher_div('div_avis_1');\" style='position: absolute; left: ".$x0."px; top: 0px; width: ".$largeurMat."px; height: ".$hauteur_graphe."px;";
 									//echo " border: 1px dashed green;";
 									echo "'></div>\n";
 								}
 								else {
-									echo "<div onMouseover=\"delais_afficher_div('div_avis_1','y',-10,20,$duree_delais_afficher_div,$largeurMat,$hauteur_rect_delais_afficher_div);\" onMouseout=\"cacher_div('div_avis_1');\" style='position: absolute; left: ".$x0."px; top: 0px; width: ".$largeurMat."px; height: ".$hauteur_graphe."px;";
+									echo "<div onMouseover=\"affiche_eleve_delais_afficher_div('div_avis_1','y',-10,20,$duree_delais_afficher_div,$largeurMat,$hauteur_rect_delais_afficher_div);\" onMouseout=\"cacher_div('div_avis_1');\" style='position: absolute; left: ".$x0."px; top: 0px; width: ".$largeurMat."px; height: ".$hauteur_graphe."px;";
 									//echo " border: 1px dashed green;";
 									echo "'></div>\n";
 								}
@@ -3468,10 +3468,10 @@ function eleve_suivant() {
 						//echo "<area href=\"#\" onClick='return false;' onMouseover=\"div_info('div_matiere_',$i,'affiche');\" onMouseout=\"div_info('div_matiere_',$i,'cache');\" shape=\"rect\" coords=\"$x0,0,$x1,$hauteur_graphe\">";
 
 						if($click_plutot_que_survol_aff_app=="y") {
-							echo "<area href=\"#\" onClick=\"delais_afficher_div('div_app_".$i."','y',-10,20,1,$largeurMat,$hauteur_rect_delais_afficher_div);return false;\" onMouseout=\"cacher_div('div_app_".$i."');\" shape=\"rect\" coords=\"$x0,0,$x1,$hauteur_graphe\" alt=\"\">";
+							echo "<area href=\"#\" onClick=\"affiche_eleve_delais_afficher_div('div_app_".$i."','y',-10,20,1,$largeurMat,$hauteur_rect_delais_afficher_div);return false;\" onMouseout=\"cacher_div('div_app_".$i."');\" shape=\"rect\" coords=\"$x0,0,$x1,$hauteur_graphe\" alt=\"\">";
 						}
 						else {
-							echo "<area href=\"#\" onClick='return false;' onMouseover=\"delais_afficher_div('div_app_".$i."','y',-10,20,$duree_delais_afficher_div,$largeurMat,$hauteur_rect_delais_afficher_div);\" onMouseout=\"cacher_div('div_app_".$i."');\" shape=\"rect\" coords=\"$x0,0,$x1,$hauteur_graphe\" alt=\"\">";
+							echo "<area href=\"#\" onClick='return false;' onMouseover=\"affiche_eleve_delais_afficher_div('div_app_".$i."','y',-10,20,$duree_delais_afficher_div,$largeurMat,$hauteur_rect_delais_afficher_div);\" onMouseout=\"cacher_div('div_app_".$i."');\" shape=\"rect\" coords=\"$x0,0,$x1,$hauteur_graphe\" alt=\"\">";
 						}
 					}
 				}
@@ -3481,10 +3481,10 @@ function eleve_suivant() {
 				//echo "<area href=\"#\" onClick='return false;' onMouseover=\"div_info('div_avis_','1','affiche');\" onMouseout=\"div_info('div_avis_','1','cache');\" shape=\"rect\" coords=\"$x0,0,$x1,$hauteur_graphe\">";
 				if($temoin_avis_present=="y") {
 					if($click_plutot_que_survol_aff_app=="y") {
-						echo "<area href=\"#\" onClick=\"delais_afficher_div('div_avis_1','y',-10,20,1,$largeurMat,$hauteur_rect_delais_afficher_div);return false;\" onMouseout=\"cacher_div('div_avis_1');\" shape=\"rect\" coords=\"$x0,0,$x1,$hauteur_graphe\" alt=\"\">";
+						echo "<area href=\"#\" onClick=\"affiche_eleve_delais_afficher_div('div_avis_1','y',-10,20,1,$largeurMat,$hauteur_rect_delais_afficher_div);return false;\" onMouseout=\"cacher_div('div_avis_1');\" shape=\"rect\" coords=\"$x0,0,$x1,$hauteur_graphe\" alt=\"\">";
 					}
 					else {
-						echo "<area href=\"#\" onClick='return false;' onMouseover=\"delais_afficher_div('div_avis_1','y',-10,20,$duree_delais_afficher_div,$largeurMat,$hauteur_rect_delais_afficher_div);\" onMouseout=\"cacher_div('div_avis_1');\" shape=\"rect\" coords=\"$x0,0,$x1,$hauteur_graphe\" alt=\"\">";
+						echo "<area href=\"#\" onClick='return false;' onMouseover=\"affiche_eleve_delais_afficher_div('div_avis_1','y',-10,20,$duree_delais_afficher_div,$largeurMat,$hauteur_rect_delais_afficher_div);\" onMouseout=\"cacher_div('div_avis_1');\" shape=\"rect\" coords=\"$x0,0,$x1,$hauteur_graphe\" alt=\"\">";
 					}
 				}
 				echo "</map>\n";
@@ -3700,10 +3700,10 @@ function eleve_suivant() {
 					//echo "<area href=\"#\" onClick='return false;' onMouseover=\"afficher_div('div_app_".$k."','y',-10,20);\" onMouseout=\"cacher_div('div_app_".$k."');\" shape=\"rect\" coords=\"$x,$y,$x2,$y2\">\n";
 
 					if($click_plutot_que_survol_aff_app=="y") {
-						echo "<area href=\"#\" onClick=\"delais_afficher_div('div_app_".$k."','y',-10,20,1,50,50);return false;\" shape=\"rect\" coords=\"$x,$y,$x2,$y2\" alt=\"\">\n";
+						echo "<area href=\"#\" onClick=\"affiche_eleve_delais_afficher_div('div_app_".$k."','y',-10,20,1,50,50);return false;\" shape=\"rect\" coords=\"$x,$y,$x2,$y2\" alt=\"\">\n";
 					}
 					else {
-						echo "<area href=\"#\" onClick='return false;' onMouseover=\"delais_afficher_div('div_app_".$k."','y',-10,20,$duree_delais_afficher_div,50,50);\" shape=\"rect\" coords=\"$x,$y,$x2,$y2\" alt=\"\">\n";
+						echo "<area href=\"#\" onClick='return false;' onMouseover=\"affiche_eleve_delais_afficher_div('div_app_".$k."','y',-10,20,$duree_delais_afficher_div,50,50);\" shape=\"rect\" coords=\"$x,$y,$x2,$y2\" alt=\"\">\n";
 					}
 				}
 
@@ -3793,10 +3793,10 @@ function eleve_suivant() {
 
 						if(isset($info_imagemap[$i])) {
 							if($click_plutot_que_survol_aff_app=="y") {
-								echo "<div onclick=\"delais_afficher_div('div_app_".$i."','y',-10,20,500,$largeurMat,10,1,$largeurMat,$hauteur_rect_delais_afficher_div);\" onMouseout=\"cacher_div('div_app_".$i."');\" style='position: absolute; left: ".$x0."px; top: 0px; width: ".$largeurMat."px; height: ".$hauteur_graphe."px;'>&nbsp;</div>\n";
+								echo "<div onclick=\"affiche_eleve_delais_afficher_div('div_app_".$i."','y',-10,20,500,$largeurMat,10,1,$largeurMat,$hauteur_rect_delais_afficher_div);\" onMouseout=\"cacher_div('div_app_".$i."');\" style='position: absolute; left: ".$x0."px; top: 0px; width: ".$largeurMat."px; height: ".$hauteur_graphe."px;'>&nbsp;</div>\n";
 							}
 							else {
-								echo "<div onMouseover=\"delais_afficher_div('div_app_".$i."','y',-10,20,500,$largeurMat,10,$duree_delais_afficher_div,$largeurMat,$hauteur_rect_delais_afficher_div);\" onMouseout=\"cacher_div('div_app_".$i."');\" style='position: absolute; left: ".$x0."px; top: 0px; width: ".$largeurMat."px; height: ".$hauteur_graphe."px;'>&nbsp;</div>\n";
+								echo "<div onMouseover=\"affiche_eleve_delais_afficher_div('div_app_".$i."','y',-10,20,500,$largeurMat,10,$duree_delais_afficher_div,$largeurMat,$hauteur_rect_delais_afficher_div);\" onMouseout=\"cacher_div('div_app_".$i."');\" style='position: absolute; left: ".$x0."px; top: 0px; width: ".$largeurMat."px; height: ".$hauteur_graphe."px;'>&nbsp;</div>\n";
 							}
 						}
 					}
@@ -3805,10 +3805,10 @@ function eleve_suivant() {
 					$x1=$largeur_graphe;
 					if($temoin_avis_present=="y") {
 						if($click_plutot_que_survol_aff_app=="y") {
-							echo "<div onclick=\"delais_afficher_div('div_avis_1','y',-10,20,1,$largeurMat,$hauteur_rect_delais_afficher_div);\" onMouseout=\"cacher_div('div_avis_1');\" style='position: absolute; left: ".$x0."px; top: 0px; width: ".$largeurMat."px; height: ".$hauteur_graphe."px;'>&nbsp;</div>\n";
+							echo "<div onclick=\"affiche_eleve_delais_afficher_div('div_avis_1','y',-10,20,1,$largeurMat,$hauteur_rect_delais_afficher_div);\" onMouseout=\"cacher_div('div_avis_1');\" style='position: absolute; left: ".$x0."px; top: 0px; width: ".$largeurMat."px; height: ".$hauteur_graphe."px;'>&nbsp;</div>\n";
 						}
 						else {
-							echo "<div onMouseover=\"delais_afficher_div('div_avis_1','y',-10,20,$duree_delais_afficher_div,$largeurMat,$hauteur_rect_delais_afficher_div);\" onMouseout=\"cacher_div('div_avis_1');\" style='position: absolute; left: ".$x0."px; top: 0px; width: ".$largeurMat."px; height: ".$hauteur_graphe."px;'>&nbsp;</div>\n";
+							echo "<div onMouseover=\"affiche_eleve_delais_afficher_div('div_avis_1','y',-10,20,$duree_delais_afficher_div,$largeurMat,$hauteur_rect_delais_afficher_div);\" onMouseout=\"cacher_div('div_avis_1');\" style='position: absolute; left: ".$x0."px; top: 0px; width: ".$largeurMat."px; height: ".$hauteur_graphe."px;'>&nbsp;</div>\n";
 						}
 					}
 
@@ -4362,6 +4362,31 @@ echo "<script type='text/javascript'>
 		document.getElementById('titre_entete_bull_simp').innerHTML='Bulletin simplifié de '+login_eleve+' période '+num_per1+' à '+num_per2;
 		new Ajax.Updater($('corps_bull_simp'),'../saisie/ajax_edit_limite.php?choix_edit=2&login_eleve='+login_eleve+'&id_classe='+id_classe+'&periode1='+num_per1+'&periode2='+num_per2,{method: 'get'});
 	}
+
+	/*
+	var svg_desactivation_infobulle;
+	function sauve_desactivation_infobulle() {
+		svg_desactivation_infobulle=desactivation_infobulle;
+		desactivation_infobulle='n';
+	}
+
+	function restaure_desactivation_infobulle() {
+		desactivation_infobulle=svg_desactivation_infobulle;
+	}
+	*/
+
+	function affiche_eleve_afficher_div(id,positionner,dx,dy) {
+		if(desactivation_infobulle!='y') {
+			afficher_div(id,positionner,dx,dy);
+		}
+	}
+
+	function affiche_eleve_delais_afficher_div(id,positionner,dx,dy,delais,DX,DY) {
+		if(desactivation_infobulle!='y') {
+			delais_afficher_div(id,positionner,dx,dy,delais,DX,DY);
+		}
+	}
+
 	//]]>
 </script>\n";
 
