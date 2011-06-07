@@ -1749,15 +1749,17 @@ function affiche_tableau($nombre_lignes, $nb_col, $ligne1, $col, $larg_tab, $bor
 
 				echo "<td class='small' ";
 				//echo $bg_color;
-				if(($vtn_coloriser_resultats=='y')&&($j>=$num_debut_colonnes_matieres)&&($i>=$num_debut_lignes_eleves)) {
-					if(strlen(preg_replace('/[0-9.,]/','',$col[$j][$i]))==0) {
-						for($loop=0;$loop<count($vtn_borne_couleur);$loop++) {
-							if(preg_replace('/,/','.',$col[$j][$i])<=preg_replace('/,/','.',$vtn_borne_couleur[$loop])) {
-								echo " style='";
-								if($vtn_couleur_texte[$loop]!='') {echo "color:$vtn_couleur_texte[$loop]; ";}
-								if($vtn_couleur_cellule[$loop]!='') {echo "background-color:$vtn_couleur_cellule[$loop]; ";}
-								echo "'";
-								break;
+				if(!preg_match("/Rang de l/",$ligne1[$j])) {
+					if(($vtn_coloriser_resultats=='y')&&($j>=$num_debut_colonnes_matieres)&&($i>=$num_debut_lignes_eleves)) {
+						if(strlen(preg_replace('/[0-9.,]/','',$col[$j][$i]))==0) {
+							for($loop=0;$loop<count($vtn_borne_couleur);$loop++) {
+								if(preg_replace('/,/','.',$col[$j][$i])<=preg_replace('/,/','.',$vtn_borne_couleur[$loop])) {
+									echo " style='";
+									if($vtn_couleur_texte[$loop]!='') {echo "color:$vtn_couleur_texte[$loop]; ";}
+									if($vtn_couleur_cellule[$loop]!='') {echo "background-color:$vtn_couleur_cellule[$loop]; ";}
+									echo "'";
+									break;
+								}
 							}
 						}
 					}
@@ -1767,15 +1769,17 @@ function affiche_tableau($nombre_lignes, $nb_col, $ligne1, $col, $larg_tab, $bor
             } else {
 				echo "<td align=\"center\" class='small' ";
 				//echo $bg_color;
-				if(($vtn_coloriser_resultats=='y')&&($j>=$num_debut_colonnes_matieres)&&($i>=$num_debut_lignes_eleves)) {
-					if(strlen(preg_replace('/[0-9.,]/','',$col[$j][$i]))==0) {
-						for($loop=0;$loop<count($vtn_borne_couleur);$loop++) {
-							if(preg_replace('/,/','.',$col[$j][$i])<=preg_replace('/,/','.',$vtn_borne_couleur[$loop])) {
-								echo " style='";
-								if($vtn_couleur_texte[$loop]!='') {echo "color:$vtn_couleur_texte[$loop]; ";}
-								if($vtn_couleur_cellule[$loop]!='') {echo "background-color:$vtn_couleur_cellule[$loop]; ";}
-								echo "'";
-								break;
+				if(!preg_match("/Rang de l/",$ligne1[$j])) {
+					if(($vtn_coloriser_resultats=='y')&&($j>=$num_debut_colonnes_matieres)&&($i>=$num_debut_lignes_eleves)) {
+						if(strlen(preg_replace('/[0-9.,]/','',$col[$j][$i]))==0) {
+							for($loop=0;$loop<count($vtn_borne_couleur);$loop++) {
+								if(preg_replace('/,/','.',$col[$j][$i])<=preg_replace('/,/','.',$vtn_borne_couleur[$loop])) {
+									echo " style='";
+									if($vtn_couleur_texte[$loop]!='') {echo "color:$vtn_couleur_texte[$loop]; ";}
+									if($vtn_couleur_cellule[$loop]!='') {echo "background-color:$vtn_couleur_cellule[$loop]; ";}
+									echo "'";
+									break;
+								}
 							}
 						}
 					}
