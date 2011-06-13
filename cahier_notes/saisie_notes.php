@@ -373,9 +373,12 @@ if (isset($_POST['is_posted'])) {
 					$test_eleve_note_query = mysql_query("SELECT * FROM cn_notes_devoirs WHERE (login='$reg_eleve_login' AND id_devoir = '$id_devoir')");
 					$test = mysql_num_rows($test_eleve_note_query);
 					if ($test != "0") {
-						$register = mysql_query("UPDATE cn_notes_devoirs SET comment='".$comment."', note='$note',statut='$elev_statut' WHERE (login='".$reg_eleve_login."' AND id_devoir='".$id_devoir."')");
+						$sql="UPDATE cn_notes_devoirs SET comment='".$comment."', note='$note',statut='$elev_statut' WHERE (login='".$reg_eleve_login."' AND id_devoir='".$id_devoir."');";
+						//echo "$sql<br />";
+						$register = mysql_query($sql);
 					} else {
-						$register = mysql_query("INSERT INTO cn_notes_devoirs SET login='".$reg_eleve_login."', id_devoir='".$id_devoir."',note='".$note."',statut='".$elev_statut."',comment='".$comment."'");
+						$sql="INSERT INTO cn_notes_devoirs SET login='".$reg_eleve_login."', id_devoir='".$id_devoir."',note='".$note."',statut='".$elev_statut."',comment='".$comment."';";
+						$register = mysql_query($sql);
 					}
 
 				}
@@ -729,13 +732,13 @@ if ($id_devoir == 0) {
 	echo "<fieldset style=\"padding-top: 0px; padding-bottom: 0px;  margin-left: 0px; margin-right: 100px;\">\n";
 	echo "<table summary='Paramètres'><tr><td>Masquer les colonnes \"commentaires\" non vides (mode visualisation uniquement) :
 	</td><td><input type=\"checkbox\" name=\"affiche_comment\"  ";
-	if ($_SESSION['affiche_comment'] != 'yes') echo "checked";
+	if ($_SESSION['affiche_comment'] != 'yes') {echo "checked";}
 	echo " /></td><td><input type=\"submit\" name=\"ok\" value=\"OK\" /></td></tr>\n";
 	$nb_dev_sous_cont = mysql_num_rows(mysql_query("select d.id from cn_devoirs d, cn_conteneurs c where (d.id_conteneur = c.id and c.parent='$id_conteneur')"));
 	if ($nb_dev_sous_cont != 0) {
 		//echo "<tr><td>Afficher les évaluations des \"sous-boîtes\" : </td><td><input type=\"checkbox\" name=\"affiche_tous\"  ";
 		echo "<tr><td>Afficher les évaluations des \"sous-".htmlentities(strtolower(getSettingValue("gepi_denom_boite")))."s\" : </td><td><input type=\"checkbox\" name=\"affiche_tous\"  ";
-		if ($_SESSION['affiche_tous'] == 'yes') echo "checked";
+		if ($_SESSION['affiche_tous'] == 'yes') {echo "checked";}
 		echo " /></td><td></td></tr>\n";
 	}
 	echo "</table></fieldset>\n";
@@ -1356,8 +1359,12 @@ while ($i < $nb_dev) {
 			if ($ramener_sur_referentiel[$i] != 'V') {
 				echo "<font size=-2>Note sur ".$note_sur[$i]."<br />";
 			} else {
-				$tabdiv_infobulle[]=creer_div_infobulle('ramenersurReferentiel_'.$i,"Ramener sur referentiel","","La note est ramenée sur ".getSettingValue("referentiel_note")." pour le calcul de la moyenne","",15,0,'y','y','n','n');
-				echo "<a href='#' onmouseover=\"afficher_div('ramenersurReferentiel_$i','y',-150,20	);\" >";
+				//$tabdiv_infobulle[]=creer_div_infobulle('ramenersurReferentiel_'.$i,"Ramener sur referentiel","","La note est ramenée sur ".getSettingValue("referentiel_note")." pour le calcul de la moyenne","",15,0,'y','y','n','n');
+				$tabdiv_infobulle[]=creer_div_infobulle('ramenersurReferentiel_'.$i,"","","La note est ramenée sur ".getSettingValue("referentiel_note")." pour le calcul de la moyenne","",15,0,'n','n','n','n');
+				echo "<a href='#' onmouseover=\"delais_afficher_div('ramenersurReferentiel_$i','y',-150,20,1500,10,10);\"";
+				echo " onmouseout=\"cacher_div('ramenersurReferentiel_".$i."');\"";
+				echo ">";
+
 				echo "<font size=-2>Note sur ".$note_sur[$i];
 				echo "</a><br />";
 			}
@@ -1394,8 +1401,11 @@ if ($id_devoir==0) {
 					if ($ramener_sur_referentiel_s_dev[$i][$m] != 'V') {
 						echo "<font size=-2>Note sur ".$note_sur_s_dev[$i][$m]."<br />";
 					} else {
-						$tabdiv_infobulle[]=creer_div_infobulle("ramenersurReferentiel_s_dev_".$i."_".$m,"Ramener sur referentiel","","La note est ramenée sur ".getSettingValue("referentiel_note")." pour le calcul de la moyenne","",15,0,'y','y','n','n');
-						echo "<a href='#' onmouseover=\"afficher_div('ramenersurReferentiel_s_dev_".$i."_".$m."','y',-150,20	);\" >";
+						//$tabdiv_infobulle[]=creer_div_infobulle("ramenersurReferentiel_s_dev_".$i."_".$m,"Ramener sur referentiel","","La note est ramenée sur ".getSettingValue("referentiel_note")." pour le calcul de la moyenne","",15,0,'y','y','n','n');
+						$tabdiv_infobulle[]=creer_div_infobulle("ramenersurReferentiel_s_dev_".$i."_".$m,"","","La note est ramenée sur ".getSettingValue("referentiel_note")." pour le calcul de la moyenne","",15,0,'n','n','n','n');
+						echo "<a href='#' onmouseover=\"delais_afficher_div('ramenersurReferentiel_s_dev_".$i."_".$m."','y',-150,20,1500,10,10);\"";
+						echo " onmouseout=\"cacher_div('ramenersurReferentiel_s_dev_".$i."_".$m."');\"";
+						echo ">";
 						echo "<font size=-2>Note sur ".$note_sur_s_dev[$i][$m];
 						echo "</a><br />";
 					}
@@ -1503,7 +1513,7 @@ if(($id_devoir>0)||($nb_sous_cont==0)) {
 			$tabdiv_infobulle[]=creer_div_infobulle('repartition_notes_'.$k,$titre,"",$texte,"",14,0,'y','y','n','n');
 
 			//echo " <a href='#' onmouseover=\"afficher_div('repartition_notes_$k','y',-100,20);\"";
-			echo " <a href='#' onmouseover=\"delais_afficher_div('repartition_notes_$k','y',-100,20,1000,10,10);\"";
+			echo " <a href='#' onmouseover=\"delais_afficher_div('repartition_notes_$k','y',-100,20,1500,10,10);\"";
 			echo ">";
 			echo "<img src='../images/icons/histogramme.png' alt='Répartition des notes' />";
 			echo "</a>";
@@ -1520,7 +1530,7 @@ if(($id_devoir>0)||($nb_sous_cont==0)) {
 		// Colonne Moyenne de l'élève
 		echo "<td>";
 		//echo "&nbsp;";
-		echo " <a href='#' onmouseover=\"afficher_div('repartition_notes_moyenne','y',-100,20);\"";
+		echo " <a href='#' onmouseover=\"delais_afficher_div('repartition_notes_moyenne','y',-100,20,1500,10,10);\"";
 		echo ">";
 		echo "<img src='../images/icons/histogramme.png' alt='Répartition des notes' />";
 		echo "</a>";
@@ -1679,7 +1689,7 @@ while($i < $nombre_lignes) {
 		// ===================================
 		// AJOUT: boireaus 20071101
 		// Ajout d'un test pour se prémunir du bug rencontré par certains chez Free avec les @mysql_result
-		if($moyenne_query){
+		if($moyenne_query) {
 			$statut_moy = @mysql_result($moyenne_query, 0, "statut");
 			if ($statut_moy == 'y') {
 				$moy = @mysql_result($moyenne_query, 0, "note");
@@ -1699,7 +1709,7 @@ while($i < $nombre_lignes) {
 				$data_pdf[$pointer][] = "";
 			}
 		}
-		else{
+		else {
 			$statut_moy = "";
 			$moy = '&nbsp;';
 			$data_pdf[$pointer][] = "";
