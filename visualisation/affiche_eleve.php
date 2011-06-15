@@ -1396,7 +1396,7 @@ if (!isset($id_classe) and $_SESSION['statut'] != "responsable" AND $_SESSION['s
 			if($temoin_image_escalier=='oui') {$checked=" checked='yes'";} else {$checked="";}
 			echo "<input type='radio' name='temoin_image_escalier' id='temoin_image_escalier_oui' value='oui'$checked /><label for='temoin_image_escalier_oui' style='cursor: pointer;'> Oui </label>/";
 			if($temoin_image_escalier!='oui') {$checked=" checked='yes'";} else {$checked="";}
-			echo "<label for='temoin_image_escalier_non' style='cursor: pointer;'> Non </label><input type='radio' name='temoin_image_escalier' id='temoin_image_escalier_non' value='oui'$checked />";
+			echo "<label for='temoin_image_escalier_non' style='cursor: pointer;'> Non </label><input type='radio' name='temoin_image_escalier' id='temoin_image_escalier_non' value='non'$checked />";
 			echo "</td></tr>\n";
 
 			//echo "<tr><td>Tronquer le nom court<br />de matière à <a href='javascript:alert(\"A zéro caractères, on ne tronque pas le nom court de matière affiché en haut du graphe.\")'>X</a> caractères:</td><td><select name='tronquer_nom_court'>\n";
