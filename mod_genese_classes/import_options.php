@@ -1,7 +1,7 @@
 <?php
 /* $Id$ */
 /*
-* Copyright 2001, 2005 Thomas Belliard, Laurent Delineau, Edouard Hue, Eric Lebrun
+* Copyright 2001, 2011 Thomas Belliard, Laurent Delineau, Edouard Hue, Eric Lebrun
 *
 * This file is part of GEPI.
 *
@@ -33,7 +33,7 @@ if ($resultat_session == 'c') {
 } else if ($resultat_session == '0') {
 	header("Location: ../logout.php?auto=1");
 	die();
-};
+}
 
 //======================================================================================
 
@@ -224,14 +224,22 @@ if($action=="upload_file") {
 						$alt=$alt*(-1);
 						echo "<tr class='lig$alt'><td style='text-align:left;'><b>$val_login</b>&nbsp;:</td><td style='text-align:left;'>\n";
 					}
+					$chaine_opt_eleve="";
 					for($i=0;$i<count($tab_options);$i++) {
 						if($tabligne[$tabligne_entete_inverse["$tab_options[$i]"]]==1) {
 
 							echo $tab_options[$i]." ";
-							$sql="INSERT INTO gc_eleves_options SET projet='$projet', login='$val_login', opt='".$tab_options[$i]."';";
+							$chaine_opt_eleve.="|".$tab_options[$i];
+							//$sql="INSERT INTO gc_eleves_options SET projet='$projet', login='$val_login', opt='".$tab_options[$i]."';";
 							//echo "$sql<br />\n";
-							$res=mysql_query($sql);
+							//$res=mysql_query($sql);
 						}
+					}
+					if($chaine_opt_eleve!="") {
+						$chaine_opt_eleve.="|";
+						$sql="INSERT INTO gc_eleves_options SET projet='$projet', login='$val_login', liste_opt='".$chaine_opt_eleve."';";
+						//echo "$sql<br />\n";
+						$res=mysql_query($sql);
 					}
 				}
 
@@ -258,7 +266,11 @@ else {
 	echo "<p><input type='submit' value='Valider' />\n";
 	echo "</form>\n";
 
-	echo "<p><i>NOTE&nbsp;:</i> Les options préalablement saisies pour ce projet seront perdues.</p>\n";
+	echo "<p><i>NOTES&nbsp;:</i></p>\n";
+	echo "<ul>\n";
+	echo "<li><p>Les options préalablement saisies pour ce projet seront perdues.<p></li>\n";
+	echo "<li><p>Le format du CSV pourra être par exemple&nbsp;:<br />NOM;PRENOM;NAISSANCE;ELENOET;CLASSE;AGL1;AGL2;ALL1;ALL2;ATHLE;DECP3;ESP2;LATIN;Redoublement;Depart<br />Dans cet exemple, ELENOET sera la clé pour identifier l'élève.<br />Les autres clés valides sont LOGIN, ELE_ID, INE.<br />Les noms des colonnes doivent coïncider avec les noms de matières dans Gepi.</p><p>Le plus simple pour obtenir ce fichier consiste à suivre les étapes dans l'ordre.<br />Lors de l'étape 2 'Lister les options actuelles des élèves', un fichier CSV au bon format est généré.</p></li>\n";
+	echo "</ul>\n";
 }
 
 
