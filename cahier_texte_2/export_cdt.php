@@ -1173,7 +1173,7 @@ if($action=='export_zip') {
 	// On fait le ménage
 	for($i=0;$i<count($tab_fichiers_a_zipper);$i++) {
 		//echo "unlink($tab_fichiers_a_zipper[$i]);<br />";
-		unlink($tab_fichiers_a_zipper[$i]);
+		if(file_exists($tab_fichiers_a_zipper[$i])) {unlink($tab_fichiers_a_zipper[$i]);}
 	}
 	
 	rmdir($dossier_export."/cahier_texte");
