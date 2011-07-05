@@ -345,7 +345,7 @@ else {
 				$nom_groupe=preg_replace('/&/','et',unhtmlentities(remplace_accents($current_group['name'],'all')));
 				$description_groupe=preg_replace('/&/','et',unhtmlentities(remplace_accents($current_group['description'],'all')));
 				$classlist_string_groupe=preg_replace('/&/','et',unhtmlentities(remplace_accents($current_group['classlist_string'],'all')));
-				$nom_page_html_groupe=$id_groupe."_".$nom_groupe."_"."$description_groupe"."_".$classlist_string_groupe.".$extension";
+				$nom_page_html_groupe=strtr($id_groupe."_".$nom_groupe."_"."$description_groupe"."_".$classlist_string_groupe.".$extension","/","_");
 
 
 				$nom_complet_matiere=preg_replace('/&/','et',unhtmlentities(remplace_accents($current_group['matiere']['nom_complet'],'all')));
@@ -465,7 +465,9 @@ else {
 
 				$html=html_entete("CDT: ".$nom_detaille_groupe_non_html,1,'y',"$chaine_login_prof").$html;
 				$html.=html_pied_de_page();
-		
+
+				//echo "\$dossier_cdt=$dossier_cdt<br />";
+				//echo "\$nom_fichier=$nom_fichier<br />";
 				$f=fopen($dossier_cdt."/".$nom_fichier,"w+");
 				fwrite($f,$html);
 				fclose($f);
