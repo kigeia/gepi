@@ -854,10 +854,39 @@ else {
 		echo '<p style="text-align: center; font-weight: bold;"><a href="../mod_ent/gestion_ent_profs.php">Vérifier les logins avant de poursuivre</a></p>'."\n";
 
 	} else {
-
+		/*
 		echo '<p style="text-align: center; font-weight: bold;"><a href="prof_disc_classe_csv.php?a=a'.add_token_in_url().'">Procéder à la cinquième phase d\'initialisation</a></p>'."\n";
 
 		echo "<p style='text-align: center; font-weight: bold;'>Si la remontée vers STS n'a pas encore été effectuée, vous pouvez effectuer l'initialisation des enseignements à partir d'un export CSV de UnDeuxTemps&nbsp;: <a href='traite_csv_udt.php?a=a".add_token_in_url()."'>Procéder à la cinquième phase d'initialisation</a><br />(<i>procédure encore expérimentale... il se peut que vous ayez des groupes en trop</i>)</p>\n";
+		*/
+
+		$nb_modes=2;
+		if(file_exists('init_alternatif.php')) {
+			$nb_modes=3;
+		}
+
+		echo "<p>La création des enseignements peut se faire de $nb_modes façons différentes (<i>par ordre de préférence</i>)&nbsp;:</p>\n";
+
+		echo "<ul>\n";
+		echo "<li>\n";
+		//  style="text-align: center; font-weight: bold;"
+		echo "<p>";
+		echo "Si votre emploi du temps est remonté vers STS, vous disposez d'un fichier <b>sts_emp_RNE_ANNEE.xml</b>&nbsp;:";
+		echo "<br />";
+		echo "<a href='prof_disc_classe_csv.php?a=a".add_token_in_url()."'>Procéder à la cinquième phase d'initialisation</a></p>\n";
+		echo "</li>\n";
+
+		echo "<li>\n";
+		echo "<p>Si la remontée vers STS n'a pas encore été effectuée, vous pouvez effectuer l'initialisation des enseignements à partir d'un export CSV de UnDeuxTemps&nbsp;: <br /><a href='traite_csv_udt.php?a=a".add_token_in_url()."'>Procéder à la cinquième phase d'initialisation</a><br />(<i>procédure encore expérimentale... il se peut que vous ayez des groupes en trop</i>)</p>\n";
+		echo "</li>\n";
+
+		if($nb_modes==3) {
+			echo "<li>\n";
+			echo "<p>Si vous n'avez pas non plus d'export CSV d'UnDeuxTemps&nbsp;: <br /><a href='init_alternatif.php?'>Initialisation alternative des enseignements</a><br />(<i>le mode le plus fastidieux</i>)</p>\n";
+			echo "</li>\n";
+		}
+
+		echo "</ul>\n";
 
 	}
 
