@@ -115,6 +115,8 @@
 "ct_private_entry",
 "ct_sequences",
 //"setting"
+"edt_classes",
+"edt_cours"
 );
 
 
