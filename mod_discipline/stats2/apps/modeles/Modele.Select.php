@@ -88,9 +88,13 @@ Class modele_select extends Modele {
 				AND e.login=jec.login AND jec.id_classe=c.id
 				GROUP BY e.login";
           $this->res = mysql_query($this->sql);
-          while($this->row=mysql_fetch_assoc($this->res)) {
-            $this->individu_identite=$this->row;
+          if (mysql_num_rows($this->res) > 0) {
+                        while ($this->row = mysql_fetch_assoc($this->res)) {
+                            $this->individu_identite = $this->row;
           }
+                    } else {
+                        $this->individu_identite = Array("login" => $ident, "nom" => "eleve inconnu(login:$ident)", "prenom" => "inconnu", "classe" => "classe inconnue");
+                    }
           break;
         }
       case'personnels': {
@@ -99,9 +103,14 @@ Class modele_select extends Modele {
 				AND (statut='professeur' OR statut='CPE' OR statut='AUTRE'
                                 OR statut='SCOLARITE' OR statut='Administrateur')";
           $this->res = mysql_query($this->sql);
-          while($this->row=mysql_fetch_assoc($this->res)) {
-            $this->individu_identite=$this->row;
+          if (mysql_num_rows($this->res) > 0) {
+                        while ($this->row = mysql_fetch_assoc($this->res)) {
+                            $this->individu_identite = $this->row;
           }
+                    } else {
+                        $this->individu_identite = Array("login" => $ident, "nom" => "personnel inconnu(login:'.$ident.'", "prenom" => "inconnu", "statut" => "statut inconnu");
+                    }
+
           break;
         }
     }
