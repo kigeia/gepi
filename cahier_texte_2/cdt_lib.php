@@ -395,7 +395,11 @@ require_once("'.$pref_arbo.'/entete.php");
 		return $chaineTmp;
 	}
 
-	function creer_index_logout($path, $pref_arbo_logout) {
+	//function creer_index_logout($path, $pref_arbo_logout) {
+	function creer_index_logout($path) {
+		// $pref_arbo_logout n'est plus utilisé
+		global $gepiPath;
+
 		if (!file_exists($path)) {return false;}
 		else {
 			$ok = false;
@@ -405,7 +409,8 @@ require_once("'.$pref_arbo.'/entete.php");
 				include("$path/.test");
 				if($ok) {
 					if ($f = @fopen("$path/index.html", "w")) {
-						@fputs($f, '<script type="text/javascript">document.location.replace("'.$pref_arbo_logout.'/login.php")</script>');
+						//@fputs($f, '<script type="text/javascript">document.location.replace("'.$pref_arbo_logout.'/logout.php")</script>');
+						@fputs($f, '<script type="text/javascript">document.location.replace("'.$gepiPath.'/logout.php?auto=1")</script>');
 						@fclose($f);
 					}
 				}
@@ -414,7 +419,11 @@ require_once("'.$pref_arbo.'/entete.php");
 		}
 	}
 
-	function creer_rep_docs_joints($base, $subdir, $pref_arbo_logout) {
+	//function creer_rep_docs_joints($base, $subdir, $pref_arbo_logout) {
+	function creer_rep_docs_joints($base, $subdir) {
+		// $pref_arbo_logout n'est plus utilisé
+		global $gepiPath;
+
 		$path = $base.'/'.$subdir;
 		if (file_exists($path)) {return true;}
 	
@@ -427,7 +436,8 @@ require_once("'.$pref_arbo.'/entete.php");
 			include("$path/.test");
 			if($ok) {
 				if ($f = @fopen("$path/index.html", "w")) {
-					@fputs($f, '<script type="text/javascript">document.location.replace("'.$pref_arbo_logout.'/login.php")</script>');
+					//@fputs($f, '<script type="text/javascript">document.location.replace("'.$pref_arbo_logout.'/login.php")</script>');
+					@fputs($f, '<script type="text/javascript">document.location.replace("'.$gepiPath.'/logout.php?auto=1")</script>');
 					@fclose($f);
 				}
 			}
