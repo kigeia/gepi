@@ -65,6 +65,9 @@ if (!checkAccess()) {
 
 include('lib_exb.php');
 
+$mode_utf8_pdf=getSettingValue("mode_utf8_bulletins_pdf");
+if($mode_utf8_pdf=="") {$mode_utf8_pdf="n";}
+
 $id_exam=isset($_POST['id_exam']) ? $_POST['id_exam'] : (isset($_GET['id_exam']) ? $_GET['id_exam'] : NULL);
 $mode=isset($_POST['mode']) ? $_POST['mode'] : (isset($_GET['mode']) ? $_GET['mode'] : NULL);
 
@@ -397,7 +400,12 @@ if(($_SESSION['statut']=='administrateur')||($_SESSION['statut']=='scolarite')||
 
 								$tab_note["$lig_dev->login"][$tab_id_classe[$i]]["$tab_matiere[$j]"]["nom_complet"]=$tab_matiere_nom_complet[$j];
 
-								$tab_note["$lig_dev->login"][$tab_id_classe[$i]]["$tab_matiere[$j]"]["info_dev"]="Note hors enseignement de l'année.";
+								if($mode_utf8_pdf=="n") {
+									$tab_note["$lig_dev->login"][$tab_id_classe[$i]]["$tab_matiere[$j]"]["info_dev"]="Note hors enseignement de l'année.";
+								}
+								else {
+									$tab_note["$lig_dev->login"][$tab_id_classe[$i]]["$tab_matiere[$j]"]["info_dev"]="Note hors enseignement de l'annee.";
+								}
 /*
 								if($lig_dev->statut=='') {
 									if(!isset($tab_moy[$tab_id_classe[$i]]["$tab_matiere[$j]"]["total"])) {

@@ -252,7 +252,8 @@ function bull_exb($tab_ele,$i) {
 		//Police Arial Gras 6
 		$pdf->SetFont('Arial','B',8);
 		// $fomule = 'Bulletin à conserver précieusement. Aucun duplicata ne sera délivré. - GEPI : solution libre de gestion et de suivi des résultats scolaires.'
-		$pdf->Cell(0,4.5, $bull_formule_bas,0,0,'C');
+		//$pdf->Cell(0,4.5, $bull_formule_bas,0,0,'C');
+		$pdf->Cell(0,4.5, traite_accents_utf8($bull_formule_bas),0,0,'C');
 		//= = = == = = == = = == = = == = = == = = == = = == = = =
 
 		// A VERIFIER: CETTE VARIABLE NE DOIT PAS ETRE UTILE
@@ -1992,6 +1993,7 @@ function bull_exb($tab_ele,$i) {
 								$h_cell=$espace_entre_matier;
 
 								cell_ajustee(traite_accents_utf8($texte),$pdf->GetX(),$pdf->GetY(),$largeur_dispo,$h_cell,$taille_max_police,$taille_min_police,'LRBT');
+								//cell_ajustee($texte,$pdf->GetX(),$pdf->GetY(),$largeur_dispo,$h_cell,$taille_max_police,$taille_min_police,'LRBT');
 							}
 
 							$pdf->SetFont($tab_modele_pdf["caractere_utilse"][$classe_id],'',10);
@@ -2245,7 +2247,7 @@ function bull_exb($tab_ele,$i) {
 */
 				$tt_avis = 'Avis général :';
 
-				$pdf->Cell($tab_modele_pdf["longeur_avis_cons"][$classe_id],5, $tt_avis,0,2,'');
+				$pdf->Cell($tab_modele_pdf["longeur_avis_cons"][$classe_id],5, traite_accents_utf8($tt_avis),0,2,'');
 
 				//$pdf->SetXY($tab_modele_pdf["X_avis_cons"][$classe_id]+2.5,$tab_modele_pdf["Y_avis_cons"][$classe_id]+5);
 				$pdf->SetXY($tab_modele_pdf["X_avis_cons"][$classe_id]+2.5,$Y_avis_cons_init+5);
