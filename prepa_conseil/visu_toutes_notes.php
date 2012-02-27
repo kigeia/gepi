@@ -446,6 +446,11 @@ while ($p < $periode_limit) {
 
 	$tab_moy['periodes'][$p]['current_group_effectif_avec_note']=$current_group_effectif_avec_note; // [$j]
 
+	/*
+	echo "<pre>";
+	echo print_r($tab_moy);
+	echo "</pre>";
+	*/
 	$p++;
 }
 
@@ -488,7 +493,7 @@ $lignes_groupes=count($tab_moy['current_group']);
 
 // Pour débugger:
 $lignes_debug="";
-$ele_login_debug="DUPRE_C";
+$ele_login_debug="debenaz_a";
 $lignes_debug.="<p><b>$ele_login_debug</b><br />";
 
 unset($current_eleve_login);
@@ -508,7 +513,7 @@ while($j < $nb_lignes_tableau) {
 	//echo "\$col[1][$j+$ligne_supl]=".$col[1][$j+$ligne_supl]."<br />";
 	//=======================================
 	// colonne date de naissance
-	if ($aff_date_naiss){
+	if (($aff_date_naiss)&&($aff_date_naiss=='y')) {
 		$tmpdate=mysql_result($appel_donnees_eleves, $j, "naissance");
 		$tmptab=explode("-",$tmpdate);
 		if(strlen($tmptab[0])==4){$tmptab[0]=substr($tmptab[0],2,2);}
@@ -518,19 +523,20 @@ while($j < $nb_lignes_tableau) {
 	//=======================================
 
 	// colonne régime
-	if (($aff_reg) or ($aff_doub))
+	if ((($aff_reg)&&($aff_reg=='y')) or (($aff_doub)&&($aff_doub=='y'))) {
 		$regime_doublant_eleve = mysql_query("SELECT * FROM j_eleves_regime WHERE login = '$current_eleve_login[$j]';");
-	if ($aff_reg) {
+	}
+	if (($aff_reg)&&($aff_reg=='y')) {
 		$col[$ind][$j+$ligne_supl] = @mysql_result($regime_doublant_eleve, 0, "regime");
 		$ind++;
 	}
 	// colonne doublant
-	if ($aff_doub) {
+	if (($aff_doub)&&($aff_doub=='y')) {
 		$col[$ind][$j+$ligne_supl] = @mysql_result($regime_doublant_eleve, 0, "doublant");
 		$ind++;
 	}
 	// Colonne absence
-	if ($aff_abs) {
+	if (($aff_abs)&&($aff_abs=='y')) {
         if (getSettingValue("active_module_absence") != '2' || getSettingValue("abs2_import_manuel_bulletin") == 'y') {
             $abs_eleve = "NR";
             if ($referent == "une_periode")
@@ -573,7 +579,7 @@ while($j < $nb_lignes_tableau) {
     }
 
 	// Colonne rang
-	if (($aff_rang) and ($referent=="une_periode")) {
+	if (($aff_rang) and ($aff_rang=='y') and ($referent=="une_periode")) {
 		$rang = sql_query1("select rang from j_eleves_classes where (
 			periode = '".$num_periode."' and
 			id_classe = '".$id_classe."' and
@@ -597,20 +603,20 @@ $ligne1[1] = "<a href='#' onclick=\"document.getElementById('col_tri').value='1'
 			"</a>";
 $ligne1_csv[1] = "Nom ";
 //=========================
-if ($aff_date_naiss){
+if (($aff_date_naiss)&&($aff_date_naiss=='y')) {
 	$ligne1[] = "<img src=\"../lib/create_im_mat.php?texte=".rawurlencode("Date de naissance")."&amp;width=22\" width=\"22\" border=\"0\" alt=\"date de naissance\" />";
 	$ligne1_csv[] = "Date de naissance";
 }
 //=========================
-if ($aff_reg){
+if (($aff_reg)&&($aff_reg=='y')) {
 	$ligne1[] = "<img src=\"../lib/create_im_mat.php?texte=".rawurlencode("Régime")."&amp;width=22\" width=\"22\" border=\"0\" alt=\"régime\" />";
 	$ligne1_csv[]="Régime";
 }
-if($aff_doub){
+if(($aff_doub)&&($aff_doub=='y')) {
 	$ligne1[] = "<img src=\"../lib/create_im_mat.php?texte=Redoublant&amp;width=22\" width=\"22\" border=\"0\" alt=\"doublant\" />";
 	$ligne1_csv[]="Redoublant";
 }
-if ($aff_abs){
+if (($aff_abs)&&($aff_abs=='y')) {
 	$ligne1[] = "<a href='#' onclick=\"document.getElementById('col_tri').value='".(count($ligne1)+1)."';".
 				"document.forms['formulaire_tri'].submit();\">".
 				"<img src=\"../lib/create_im_mat.php?texte=".rawurlencode("1/2 journées d'absence")."&amp;width=22\" width=\"22\" border=\"0\" alt=\"1/2 journées d'absence\" />".
@@ -618,7 +624,7 @@ if ($aff_abs){
 
 	$ligne1_csv[]="1/2 journées d'absence";
 }
-if (($aff_rang) and ($referent=="une_periode")){
+if (($aff_rang) and ($aff_rang=='y') and ($referent=="une_periode")){
 	$ligne1[] = "<a href='#' onclick=\"document.getElementById('col_tri').value='".(count($ligne1)+1)."';".
 				"document.getElementById('sens_tri').value='inverse';".
 				"document.forms['formulaire_tri'].submit();\">".
@@ -646,7 +652,7 @@ $nb_col = 1;
 $k= 1;
 
 //=========================
-if ($aff_date_naiss){
+if (($aff_date_naiss)&&($aff_date_naiss=='y')) {
 	if ($nb_coef_non_nuls != 0) $col[$ind][0] = "-";
 	$col[$ind][$nb_lignes_tableau+$ligne_supl] = "-";
 	$col[$ind][$nb_lignes_tableau+1+$ligne_supl] = "-";
@@ -657,7 +663,7 @@ if ($aff_date_naiss){
 }
 //=========================
 
-if ($aff_reg) {
+if (($aff_reg)&&($aff_reg=='y')) {
 	if ($nb_coef_non_nuls != 0) $col[$ind][0] = "-";
 	$col[$ind][$nb_lignes_tableau+$ligne_supl] = "-";
 	$col[$ind][$nb_lignes_tableau+1+$ligne_supl] = "-";
@@ -666,7 +672,7 @@ if ($aff_reg) {
 	$k++;
 	$ind++;
 }
-if ($aff_doub) {
+if (($aff_doub)&&($aff_doub=='y')) {
 	if ($nb_coef_non_nuls != 0) $col[$ind][0] = "-";
 	$col[$ind][$nb_lignes_tableau+$ligne_supl] = "-";
 	$col[$ind][$nb_lignes_tableau+1+$ligne_supl] = "-";
@@ -675,7 +681,7 @@ if ($aff_doub) {
 	$k++;
 	$ind++;
 }
-if ($aff_abs) {
+if (($aff_abs)&&($aff_abs=='y')) {
 	if ($nb_coef_non_nuls != 0) $col[$ind][0] = "-";
 	$col[$ind][$nb_lignes_tableau+$ligne_supl] = "-";
 	$col[$ind][$nb_lignes_tableau+1+$ligne_supl] = "-";
@@ -684,7 +690,7 @@ if ($aff_abs) {
 	$k++;
 	$ind++;
 }
-if (($aff_rang) and ($referent=="une_periode")) {
+if (($aff_rang) and ($aff_rang=='y') and ($referent=="une_periode")) {
 	if ($nb_coef_non_nuls != 0) $col[$ind][0] = "-";
 	$col[$ind][$nb_lignes_tableau+$ligne_supl] = "-";
 	$col[$ind][$nb_lignes_tableau+1+$ligne_supl] = "-";
@@ -1844,7 +1850,8 @@ if ($ligne_supl >= 1) {
 
 
 		// Colonne rang (en fin de tableau (dernière colonne) dans le cas Année entière)
-		if (($aff_rang) and ($referent!="une_periode")) {
+		if (($aff_rang) and ($aff_rang=='y') and ($referent!="une_periode")) {
+
 			// Calculer le rang dans le cas année entière
 			//$nb_col++;
 
@@ -2257,19 +2264,19 @@ $classe = sql_query1("SELECT classe FROM classes WHERE id = '$id_classe'");
 echo "<div class='noprint' style='float: right; border: 1px solid black; background-color: white; width: 7em; height: 1em; text-align: center; padding-bottom:3px;'>
 <a href='".$_SERVER['PHP_SELF']."?mode=csv&amp;id_classe=$id_classe&amp;num_periode=$num_periode";
 
-if($aff_abs){
+if(($aff_abs)&&($aff_abs=='y')) {
 	echo "&amp;aff_abs=$aff_abs";
 }
-if($aff_reg){
+if(($aff_reg)&&($aff_reg=='y')) {
 	echo "&amp;aff_reg=$aff_reg";
 }
-if($aff_doub){
+if(($aff_doub)&&($aff_doub=='y')) {
 	echo "&amp;aff_doub=$aff_doub";
 }
-if($aff_rang){
+if(($aff_rang)&&($aff_rang=='y')) {
 	echo "&amp;aff_rang=$aff_rang";
 }
-if($aff_date_naiss){
+if(($aff_date_naiss)&&($aff_date_naiss=='y')) {
 	echo "&amp;aff_date_naiss=$aff_date_naiss";
 }
 
@@ -2294,6 +2301,18 @@ if((isset($avec_moy_gen_periodes_precedentes))&&($avec_moy_gen_periodes_preceden
 //echo "'>CSV</a>
 echo "'>Export CSV</a>
 </div>\n";
+
+// Pour ajouter une marge:
+echo "<div id='div_prepa_conseil_vtn'";
+if(isset($_POST['vtn_pref_marges'])) {
+	$vtn_pref_marges=preg_replace('/[^0-9]/','',$_POST['vtn_pref_marges']);
+	if($vtn_pref_marges!='') {
+		echo " style='margin:".$vtn_pref_marges."px;'";
+	}
+	// Pour permettre de ne pas inserer de margin et memoriser ce choix, on accepte le champ vide:
+	$_SESSION['vtn_pref_marges']=$vtn_pref_marges;
+}
+echo ">\n";
 
 // Affichage de la légende de la colorisation
 if($vtn_coloriser_resultats=='y') {
@@ -2364,7 +2383,7 @@ if($vtn_coloriser_resultats=='y') {
 }
 echo "<p><br /></p>\n";
 
-
+echo "</div>\n"; // Fin du div_prepa_conseil_vtn
 
 //=======================================================
 // MODIF: boireaus 20080424

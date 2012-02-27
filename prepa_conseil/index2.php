@@ -214,6 +214,7 @@ if (isset($id_classe)) {
 		}
 		echo " /></td>\n";
 		echo "</tr>\n";
+
 		echo "<tr>\n";
 		echo "<td>\n";
 		echo "<label for='couleur_alterne' style='cursor:pointer;'>\n";
@@ -230,6 +231,36 @@ if (isset($id_classe)) {
 			echo "checked";
 		}
 		echo " /></td>\n";
+		echo "</tr>\n";
+
+		echo "<tr>\n";
+		echo "<td>\n";
+		echo "<label for='vtn_pref_marges' style='cursor:pointer;'>\n";
+		echo "Marge ajoutée : \n";
+		echo "</label>\n";
+		echo "</td>\n";
+		echo "<td><input type=\"text\" size=\"2\" name=\"vtn_pref_marges\" id=\"vtn_pref_marges\" ";
+		echo "value='";
+		if(isset($_SESSION['vtn_pref_marges'])) {
+			$vtn_pref_marges=preg_replace('/[^0-9]/','',$_SESSION['vtn_pref_marges']);
+			// Pour permettre de ne pas inserer de margin et memoriser ce choix, on accepte le champ vide:
+			//if($vtn_pref_marges!='') {
+				echo $vtn_pref_marges;
+			/*
+			}
+			else {
+				echo "0";
+			}
+			*/
+		}
+		// On n'impose pas de forcer le margin
+		/*
+		else {
+			echo "0";
+		}
+		*/
+		echo "' ";
+		echo " />px</td>\n";
 		echo "</tr>\n";
 		echo "</table>\n";
 
