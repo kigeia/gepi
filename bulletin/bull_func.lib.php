@@ -3358,7 +3358,8 @@ function bulletin_pdf($tab_bull,$i,$tab_rel) {
 						$deca = ($hauteur_regroupement-$longeur_test_s)/2;
 
 						//place le texte dans le cadre
-						$placement = $Y_decal+$espace_entre_matier-$deca;
+						//$placement = $Y_decal+$espace_entre_matier-$deca;
+						$placement = $Y_categ_cote+$hauteur_regroupement-$deca;
 						$pdf->SetFont($tab_modele_pdf["caractere_utilse"][$classe_id],'',$hauteur_caractere_vertical);
 						$pdf->TextWithDirection($X_bloc_matiere-1,$placement,traite_accents_utf8(unhtmlentities($text_s)),'U');
 						$pdf->SetFont($tab_modele_pdf["caractere_utilse"][$classe_id],'',10);
@@ -5167,6 +5168,12 @@ $hauteur_pris_app_abs=$hauteur_pris;
 				} else {
 					$tt_avis = 'Avis du Conseil de classe :';
 				}
+
+//$tt_avis.='\n$tab_modele_pdf["taille_titre_bloc_avis_conseil"][$classe_id]='.$tab_modele_pdf["taille_titre_bloc_avis_conseil"][$classe_id]."\n";
+//$tt_avis='$taille='.$taille."\n";
+
+//$tt_avis='$tab_modele_pdf["longeur_avis_cons"]['.$classe_id.']='.$tab_modele_pdf["longeur_avis_cons"][$classe_id]."\n";
+
 				$pdf->Cell($tab_modele_pdf["longeur_avis_cons"][$classe_id],5, $tt_avis,0,2,'');
 
 				//$pdf->SetXY($tab_modele_pdf["X_avis_cons"][$classe_id]+2.5,$tab_modele_pdf["Y_avis_cons"][$classe_id]+5);
@@ -5193,7 +5200,17 @@ $hauteur_pris_app_abs=$hauteur_pris;
 				//$avec_coches_mentions="y";
 				//if($avec_coches_mentions=="y") {
 				if($tab_modele_pdf["affich_coches_mentions"][$classe_id]!="n") {
-					$marge_droite_avis_cons=40;
+
+					if((!isset($tableau_des_mentions_sur_le_bulletin))||(!is_array($tableau_des_mentions_sur_le_bulletin))||(count($tableau_des_mentions_sur_le_bulletin)==0)) {
+						$tableau_des_mentions_sur_le_bulletin=get_mentions($classe_id);
+					}
+
+					if(count($tableau_des_mentions_sur_le_bulletin)>0) {
+						$marge_droite_avis_cons=40;
+					}
+					else {
+						$marge_droite_avis_cons=5;
+					}
 				}
 				else {
 					$marge_droite_avis_cons=5;
