@@ -267,7 +267,7 @@ elseif(!isset($ele_login)) {
 
 	echo "<blockquote>\n";
 
-	$sql="SELECT e.nom, e.prenom, e.login FROM j_eleves_classes jec, eleves e WHERE jec.login=e.login AND jec.id_classe='$id_classe' AND jec.periode='$periode_num';";
+	$sql="SELECT e.nom, e.prenom, e.login FROM j_eleves_classes jec, eleves e WHERE jec.login=e.login AND jec.id_classe='$id_classe' AND jec.periode='$periode_num' ORDER BY nom,prenom;";
 	$res_ele=mysql_query($sql);
 
 	$nombreligne=mysql_num_rows($res_ele);
@@ -435,12 +435,16 @@ else {
 			FROM groupes g,
 				matieres m,
 				j_groupes_matieres jgm,
-				j_eleves_groupes jeg
+				j_eleves_groupes jeg,
+				j_groupes_classes jgc
 			WHERE g.id=jeg.id_groupe AND
 				g.id=jgm.id_groupe AND
 				jgm.id_matiere=m.matiere AND
 				jeg.login='".$ele_login."' AND
-				jeg.periode='".$periode_num."';";
+				jeg.periode='".$periode_num."' AND
+				jgc.id_groupe=jeg.id_groupe AND
+				jgc.id_classe='$id_classe' AND
+				jeg.id_groupe NOT IN (SELECT id_groupe FROM j_groupes_visibilite WHERE domaine='bulletins' AND visible='n') ORDER BY jgc.priorite,jgm.id_matiere;";
 	//echo "$sql<br />\n";
 	$res_grp=mysql_query($sql);
 	if(mysql_num_rows($res_grp)==0) {
