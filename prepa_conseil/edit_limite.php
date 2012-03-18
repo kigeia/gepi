@@ -60,6 +60,23 @@ if (!checkAccess()) {
 // $choix_edit=4
 //    - Affichage du bulletin des avis sur la classe
 
+
+// Vérification sur $id_classe
+if(!isset($id_classe)) {
+	header("Location: ../accueil.php?msg=Classe non choisie pour les bulletins simplifiés");
+	die();
+}
+elseif(!is_numeric($id_classe)) {
+	header("Location: ../accueil.php?msg=Classe invalide ($id_classe) pour les bulletins simplifiés");
+	die();
+}
+$nom_classe=get_nom_classe($id_classe);
+if(!$nom_classe) {
+	header("Location: ../accueil.php?msg=Classe invalide ($id_classe) pour les bulletins simplifiés");
+	die();
+}
+
+
 include "../lib/periodes.inc.php";
 include "../lib/bulletin_simple.inc.php";
 //include "../lib/bulletin_simple_bis.inc.php";
@@ -91,7 +108,7 @@ if ($_SESSION['statut'] == "responsable") {
 			"re.pers_id = r.pers_id AND " .
 			"r.login = '" . $_SESSION['login'] . "' AND (re.resp_legal='1' OR re.resp_legal='2'))");
 	if (mysql_result($test, 0) == 0) {
-	    tentative_intrusion(3, "Tentative d'un parent de visualiser un bulletin simplifié d'un élève dont il n'est pas responsable légal.");
+	    tentative_intrusion(3, "Tentative d'un parent de visualiser un bulletin simplifié d'un élève ($login_eleve) dont il n'est pas responsable légal.");
 	    echo "Vous ne pouvez visualiser que les bulletins simplifiés des élèves pour lesquels vous êtes responsable légal.\n";
 	    require("../lib/footer.inc.php");
 		die();
@@ -100,7 +117,7 @@ if ($_SESSION['statut'] == "responsable") {
 
 // Et une autre...
 if ($_SESSION['statut'] == "eleve" AND strtoupper($_SESSION['login']) != strtoupper($login_eleve)) {
-    tentative_intrusion(3, "Tentative d'un élève de visualiser un bulletin simplifié d'un autre élève.");
+    tentative_intrusion(3, "Tentative d'un élève de visualiser un bulletin simplifié d'un autre élève ($login_eleve).");
     echo "Vous ne pouvez visualiser que vos bulletins simplifiés.\n";
     require("../lib/footer.inc.php");
 	die();
@@ -118,7 +135,7 @@ if (($_SESSION['statut'] == "responsable" OR $_SESSION['statut'] == "eleve") AND
 if ($_SESSION['statut'] == "professeur" AND getSettingValue("GepiAccesBulletinSimpleProfToutesClasses") != "yes") {
 	$test = mysql_num_rows(mysql_query("SELECT jgc.* FROM j_groupes_classes jgc, j_groupes_professeurs jgp WHERE (jgp.login='".$_SESSION['login']."' AND jgc.id_groupe = jgp.id_groupe AND jgc.id_classe = '".$id_classe."')"));
 	if ($test == "0") {
-		tentative_intrusion("2", "Tentative d'accès par un prof à une classe dans laquelle il n'enseigne pas, sans en avoir l'autorisation.");
+		tentative_intrusion("2", "Tentative d'accès par un prof à une classe (".$nom_classe.") dans laquelle il n'enseigne pas, sans en avoir l'autorisation.");
 		echo "Vous ne pouvez pas accéder à cette classe car vous n'y êtes pas professeur !";
 		require ("../lib/footer.inc.php");
 		die();
@@ -133,7 +150,7 @@ $choix_edit == "2") {
 
 	$test = mysql_num_rows(mysql_query("SELECT jeg.* FROM j_eleves_groupes jeg, j_groupes_professeurs jgp WHERE (jgp.login='".$_SESSION['login']."' AND jeg.id_groupe = jgp.id_groupe AND jeg.login = '".$login_eleve."')"));
 	if ($test == "0") {
-		tentative_intrusion("2", "Tentative d'accès par un prof à un bulletin simplifié d'un élève qu'il n'a pas en cours, sans en avoir l'autorisation.");
+		tentative_intrusion("2", "Tentative d'accès par un prof à un bulletin simplifié d'un élève ($login_eleve) qu'il n'a pas en cours, sans en avoir l'autorisation.");
 		echo "Vous ne pouvez pas accéder à cet élève !";
 		require ("../lib/footer.inc.php");
 		die();
