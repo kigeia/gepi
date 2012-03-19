@@ -257,8 +257,11 @@ while ($i < $nombre_lignes){
 	if($call_reg) {$infos_debug.="Succes de $sql<br />";} else {$infos_debug.="Echec de $sql<br />";}
 	$i++;
 }
-$call_data = mysql_query("SELECT max(num) as max FROM $nom_table");
+$sql="SELECT max(num) as max FROM $nom_table";
+$call_data = mysql_query($sql);
+if($call_data) {$infos_debug.="Succes de $sql<br />";} else {$infos_debug.="Echec de $sql<br />";}
 $nb_periode_max = mysql_result($call_data, 0, "max");
+$infos_debug.="\$nb_periode_max=$nb_periode_max<br />";
 
 $message_enregistrement = "Les modifications ont été enregistrées !";
 $themessage  = 'Des notes ou des appréciations ont été modifiées. Voulez-vous vraiment quitter sans enregistrer ?';
