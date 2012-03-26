@@ -327,6 +327,11 @@ else {
 	echo "<input type='hidden' name='onglet' id='onglet_courant' value='";
 	if(isset($onglet)) {echo $onglet;}
 	echo "' />\n";
+
+
+	echo "<input type='hidden' name='onglet2' id='onglet_bull_courant' value='";
+	if(isset($onglet2)) {echo $onglet2;}
+	echo "' />\n";
 	echo "</form>\n";
 
 	// Affichage des onglets pour l'élève choisi
@@ -348,8 +353,21 @@ Patientez pendant l'extraction des données... merci.
 		else {
 			onglet='eleve';
 		}
-		//alert('".$_SERVER['PHP_SELF']."?id_classe='+id_classe+'&ele_login='+ele_login+'&onglet='+onglet);
-		document.location.replace('".$_SERVER['PHP_SELF']."?id_classe='+id_classe+'&ele_login='+ele_login+'&onglet='+onglet);
+
+		if(document.getElementById('onglet_bull_courant')) {
+			onglet2=document.getElementById('onglet_bull_courant').value;
+		}
+		else {
+			onglet2='';
+		}
+
+		if(onglet2=='') {
+			//alert('".$_SERVER['PHP_SELF']."?id_classe='+id_classe+'&ele_login='+ele_login+'&onglet='+onglet);
+			document.location.replace('".$_SERVER['PHP_SELF']."?id_classe='+id_classe+'&ele_login='+ele_login+'&onglet='+onglet);
+		}
+		else {
+			document.location.replace('".$_SERVER['PHP_SELF']."?id_classe='+id_classe+'&ele_login='+ele_login+'&onglet='+onglet+'&onglet2='+onglet2);
+		}
 	}
 </script>\n";
 
@@ -2504,6 +2522,8 @@ Patientez pendant l'extraction des données... merci.
 
 		if(document.getElementById(id)) {
 			document.getElementById(id).style.display='';
+
+			document.getElementById('onglet_bull_courant').value=id;
 		}
 		if(document.getElementById('t_'+id)) {
 			document.getElementById('t_'+id).style.borderBottomColor='white';
