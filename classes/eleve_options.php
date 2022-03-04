@@ -305,7 +305,26 @@ $call_data_eleves = mysql_query("SELECT * FROM eleves WHERE (login = '$login_ele
 $nom_eleve = @mysql_result($call_data_eleves, '0', 'nom');
 $prenom_eleve = @mysql_result($call_data_eleves, '0', 'prenom');
 
-echo "<h3>".$nom_eleve." ".$prenom_eleve." - Classe : $classe</h3>\n";
+
+echo "<h3>";
+if(acces("/eleves/modify_eleve.php", $_SESSION['statut'])) {
+	echo "<a href='../eleves/modify_eleve.php?eleve_login=".$login_eleve."' title=\"Voir la fiche élève\"";
+	echo " onclick=\"return confirm_abandon (this, change, '$themessage')\"";
+	echo ">".$nom_eleve." ".$prenom_eleve."</a>";
+}
+else {
+	echo $nom_eleve." ".$prenom_eleve;
+}
+echo " - Classe : ";
+if(acces("/classes/classes_const.php", $_SESSION['statut'])) {
+	echo "<a href='../classes/classes_const.php?id_classe=$id_classe' title=\"Voir la composition de la classe (élèves)\"";
+	echo " onclick=\"return confirm_abandon (this, change, '$themessage')\"";
+	echo ">".$classe."</a>";
+}
+else {
+	echo $classe;
+}
+echo "</h3>\n";
 
 if($_SESSION['statut']=="administrateur"){
 	//echo "<p>Pour valider les modifications, cliquez sur le bouton qui apparait en bas de la page.</p>\n";
@@ -390,7 +409,7 @@ while ($i < $nombre_ligne) {
 	//$description_groupe = mysql_result($call_group, $i, "description");
 	$description_groupe = htmlspecialchars(mysql_result($call_group, $i, "description"));
 	$alt=$alt*(-1);
-	echo "<tr class='lig$alt white_hover'>\n";
+	echo "<tr class='lig$alt white_hover' id='tr_$i'>\n";
 	echo "<td>";
 
 	$sql="SELECT u.nom,u.prenom FROM j_groupes_professeurs jgp, utilisateurs u WHERE
@@ -590,8 +609,8 @@ while ($i < $nombre_ligne) {
 		echo "<td>\n";
 		//echo "<input type='button' name='coche_lig_$i' value='C' onClick='modif_case($i,\"lig\",true)' />/\n";
 		//echo "<input type='button' name='decoche_lig_$i' value='D' onClick='modif_case($i,\"lig\",false)' />\n";
-		echo "<a href='javascript:modif_case($i,\"lig\",true)'><img src='../images/enabled.png' width='15' height='15' alt='Tout cocher' /></a>/\n";
-		echo "<a href='javascript:modif_case($i,\"lig\",false)'><img src='../images/disabled.png' width='15' height='15' alt='Tout décocher' /></a>\n";
+		echo "<a href='javascript:modif_case($i,\"lig\",true);griser_degriser(etat_grisage);'><img src='../images/enabled.png' width='15' height='15' alt='Tout cocher' /></a>/\n";
+		echo "<a href='javascript:modif_case($i,\"lig\",false);griser_degriser(etat_grisage);'><img src='../images/disabled.png' width='15' height='15' alt='Tout décocher' /></a>\n";
 		echo "</td>\n";
 	}
 	//=========================
@@ -623,6 +642,9 @@ echo "</table>\n";
 //============================================
 // AJOUT: boireaus
 echo "<script type='text/javascript' language='javascript'>
+
+	var etat_grisage='griser';
+
 	function DecocheColonne_si_bull_et_cn_vide(i) {
 		for (var ki=0;ki<$nombre_ligne;ki++) {
 			if((document.getElementById('case'+ki+'_'+i))&&(!document.getElementById('img_bull_non_vide_'+ki+'_'+i))&&(!document.getElementById('img_cn_non_vide_'+ki+'_'+i))) {
@@ -630,6 +652,7 @@ echo "<script type='text/javascript' language='javascript'>
 			}
 		}
 		changement();
+		griser_degriser(etat_grisage);
 	}
 
 	function copieEnseignementsPeriode1(num_periode) {
@@ -658,8 +681,43 @@ echo "<script type='text/javascript' language='javascript'>
 				}
 			}
 		}
+		griser_degriser(etat_grisage);
 		changement();
 	}
+
+	function griser_degriser(mode) {
+		if(mode=='griser') {
+			griser_degriser('degriser');
+
+			for (var ki=0;ki<$nombre_ligne;ki++) {
+				temoin='n';
+				for(i=1;i<".$nb_periode.";i++) {
+					if(document.getElementById('case'+ki+'_'+i)){
+						if(document.getElementById('case'+ki+'_'+i).checked == true) {
+							temoin='y';
+						}
+					}
+				}
+
+				if(temoin=='n') {
+					if(document.getElementById('tr_'+ki)) {
+						document.getElementById('tr_'+ki).style.backgroundColor='grey';
+					}
+				}
+			}
+		}
+		else {
+			for (var ki=0;ki<$nombre_ligne;ki++) {
+				if(document.getElementById('tr_'+ki)) {
+					document.getElementById('tr_'+ki).style.backgroundColor='';
+				}
+			}
+		}
+		etat_grisage=mode;
+	}
+
+	griser_degriser('griser');
+
 </script>\n";
 
 if($nb_erreurs>0){

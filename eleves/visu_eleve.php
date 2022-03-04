@@ -53,12 +53,19 @@ if (!checkAccess()) {
 $utilisation_win = "oui";
 $utilisation_jsdivdrag = "oui";
 
+$avec_js_et_css_edt="y";
+
 if (getSettingValue("active_module_absence")=='2') {
-  $style_specifique[] = "mod_abs2/lib/abs_style";
-  $javascript_specifique[] = "lib/tablekit";
-$dojo=true;
+	$style_specifique[] = "mod_abs2/lib/abs_style";
+	$javascript_specifique[] = "lib/tablekit";
+	$dojo=true;
 }
 $style_specifique[] = "eleves/visu_eleve";
+
+$style_specifique[] = "lib/DHTMLcalendar/calendarstyle";
+$javascript_specifique[] = "lib/DHTMLcalendar/calendar";
+$javascript_specifique[] = "lib/DHTMLcalendar/lang/calendar-fr";
+$javascript_specifique[] = "lib/DHTMLcalendar/calendar-setup";
 
 $ele_login=isset($_POST['ele_login']) ? $_POST['ele_login'] : (isset($_GET['ele_login']) ? $_GET['ele_login'] : NULL);
 $onglet=isset($_POST['onglet']) ? $_POST['onglet'] : (isset($_GET['onglet']) ? $_GET['onglet'] : NULL);

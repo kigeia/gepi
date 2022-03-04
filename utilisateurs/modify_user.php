@@ -1,7 +1,7 @@
 <?php
 /*
 *
-* Copyright 2001, 2011 Thomas Belliard, Laurent Delineau, Edouard Hue, Eric Lebrun
+* Copyright 2001, 2012 Thomas Belliard, Laurent Delineau, Edouard Hue, Eric Lebrun
 *
 * This file is part of GEPI.
 *
@@ -27,6 +27,7 @@ $variables_non_protegees = 'yes';
 $affiche_connexion = 'yes';
 $niveau_arbo = 1;
 require_once("../lib/initialisations.inc.php");
+require_once("../lib/share-trombinoscope.inc.php");
 
 // Resume session
 $resultat_session = $session_gepi->security_check();
@@ -513,6 +514,7 @@ elseif(isset($_POST['suppression_assoc_user_groupes'])) {
 
 // On appelle les informations de l'utilisateur pour les afficher :
 if (isset($user_login) and ($user_login!='')) {
+
 	$call_user_info = mysql_query("SELECT * FROM utilisateurs WHERE login='".$user_login."'");
 	$user_auth_mode = mysql_result($call_user_info, "0", "auth_mode");
 	$user_nom = mysql_result($call_user_info, "0", "nom");
@@ -573,6 +575,10 @@ if (isset($user_login) and ($user_login!='')) {
 	if (isset($_POST['reg_statut'])) $user_statut = $_POST['reg_statut'];
 	if (isset($_POST['reg_email'])) $user_email = $_POST['reg_email'];
 	if (isset($_POST['reg_etat'])) $user_etat = $_POST['reg_etat'];
+
+	if ((isset($_POST['matiere_0']))&&($_POST['matiere_0']!='')) {
+		$user_matiere[0]=$_POST['matiere_0'];
+	}
 }
 
 $themessage  = 'Des informations ont été modifiées. Voulez-vous vraiment quitter sans enregistrer ?';
@@ -582,7 +588,7 @@ $themessage2 = "Êtes-vous sûr de vouloir effectuer cette opération ?\\n Actue
 $titre_page = "Création/modification d'un personnel";
 require_once("../lib/header.inc.php");
 //**************** FIN EN-TETE *****************
-
+//debug_var();
 ?>
 <script type='text/javascript'>
 	function display_password_fields(id,rw){
@@ -644,7 +650,8 @@ if ($ldap_write_access) {
 ?>
 
 <form enctype="multipart/form-data" action="modify_user.php" method="post">
-<fieldset>
+<fieldset style='border: 1px solid grey; background-image: url("../images/background/opacite50.png");'>
+		<legend style='border: 1px solid grey; background-color: white;'>Informations utilisateur</legend>
 <?php
 echo add_token_field();
 if (isset($user_login)) {
@@ -658,10 +665,11 @@ if (!isset($user_login)) echo "(<em>" . $longmax_login . " caractères maximum</
 <?php
 if (isset($user_login) and ($user_login!='')) {
 	echo "<b>".$user_login."</b>\n";
-	echo "<input type=hidden name=reg_login value=\"".$user_login."\" />\n";
+	echo "<input type='hidden' name='reg_login' value=\"".$user_login."\" />\n";
 } else {
-	echo "<input type=text name=new_login size=20 value=\"";
-	if (isset($user_login)) echo $user_login;
+	echo "<input type='text' name='new_login' size='20' value=\"";
+	if (isset($user_login)) {echo $user_login;}
+	elseif(isset($_POST['new_login'])) {echo $_POST['new_login'];}
 	echo "\" onchange=\"changement()\" />\n";
 }
 
@@ -679,6 +687,14 @@ if (!$session_gepi->auth_ldap || !$session_gepi->auth_sso) {
 		$remarque .= "est actuellement inactive. Si vous choisissez ce mode d'authentification, l'utilisateur ne disposera d'aucun moyen de s'authentifier dans Gepi.</em></p>";
 	}
 	echo $remarque;
+}
+
+if (($_SESSION['statut']=='administrateur') and (isset($user_login)) and ($user_login!='')) {
+	echo "<div style='float:right; width:10em; margin-top: 0.5em; text-align:center; border: 1px solid black;'>\n";
+	echo affiche_actions_compte($user_login, '_blank');
+	echo "<br />\n";
+	echo affiche_reinit_password($user_login);
+	echo "</div>\n";
 }
 
 ?>
@@ -847,7 +863,7 @@ if (getSettingValue("statuts_prives") == "y") {
 $k = 0;
 while ($k < $nb_mat+1) {
 	$num_mat = $k+1;
-	echo "Matière N°$num_mat (si professeur): ";
+	echo "Matière N°$num_mat (<em>si professeur</em>)&nbsp;: ";
 	$temp = "matiere_".$k;
 	echo "<select size=1 name='$temp' onchange=\"changement()\">\n";
 	$calldata = mysql_query("SELECT * FROM matieres ORDER BY matiere");
@@ -908,28 +924,22 @@ echo "<input type=hidden name=max_mat value=$nb_mat />\n";
 
 <?php
 	if((isset($user_login))&&(isset($user_statut))&&($user_statut=='professeur')) {
-		$call_classes = mysql_query("SELECT g.id group_id, g.name name, c.classe classe, c.id classe_id " .
-				"FROM j_groupes_professeurs jgp, j_groupes_classes jgc, groupes g, classes c WHERE (" .
-				"jgp.login = '$user_login' and " .
-				"g.id = jgp.id_groupe and " .
-				"jgc.id_groupe = jgp.id_groupe and " .
-				"c.id = jgc.id_classe) order by jgc.id_classe");
-		$nb_classes = mysql_num_rows($call_classes);
-		if($nb_classes>0) {
+		$groups=get_groups_for_prof($user_login,NULL,array('classes', 'matieres'));
+		if(count($groups)>0) {
 			echo "<p>&nbsp;</p>\n";
 			echo "<form enctype='multipart/form-data' action='modify_user.php' method='post'>\n";
-			echo "<fieldset>\n";
+			echo "<fieldset style='border: 1px solid grey; background-image: url(\"../images/background/opacite50.png\");'>
+	<legend style='border: 1px solid grey; background-color: white;'>Enseignements du professeur</legend>";
 			echo add_token_field();
 			echo "<p>Le professeur est associé aux enseignements suivants.<br />Vous pouvez supprimer (<i>décocher</i>) l'association avec certains enseignements&nbsp;:</p>";
 			$k = 0;
-			while ($k < $nb_classes) {
-				$user_classe['classe_nom_court'] = mysql_result($call_classes, $k, "classe");
-				$user_classe['matiere_nom_court'] = mysql_result($call_classes, $k, "name");
-				$user_classe['classe_id'] = mysql_result($call_classes, $k, "classe_id");
-				$user_classe['group_id'] = mysql_result($call_classes, $k, "group_id");
-		
-				echo "<input type='checkbox' id='user_group_$k' name='user_group[]' value='".$user_classe["group_id"]."' checked /><label for='user_group_$k'> ".$user_classe['classe_nom_court']." (".$user_classe['matiere_nom_court'].")</label><br />\n";
-	
+			foreach($groups as $current_group) {
+				echo "<input type='checkbox' id='user_group_$k' name='user_group[]' value='".$current_group["id"]."' checked /><label for='user_group_$k'> ".$current_group['name']." (<em>".$current_group['description'];
+				if((($current_group['name']!=$current_group['matiere']['matiere']))&&
+				 (($current_group['description']!=$current_group['matiere']['nom_complet']))) {
+					echo " (".$current_group['matiere']['matiere'].")";
+				}
+				echo "</em>) en ".$current_group['classlist_string']."</label><br />\n";
 				$k++;
 			}
 			echo "<input type='hidden' name='user_login' value='$user_login' />\n";

@@ -45,6 +45,18 @@ if (!checkAccess()) {
     die();
 }
 
+if($_SESSION['statut']!='administrateur') {
+	$acces_agr="n";
+	if(($_SESSION['statut']=='cpe')&&(getSettingAOui('AccesCpeAgregationAbs2'))) {
+		$acces_agr="y";
+	}
+
+	if($acces_agr=="n") {
+		header("Location: ../../logout.php?auto=1");
+		die();
+	}
+}
+
 //initialisation des variables 
 $action= isset($_POST['action'])?$_POST['action']:Null;
 $page= isset($_POST['page'])?$_POST['page']:1;
@@ -65,8 +77,16 @@ $javascript_specifique[] = "mod_abs2/lib/include";
 require_once("../../lib/header.inc.php");
 
 echo "<p class=bold>";
-echo "<a href=\"index.php\">";
+if($_SESSION['statut']=='administrateur') {
+	echo "<a href=\"index.php\">";
+}
+else {
+	echo "<a href=\"../index.php\">";
+}
 echo "<img src='../../images/icons/back.png' alt='Retour' class='back_link'/> Retour</a>";
+if ($action != "vidage" && $action!="regeneration") {
+	echo " | <a href='".$_SERVER['PHP_SELF']."'>Agrégation des absences</a>";
+}
 echo "</p>";
 ?>
 
@@ -127,12 +147,12 @@ echo "</p>";
         <form action="admin_table_agregation.php" method="post" name="form_table" id="form_table">
             <?php echo add_token_field();?>
             <?php if($action==Null) :?>
-            <input type="radio" name="action" value="vidage" /> Vider la Table <br />
-            <input type="radio" name="action" value="regeneration" 
+            <input type="radio" name="action" id="action_vidage" value="vidage" /><label for='action_vidage'> Vider la Table </label><br />
+            <input type="radio" name="action" id="action_regeneration" value="regeneration" 
                    <?php if ($action !== "regeneration" &&  $action !== "vidage") : ?> 
                    checked 
                    <?php endif;?>
-                   />Remplir la Table<br />
+                   /><label for='action_regeneration'> Remplir la Table</label><br />
             <?php else :?>
             <input type="hidden" name="action" value="<?php echo $action; ?>" />
             <?php endif;?>
@@ -149,6 +169,7 @@ echo "</p>";
                 </noscript>
             <?php endif; ?>  
         </form>
+        <p><em>ATTENTION&nbsp;:</em> L'opération de remplissage est longue et gourmande en ressources.<br />Évitez de la lancer lorsque les professeurs doivent saisir des absences, leur cahier de textes,...</p>
     </div>
 <?php /* fin du div de centrage du tableau pour ie5 */ ?>
 <?php require("../../lib/footer.inc.php");?>

@@ -42,6 +42,7 @@ if (!checkAccess()) {
 }
 
 $export_statut=isset($_GET['export_statut']) ? $_GET['export_statut'] : "";
+$avec_adresse=isset($_GET['avec_adresse']) ? $_GET['avec_adresse'] : "n";
 
 $tab_statut=array('professeur', 'administrateur', 'scolarite', 'cpe', 'secours', 'autre', 'responsable', 'eleve', 'personnels');
 
@@ -58,9 +59,25 @@ $fd = '';
 //$appel_donnees = mysql_query("SELECT * FROM utilisateurs ORDER BY nom, prenom");
 if($export_statut=='personnels') {
 	$sql="SELECT * FROM utilisateurs WHERE statut!='eleve' AND statut!='responsable' AND etat='actif' ORDER BY statut, nom, prenom;";
+
+	if(!isset($_GET['sans_entete'])) {
+		$fd.="NOM;PRENOM;LOGIN;EMAIL;STATUT";
+		$fd.="\n";
+	}
 }
 else {
 	$sql="SELECT * FROM utilisateurs WHERE statut='$export_statut' AND etat='actif' ORDER BY statut, nom, prenom;";
+
+	if(!isset($_GET['sans_entete'])) {
+		$fd.="NOM;PRENOM;LOGIN;EMAIL";
+		if($export_statut=='responsable') {
+			$fd.=";ENFANTS;SEXE;IDENTIFIANT;STATUT";
+			if($avec_adresse=='y') {
+				$fd.=";ADR1;ADR2;ADR3;ADR4;CODE_POSTAL;COMMUNE;PAYS";
+			}
+		}
+		$fd.="\n";
+	}
 }
 //echo "$sql<br />";
 $appel_donnees = mysql_query($sql);
@@ -85,6 +102,40 @@ while($j< $nombre_lignes) {
 			$liste_enfants.=$tmp_tab_enfants[$i];
 		}
 		$fd.=";".$liste_enfants;
+
+		// Ajout d'infos:
+		$sql="SELECT pers_id, civilite FROM resp_pers WHERE login='$user_login';";
+		$res_pers_id=mysql_query($sql);
+		if(mysql_num_rows($res_pers_id)==1) {
+			$civ=mysql_result($res_pers_id, 0, 'civilite');
+			if(($civ=='Mme')||($civ=='Mlle')) {
+				$fd.=";F";
+			}
+			else {
+				$fd.=";M";
+			}
+
+			$pers_id=mysql_result($res_pers_id, 0, 'pers_id');
+			$fd.=";R".$pers_id;
+		}
+		else {
+			$fd.=";;";
+		}
+
+		$fd.=";".$user_statut;
+
+		if($avec_adresse=='y') {
+			$sql="SELECT * FROM resp_adr ra, resp_pers rp WHERE rp.adr_id=ra.adr_id AND rp.login='$user_login';";
+			$res_adr=mysql_query($sql);
+			if(mysql_num_rows($res_adr)==0) {
+				$fd.=";".";".";".";".";".";".";";
+			}
+			else {
+				$lig_adr=mysql_fetch_object($res_adr);
+				$fd.=";".strtr($lig_adr->adr1,";",",").";".strtr($lig_adr->adr2,";",",").";".strtr($lig_adr->adr3,";",",").";".strtr($lig_adr->adr4,";",",").";".strtr($lig_adr->cp,";",",").";".strtr($lig_adr->commune,";",",").";".strtr($lig_adr->pays,";",",");
+				
+			}
+		}
 	}
 	$fd.=";\n";
 	$j++;

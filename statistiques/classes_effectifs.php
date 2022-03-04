@@ -43,14 +43,14 @@ $test=mysql_query($sql);
 if(mysql_num_rows($test)==0) {
 $sql="INSERT INTO droits SET id='/statistiques/classes_effectifs.php',
 administrateur='V',
-professeur='F',
-cpe='F',
-scolarite='F',
+professeur='V',
+cpe='V',
+scolarite='V',
 eleve='F',
 responsable='F',
 secours='F',
 autre='F',
-description='Export de données des bulletins',
+description='Effectifs des classes',
 statut='';";
 $insert=mysql_query($sql);
 }
@@ -59,17 +59,6 @@ if (!checkAccess()) {
     header("Location: ../logout.php?auto=2");
     die();
 }
-
-
-/*
-function clean_string_csv($texte) {
-	// Pour remplacer les ; par ., et les " par '' et virer les retours à la ligne
-	$texte=preg_replace("/;/",".,",$texte);
-	$texte=preg_replace('/"/',"''",$texte);
-	$texte=preg_replace('/\\\r\\\n/','',$texte);
-	return $texte;
-}
-*/
 
 
 $sql="SELECT DISTINCT id, classe FROM classes ORDER BY classe;";
@@ -88,16 +77,57 @@ if($nb_classes>0) {
 }
 
 if(isset($_GET['export_csv'])) {
+	$num_periode=isset($_GET['num_periode']) ? $_GET['num_periode'] : 1;
+
 	if($_GET['export_csv']=='effectifs') {
 		$nom_fic = "export_classes_effectifs_".date("Ymd_His").".csv";
 
 		$csv="Classes;Effectifs;\r\n";
 		for($i=0;$i<count($tab_classe);$i++) {
 			$csv.=$tab_classe[$i]['classe'].";";
-			$sql="SELECT e.login FROM j_eleves_classes jec, eleves e WHERE jec.id_classe='".$tab_classe[$i]['id']."' AND e.login=jec.login AND jec.periode='1';";
+			$sql="SELECT e.login FROM j_eleves_classes jec, eleves e WHERE jec.id_classe='".$tab_classe[$i]['id']."' AND e.login=jec.login AND jec.periode='$num_periode';";
 			$res_eff=mysql_query($sql);
 			$csv.=mysql_num_rows($res_eff).";\r\n";
 		}
+
+		$csv.="Total;";
+		$sql="SELECT e.login FROM j_eleves_classes jec, eleves e WHERE e.login=jec.login AND jec.periode='$num_periode';";
+		//echo "$sql<br />";
+		$res_eff=mysql_query($sql);
+		$csv.=mysql_num_rows($res_eff).";\r\n";
+
+		send_file_download_headers('text/x-csv',$nom_fic);
+		//echo $csv;
+		echo echo_csv_encoded($csv);
+		die();
+	}
+	elseif($_GET['export_csv']=='effectifs_grp') {
+		$nom_fic = "export_regroupements_effectifs_".date("Ymd_His").".csv";
+
+		$csv="Groupe;Effectifs;\r\n";
+		$sql="SELECT distinct id_groupe, count(id_classe) FROM j_groupes_classes jgc, classes c WHERE jgc.id_classe=c.id group by id_groupe HAVING COUNT(id_classe)>1 order by c.classe;";
+		$res_grp=mysql_query($sql);
+		if(mysql_num_rows($res_grp)>0) {
+			$tab_grp=array();
+			while($lig_grp=mysql_fetch_object($res_grp)) {
+				$tab_grp[]=$lig_grp->id_groupe;
+			}
+
+			for($i=0;$i<count($tab_grp);$i++) {
+				$csv.=get_info_grp($tab_grp[$i], array('classes')).";";
+				$sql="SELECT e.login FROM j_eleves_groupes jeg, eleves e WHERE jeg.id_groupe='".$tab_grp[$i]."' AND e.login=jeg.login AND jeg.periode='$num_periode';";
+				$res_eff=mysql_query($sql);
+				$csv.=mysql_num_rows($res_eff).";\r\n";
+			}
+			/*
+			$csv.="Total;";
+			$sql="SELECT e.login FROM j_eleves_classes jec, eleves e WHERE e.login=jec.login AND jec.periode='$num_periode';";
+			//echo "$sql<br />";
+			$res_eff=mysql_query($sql);
+			$csv.=mysql_num_rows($res_eff).";\r\n";
+			*/
+		}
+
 		send_file_download_headers('text/x-csv',$nom_fic);
 		//echo $csv;
 		echo echo_csv_encoded($csv);
@@ -106,25 +136,43 @@ if(isset($_GET['export_csv'])) {
 	elseif($_GET['export_csv']=='effectifs_sexe') {
 
 		$nom_fic = "export_classes_effectifs_sexe_".date("Ymd_His").".csv";
-		$csv="Classes;Effectifs;\r\n";
+		$csv="Classes;Garçons;Filles;Total;\r\n";
 		for($i=0;$i<count($tab_classe);$i++) {
 			$csv.=$tab_classe[$i]['classe'].";";
 
-			$sql="SELECT e.login FROM j_eleves_classes jec, eleves e WHERE jec.id_classe='".$tab_classe[$i]['id']."' AND e.login=jec.login AND jec.periode='1' AND e.sexe='M';";
+			$sql="SELECT e.login FROM j_eleves_classes jec, eleves e WHERE jec.id_classe='".$tab_classe[$i]['id']."' AND e.login=jec.login AND jec.periode='$num_periode' AND e.sexe='M';";
 			//echo "$sql<br />\n";
 			$res_eff=mysql_query($sql);
 			$csv.=mysql_num_rows($res_eff).";";
 		
-			$sql="SELECT e.login FROM j_eleves_classes jec, eleves e WHERE jec.id_classe='".$tab_classe[$i]['id']."' AND e.login=jec.login AND jec.periode='1' AND e.sexe='F';";
+			$sql="SELECT e.login FROM j_eleves_classes jec, eleves e WHERE jec.id_classe='".$tab_classe[$i]['id']."' AND e.login=jec.login AND jec.periode='$num_periode' AND e.sexe='F';";
 			//echo "$sql<br />\n";
 			$res_eff=mysql_query($sql);
 			$csv.=mysql_num_rows($res_eff).";";
 		
-			$sql="SELECT e.login FROM j_eleves_classes jec, eleves e WHERE jec.id_classe='".$tab_classe[$i]['id']."' AND e.login=jec.login AND jec.periode='1';";
+			$sql="SELECT e.login FROM j_eleves_classes jec, eleves e WHERE jec.id_classe='".$tab_classe[$i]['id']."' AND e.login=jec.login AND jec.periode='$num_periode';";
 			//echo "$sql<br />\n";
 			$res_eff=mysql_query($sql);
 			$csv.=mysql_num_rows($res_eff).";\r\n";
 		}
+
+		$csv.="Total;";
+
+		$sql="SELECT e.login FROM j_eleves_classes jec, eleves e WHERE e.login=jec.login AND jec.periode='$num_periode' AND e.sexe='M';";
+		//echo "$sql<br />\n";
+		$res_eff=mysql_query($sql);
+		$csv.=mysql_num_rows($res_eff).";";
+	
+		$sql="SELECT e.login FROM j_eleves_classes jec, eleves e WHERE e.login=jec.login AND jec.periode='$num_periode' AND e.sexe='F';";
+		//echo "$sql<br />\n";
+		$res_eff=mysql_query($sql);
+		$csv.=mysql_num_rows($res_eff).";";
+	
+		$sql="SELECT e.login FROM j_eleves_classes jec, eleves e WHERE e.login=jec.login AND jec.periode='$num_periode';";
+		//echo "$sql<br />\n";
+		$res_eff=mysql_query($sql);
+		$csv.=mysql_num_rows($res_eff).";\r\n";
+
 		send_file_download_headers('text/x-csv',$nom_fic);
 		//echo $csv;
 		echo echo_csv_encoded($csv);
@@ -149,66 +197,177 @@ if($nb_classes==0) {
 	die();
 }
 
-echo "<p>Effectifs en période 1&nbsp;: <a href='".$_SERVER['PHP_SELF']."?export_csv=effectifs'>Export CSV</a></p>\n";
-echo "<table class='boireaus'>\n";
-echo "<tr>\n";
-echo "<th>Classes</th>\n";
-echo "<th>Effectifs</th>\n";
-echo "</tr>\n";
-$alt=1;
-for($i=0;$i<count($tab_classe);$i++) {
-	$alt=$alt*(-1);
-	echo "<tr class='lig$alt white_hover'>\n";
-	echo "<td>".$tab_classe[$i]['classe']."</td>\n";
-
-	echo "<td>";
-	$sql="SELECT e.login FROM j_eleves_classes jec, eleves e WHERE jec.id_classe='".$tab_classe[$i]['id']."' AND e.login=jec.login AND jec.periode='1';";
-	//echo "$sql<br />\n";
-	$res_eff=mysql_query($sql);
-	echo mysql_num_rows($res_eff);
-	echo "</td>\n";
-	echo "</tr>\n";
+$sql="SELECT num_periode FROM periodes p, classes c WHERE p.id_classe=c.id ORDER BY num_periode DESC LIMIT 1";
+$res_per=mysql_query($sql);
+if(mysql_num_rows($res_per)==0) {
+	echo "<p style='color:red'>Aucune classe avec périodes n'a été trouvée.</p>\n";
 }
-echo "</table>\n";
+else {
+	$max_per=mysql_result($res_per, 0, "num_periode");
+	for($loop=1;$loop<=$max_per;$loop++) {
+		echo "<div style='float:left; width:15em;'>\n";
+		echo "<p class='bold'>Effectifs en période $loop&nbsp;: <a href='".$_SERVER['PHP_SELF']."?export_csv=effectifs&amp;num_periode=$loop'>Export CSV</a></p>\n";
+		echo "<table class='boireaus'>\n";
+		echo "<tr>\n";
+		echo "<th>Classes</th>\n";
+		echo "<th>Effectifs</th>\n";
+		echo "</tr>\n";
+		$alt=1;
+		for($i=0;$i<count($tab_classe);$i++) {
+			$alt=$alt*(-1);
+			echo "<tr class='lig$alt white_hover'>\n";
+			echo "<td>".$tab_classe[$i]['classe']."</td>\n";
 
-echo "<p>Effectifs par sexe en période 1&nbsp;: <a href='".$_SERVER['PHP_SELF']."?export_csv=effectifs_sexe'>Export CSV</a></p>\n";
-echo "<table class='boireaus'>\n";
-echo "<tr>\n";
-echo "<th>Classes</th>\n";
-echo "<th>Effectifs garçons</th>\n";
-echo "<th>Effectifs filles</th>\n";
-echo "<th>Effectifs totaux</th>\n";
-echo "</tr>\n";
-$alt=1;
-for($i=0;$i<count($tab_classe);$i++) {
-	$alt=$alt*(-1);
-	echo "<tr class='lig$alt white_hover'>\n";
-	echo "<td>".$tab_classe[$i]['classe']."</td>\n";
+			echo "<td>";
+			$sql="SELECT e.login FROM j_eleves_classes jec, eleves e WHERE jec.id_classe='".$tab_classe[$i]['id']."' AND e.login=jec.login AND jec.periode='$loop';";
+			//echo "$sql<br />\n";
+			$res_eff=mysql_query($sql);
+			echo mysql_num_rows($res_eff);
+			echo "</td>\n";
+			echo "</tr>\n";
+		}
 
-	echo "<td>";
-	$sql="SELECT e.login FROM j_eleves_classes jec, eleves e WHERE jec.id_classe='".$tab_classe[$i]['id']."' AND e.login=jec.login AND jec.periode='1' AND e.sexe='M';";
-	//echo "$sql<br />\n";
-	$res_eff=mysql_query($sql);
-	echo mysql_num_rows($res_eff);
-	echo "</td>\n";
+		echo "<tr>\n";
+		echo "<th>Total</th>\n";
 
-	echo "<td>";
-	$sql="SELECT e.login FROM j_eleves_classes jec, eleves e WHERE jec.id_classe='".$tab_classe[$i]['id']."' AND e.login=jec.login AND jec.periode='1' AND e.sexe='F';";
-	//echo "$sql<br />\n";
-	$res_eff=mysql_query($sql);
-	echo mysql_num_rows($res_eff);
-	echo "</td>\n";
+		echo "<th>";
+		$sql="SELECT e.login FROM j_eleves_classes jec, eleves e WHERE e.login=jec.login AND jec.periode='$loop';";
+		//echo "$sql<br />\n";
+		$res_eff=mysql_query($sql);
+		echo mysql_num_rows($res_eff);
+		echo "</th>\n";
+		echo "</tr>\n";
 
-	echo "<td>";
-	$sql="SELECT e.login FROM j_eleves_classes jec, eleves e WHERE jec.id_classe='".$tab_classe[$i]['id']."' AND e.login=jec.login AND jec.periode='1';";
-	//echo "$sql<br />\n";
-	$res_eff=mysql_query($sql);
-	echo mysql_num_rows($res_eff);
-	echo "</td>\n";
+		echo "</table>\n";
+		echo "</div>\n";
+	}
+	echo "<div style='clear:both;'>&nbsp;</div>\n";
+	echo "<p><br /></p>\n";
 
-	echo "</tr>\n";
+	//=======================================================
+
+	//$sql="SELECT distinct id_groupe, count(id_classe) FROM j_groupes_classes group by id_groupe HAVING COUNT(id_classe)>1;";
+	$sql="SELECT distinct id_groupe, count(id_classe) FROM j_groupes_classes jgc, classes c WHERE jgc.id_classe=c.id group by id_groupe HAVING COUNT(id_classe)>1 order by c.classe;";
+	$res_grp=mysql_query($sql);
+	if(mysql_num_rows($res_grp)>0) {
+		$tab_grp=array();
+		while($lig_grp=mysql_fetch_object($res_grp)) {
+			$tab_grp[]=$lig_grp->id_groupe;
+		}
+
+		for($loop=1;$loop<=$max_per;$loop++) {
+			echo "<div style='float:left; width:15em;'>\n";
+			echo "<p class='bold'>Effectifs en période $loop&nbsp;: <a href='".$_SERVER['PHP_SELF']."?export_csv=effectifs_grp&amp;num_periode=$loop'>Export CSV</a></p>\n";
+			echo "<table class='boireaus'>\n";
+			echo "<tr>\n";
+			echo "<th>Regroupements</th>\n";
+			echo "<th>Effectifs</th>\n";
+			echo "</tr>\n";
+			$alt=1;
+			for($i=0;$i<count($tab_grp);$i++) {
+				$alt=$alt*(-1);
+				echo "<tr class='lig$alt white_hover'>\n";
+				echo "<td>";
+				echo get_info_grp($tab_grp[$i], array('classes'));
+				echo "</td>\n";
+
+				echo "<td>";
+				$sql="SELECT e.login FROM j_eleves_groupes jeg, eleves e WHERE jeg.id_groupe='".$tab_grp[$i]."' AND e.login=jeg.login AND jeg.periode='$loop';";
+				//echo "$sql<br />\n";
+				$res_eff=mysql_query($sql);
+				echo mysql_num_rows($res_eff);
+				echo "</td>\n";
+				echo "</tr>\n";
+			}
+
+			/*
+			echo "<tr>\n";
+			echo "<th>Total</th>\n";
+
+			echo "<th>";
+			$sql="SELECT e.login FROM j_eleves_classes jec, eleves e WHERE e.login=jec.login AND jec.periode='$loop';";
+			//echo "$sql<br />\n";
+			$res_eff=mysql_query($sql);
+			echo mysql_num_rows($res_eff);
+			echo "</th>\n";
+			echo "</tr>\n";
+			*/
+
+			echo "</table>\n";
+			echo "</div>\n";
+		}
+		echo "<div style='clear:both;'>&nbsp;</div>\n";
+		echo "<p><br /></p>\n";
+	}
+
+	//=======================================================
+
+	for($loop=1;$loop<=$max_per;$loop++) {
+		echo "<div style='float:left; width:40em;'>\n";
+		echo "<p class='bold'>Effectifs par sexe en période $loop&nbsp;: <a href='".$_SERVER['PHP_SELF']."?export_csv=effectifs_sexe&amp;num_periode=$loop'>Export CSV</a></p>\n";
+		echo "<table class='boireaus'>\n";
+		echo "<tr>\n";
+		echo "<th>Classes</th>\n";
+		echo "<th>Effectifs garçons</th>\n";
+		echo "<th>Effectifs filles</th>\n";
+		echo "<th>Effectifs totaux</th>\n";
+		echo "</tr>\n";
+		$alt=1;
+		for($i=0;$i<count($tab_classe);$i++) {
+			$alt=$alt*(-1);
+			echo "<tr class='lig$alt white_hover'>\n";
+			echo "<td>".$tab_classe[$i]['classe']."</td>\n";
+
+			echo "<td>";
+			$sql="SELECT e.login FROM j_eleves_classes jec, eleves e WHERE jec.id_classe='".$tab_classe[$i]['id']."' AND e.login=jec.login AND jec.periode='$loop' AND e.sexe='M';";
+			//echo "$sql<br />\n";
+			$res_eff=mysql_query($sql);
+			echo mysql_num_rows($res_eff);
+			echo "</td>\n";
+
+			echo "<td>";
+			$sql="SELECT e.login FROM j_eleves_classes jec, eleves e WHERE jec.id_classe='".$tab_classe[$i]['id']."' AND e.login=jec.login AND jec.periode='$loop' AND e.sexe='F';";
+			//echo "$sql<br />\n";
+			$res_eff=mysql_query($sql);
+			echo mysql_num_rows($res_eff);
+			echo "</td>\n";
+
+			echo "<td>";
+			$sql="SELECT e.login FROM j_eleves_classes jec, eleves e WHERE jec.id_classe='".$tab_classe[$i]['id']."' AND e.login=jec.login AND jec.periode='$loop';";
+			//echo "$sql<br />\n";
+			$res_eff=mysql_query($sql);
+			echo mysql_num_rows($res_eff);
+			echo "</td>\n";
+
+			echo "</tr>\n";
+		}
+		echo "<tr>
+	<th>Total</th>
+	<th>";
+		$sql="SELECT e.login FROM j_eleves_classes jec, eleves e WHERE e.login=jec.login AND jec.periode='$loop' AND e.sexe='M';";
+		//echo "$sql<br />\n";
+		$res_eff=mysql_query($sql);
+		echo mysql_num_rows($res_eff);
+		echo "</th>
+	<th>";
+		$sql="SELECT e.login FROM j_eleves_classes jec, eleves e WHERE e.login=jec.login AND jec.periode='$loop' AND e.sexe='F';";
+		//echo "$sql<br />\n";
+		$res_eff=mysql_query($sql);
+		echo mysql_num_rows($res_eff);
+		echo "</th>
+	<th>";
+		$sql="SELECT e.login FROM j_eleves_classes jec, eleves e WHERE e.login=jec.login AND jec.periode='$loop';";
+		//echo "$sql<br />\n";
+		$res_eff=mysql_query($sql);
+		echo mysql_num_rows($res_eff);
+		echo "</th>
+</tr>\n";
+		echo "</table>\n";
+		echo "</div>\n";
+	}
+	echo "<div style='clear:both;'>&nbsp;</div>\n";
+	echo "<p><br /></p>\n";
 }
-echo "</table>\n";
 
 /*
 $sql="SELECT COUNT(e.login) AS nb_filles FROM j_eleves_classes jec, eleves e WHERE jec.id_classe='XXX' AND e.login=jec.login AND e.sexe='F';";

@@ -2,7 +2,7 @@
 /** Fonctions accessibles dans toutes les pages
  * 
  * 
- * @copyright Copyright 2001, 2011 Thomas Belliard, Laurent Delineau, Edouard Hue, Eric Lebrun
+ * @copyright Copyright 2001, 2013 Thomas Belliard, Laurent Delineau, Edouard Hue, Eric Lebrun
  * 
  * @package Initialisation
  * @subpackage general
@@ -46,9 +46,6 @@ include_once dirname(__FILE__).'/share-pdf.inc.php';
 
 
 
-
-
-
 /**
  * Envoi d'un courriel
  *
@@ -57,7 +54,7 @@ include_once dirname(__FILE__).'/share-pdf.inc.php';
  * @param string $destinataire Le destinataire
  * @param string $ajout_headers Text à ajouter dans le header
  */
-function envoi_mail($sujet, $message, $destinataire, $ajout_headers='') {
+function envoi_mail($sujet, $message, $destinataire, $ajout_headers='', $plain_ou_html="plain") {
 
 	$gepiPrefixeSujetMail=getSettingValue("gepiPrefixeSujetMail") ? getSettingValue("gepiPrefixeSujetMail") : "";
 
@@ -68,7 +65,7 @@ function envoi_mail($sujet, $message, $destinataire, $ajout_headers='') {
   
   $headers = "X-Mailer: PHP/" . phpversion()."\r\n";
   $headers .= "MIME-Version: 1.0\r\n";
-  $headers .= "Content-type: text/plain; charset=UTF-8\r\n";
+  $headers .= "Content-type: text/$plain_ou_html; charset=UTF-8\r\n";
   $headers .= "From: Mail automatique Gepi <ne-pas-repondre@".$_SERVER['SERVER_NAME'].">\r\n";
   $headers .= $ajout_headers;
 
@@ -77,6 +74,7 @@ function envoi_mail($sujet, $message, $destinataire, $ajout_headers='') {
 		$subject,
 		$message,
 	  $headers);
+	return $envoi;
 }
 
 /**
@@ -240,6 +238,11 @@ function generate_unique_login($_nom, $_prenom, $_mode, $_casse='min') {
 	$_prenom = preg_replace("/-/","_", $_prenom);
 
 	//==========================
+	if(getSettingAOui("FiltrageStrictAlphaNomPrenomPourLogin")) {
+		$_nom = preg_replace("/[^A-Za-z]/","", $_nom);
+		$_prenom = preg_replace("/[^A-Za-z]/","", $_prenom);
+	}
+	//==========================
 	// On génère le login
 
 	if((preg_match('/n/', $_mode))&&($_nom=="")) {return false;}
@@ -276,6 +279,11 @@ function generate_unique_login($_nom, $_prenom, $_mode, $_casse='min') {
 		else {
 			$temp1=my_strtolower($temp1);
 		}
+
+		// Suppression des _,-,. multiples
+		$temp1=preg_replace("/_{2,}/", "_", $temp1);
+		$temp1=preg_replace("/\.{2,}/", ".", $temp1);
+		$temp1=preg_replace("/\-{2,}/", "-", $temp1);
 
 		$login_user = $temp1;
 
@@ -710,6 +718,9 @@ function affiche_utilisateur($login,$id_classe) {
     case 'cni':
     if ($civilite != '') $result = $civilite." ";
     $result .= $nom." ".$i;
+    case 'cn':
+    if ($civilite != '') $result = $civilite." ";
+    $result .= $nom;
     break;
     $result = $nom." ".$prenom;
 
@@ -793,35 +804,102 @@ function genDateSelector($prefix, $day, $month, $year, $option)
  */
 function checkAccess() {
     global $gepiPath;
-    $url = parse_url($_SERVER['SCRIPT_NAME']);
-    if ($_SESSION["statut"] == 'autre') {
 
-    	$sql = "SELECT autorisation
-	    from droits_speciaux
-    	where nom_fichier = '" . mb_substr($url['path'], mb_strlen($gepiPath)) . "'
-		AND id_statut = '" . $_SESSION['statut_special_id'] . "'";
+    if(!preg_match("/mon_compte.php/", $_SERVER['SCRIPT_NAME'])) {
+        if((isset($_SESSION['statut']))&&($_SESSION['statut']!="administrateur")&&(getSettingAOui('MailValideRequis'.ucfirst($_SESSION['statut'])))) {
 
-    }else{
+			$debug_test_mail="n";
+			if($debug_test_mail=="y") {
+				$f=fopen("/tmp/debug_check_mail.txt", "a+");
+				fwrite($f, strftime("%Y-%m-%d %H:%M:%S")." checkAccess(): depuis ".$_SERVER['SCRIPT_NAME']."\n");
+				fwrite($f, strftime("%Y-%m-%d %H:%M:%S")." checkAccess(): Avant le test check_mail().\n");
+				fclose($f);
+			}
 
-		$sql = "select " . $_SESSION['statut'] . "
-	    from droits
-    	where id = '" . mb_substr($url['path'], mb_strlen($gepiPath)) . "'
-    	;";
+			$redir_saisie_mail_requise="n";
+			//if((!isset($_SESSION['email']))||(!check_mail($_SESSION['email']))) {
+			if(!isset($_SESSION['email'])) {
+				$redir_saisie_mail_requise="y";
+				if($debug_test_mail=="y") {
+					$f=fopen("/tmp/debug_check_mail.txt", "a+");
+					fwrite($f, strftime("%Y-%m-%d %H:%M:%S")." \$_SESSION['email'] est vide.\n");
+					fclose($f);
+				}
+			}
+			elseif(getSettingAOui('MailValideRequisCheckDNS')) {
+				if($debug_test_mail=="y") {
+					$f=fopen("/tmp/debug_check_mail.txt", "a+");
+					fwrite($f, strftime("%Y-%m-%d %H:%M:%S")." Avant le test checkdnsrr...\n");
+					fclose($f);
+				}
+				if(!check_mail($_SESSION['email'], 'checkdnsrr', 'y')) {
+					$redir_saisie_mail_requise="y";
+					if($debug_test_mail=="y") {
+						$f=fopen("/tmp/debug_check_mail.txt", "a+");
+						fwrite($f, strftime("%Y-%m-%d %H:%M:%S")." Le test checkdnsrr a échoué.\n");
+						fclose($f);
+					}
+				}
+			}
+			elseif(!check_mail($_SESSION['email'])) {
+				if($debug_test_mail=="y") {
+					$f=fopen("/tmp/debug_check_mail.txt", "a+");
+					fwrite($f, strftime("%Y-%m-%d %H:%M:%S")." Le check_mail() a échoué.\n");
+					fclose($f);
+				}
 
+				$redir_saisie_mail_requise="y";
+			}
+
+			if($redir_saisie_mail_requise=="y") {
+				if($debug_test_mail=="y") {
+					$f=fopen("/tmp/debug_check_mail.txt", "a+");
+					if(!isset($_SESSION['email'])) {
+					fwrite($f, strftime("%Y-%m-%d %H:%M:%S")." checkAccess(): Après le test check_mail() qui n'a pas été effectué : \$_SESSION['email'] n'est pas initialisé.\n");
+					}
+					else {
+					fwrite($f, strftime("%Y-%m-%d %H:%M:%S")." checkAccess(): Après le test check_mail() qui a échoué sur '".$_SESSION['email']."'.\n");
+					}
+					fclose($f);
+				}
+
+				header("Location: $gepiPath/utilisateurs/mon_compte.php?saisie_mail_requise=yes");
+				//getSettingValue('sso_url_portail')
+				die();
+			}
+		}
 	}
 
-    $dbCheckAccess = sql_query1($sql);
-    if (mb_substr($url['path'], 0, mb_strlen($gepiPath)) != $gepiPath) {
-        tentative_intrusion(2, "Tentative d'accès avec modification sauvage de gepiPath");
-        return (FALSE);
-    } else {
-        if ($dbCheckAccess == 'V') {
-            return (TRUE);
-        } else {
-            tentative_intrusion(1, "Tentative d'accès à un fichier sans avoir les droits nécessaires");
-            return (FALSE);
-        }
-    }
+	$url = parse_url($_SERVER['SCRIPT_NAME']);
+
+	if (mb_substr($url['path'], 0, mb_strlen($gepiPath)) != $gepiPath) {
+		tentative_intrusion(2, "Tentative d'accès avec modification sauvage de gepiPath");
+		return (FALSE);
+	}
+	else {
+		if ($_SESSION["statut"] == 'autre') {
+			$sql = "SELECT autorisation
+					FROM droits_speciaux
+					WHERE nom_fichier = '" . mb_substr($url['path'], mb_strlen($gepiPath)) . "'
+					AND id_statut = '" . $_SESSION['statut_special_id'] . "'
+					AND autorisation='V'";
+		}
+		else {
+			$sql = "SELECT " . $_SESSION['statut'] . " AS autorisation
+					FROM droits
+					WHERE id = '" . mb_substr($url['path'], mb_strlen($gepiPath)) . "'
+					AND ".$_SESSION['statut']."='V';";
+		}
+		$dbCheckAccess = mysql_query($sql);
+		if (mysql_num_rows($dbCheckAccess)>0) {
+			return (TRUE);
+		}
+		else {
+			tentative_intrusion(1, "Tentative d'accès à un fichier sans avoir les droits nécessaires");
+			return (FALSE);
+		}
+	}
+
 }
 
 /**
@@ -880,6 +958,13 @@ function detect_browser($HTTP_USER_AGENT) {
 	fwrite($f,date("d/m/Y His").": $HTTP_USER_AGENT\n");
 	fclose($f);
 	*/
+  include_once(dirname(__FILE__).'/HTMLPurifier.standalone.php');
+  $config = HTMLPurifier_Config::createDefault();
+  $config->set('Core.Encoding', 'utf-8'); // replace with your encoding
+  $config->set('HTML.Doctype', 'XHTML 1.0 Strict'); // replace with your doctype
+  $purifier = new HTMLPurifier($config);
+    
+  
 	if(function_exists('preg_match')) {
 		if (preg_match('/Opera(\/| )([0-9].[0-9]{1,2})/', $HTTP_USER_AGENT, $log_version)) {
 			$BROWSER_VER = $log_version[2];
@@ -909,7 +994,7 @@ function detect_browser($HTTP_USER_AGENT) {
 			}
 		} else {
 			$BROWSER_VER = '';
-			$BROWSER_AGENT = $HTTP_USER_AGENT;
+			$BROWSER_AGENT = $purifier->purify($HTTP_USER_AGENT);
 		}
 	}
 	elseif(function_exists('mb_ereg')) {
@@ -939,7 +1024,7 @@ function detect_browser($HTTP_USER_AGENT) {
 			$BROWSER_AGENT = 'MOZILLA';
 		} else {
 			$BROWSER_VER = '';
-			$BROWSER_AGENT = $HTTP_USER_AGENT;
+			$BROWSER_AGENT = $purifier->purify($HTTP_USER_AGENT);
 		}
 	}
 	elseif(function_exists('ereg')) {
@@ -969,12 +1054,12 @@ function detect_browser($HTTP_USER_AGENT) {
 			$BROWSER_AGENT = 'Firefox';
 		} else {
 			$BROWSER_VER = '';
-			$BROWSER_AGENT = $HTTP_USER_AGENT;
+			$BROWSER_AGENT = $purifier->purify($HTTP_USER_AGENT);
 		}
 	}
 	else {
 		$BROWSER_VER = '';
-		$BROWSER_AGENT = $HTTP_USER_AGENT;
+		$BROWSER_AGENT = $purifier->purify($HTTP_USER_AGENT);
 	}
 	return  $BROWSER_AGENT." - ".$BROWSER_VER;
 }
@@ -1227,20 +1312,24 @@ function get_periode_active($_id_classe){
  * @global string
  * @param integer $_niveau Niveau d'intrusion enregistré
  * @param string $_description Message enregistré pour cette tentative
+ * @param string $_login_a_enregistrer Login à enregistrer bien que la session ne soit pas ouverte
+                                       (cas du verrouillage de compte pour erreur de mot de passe)
+                                       Il convient de vérifier avant de passer ce paramètre, que le compte existe.
  * @see getSettingValue()
  * @see mail()
  */
-function tentative_intrusion($_niveau, $_description) {
+function tentative_intrusion($_niveau, $_description, $_login_a_enregistrer="") {
 
 	global $gepiPath;
 
 	// On commence par enregistrer la tentative en question
-
-	if (!isset($_SESSION['login'])) {
+	if (isset($_SESSION['login'])) {
+		$user_login = $_SESSION['login'];
+	} elseif($_login_a_enregistrer!="") {
+		$user_login = $_login_a_enregistrer;
+	} else {
 		// Ici, ça veut dire que l'attaque est extérieure. Il n'y a pas d'utilisateur logué.
 		$user_login = "-";
-	} else {
-		$user_login = $_SESSION['login'];
 	}
 	$adresse_ip = $_SERVER['REMOTE_ADDR'];
 	$date = strftime("%Y-%m-%d %H:%M:%S");
@@ -1400,17 +1489,31 @@ function check_temp_directory(){
  * Test le dossier en écriture et le crée au besoin
  * La fonction est appelée depuis la racine de l'arborescence GEPI (sinon ça peut bugger)
  *
+ * @param string $login_user Le login de l'utilisateur (si vide, on utilise $_SESSION['login'])
+ *
  * @return booleanTRUE si tout c'est bien passé
  */
-function check_user_temp_directory(){
+function check_user_temp_directory($login_user="", $_niveau_arbo=0) {
 	global $multisite;
+
+	$pref_arbo=".";
+	if($_niveau_arbo==1) {
+		$pref_arbo="..";
+	}
+	elseif($_niveau_arbo==2) {
+		$pref_arbo="../..";
+	}
+
+	if($login_user=="") {
+		$login_user=$_SESSION['login'];
+	}
 
 	$pref_multi="";
 	if(($multisite=='y')&&(isset($_COOKIE['RNE']))) {
 		$pref_multi=$_COOKIE['RNE']."_";
 	}
 
-	$sql="SELECT temp_dir FROM utilisateurs WHERE login='".$_SESSION['login']."'";
+	$sql="SELECT temp_dir FROM utilisateurs WHERE login='".$login_user."'";
 	$res_temp_dir=mysql_query($sql);
 
 	if(mysql_num_rows($res_temp_dir)==0){
@@ -1426,18 +1529,18 @@ function check_user_temp_directory(){
 			// On créé le répertoire temp
 			$length = rand(35, 45);
 			for($len=$length,$r='';mb_strlen($r)<$len;$r.=chr(!mt_rand(0,2)? mt_rand(48,57):(!mt_rand(0,1) ? mt_rand(65,90) : mt_rand(97,122))));
-			$dirname = $pref_multi.$_SESSION['login']."_".$r;
-			$create = mkdir("./temp/".$dirname, 0700);
+			$dirname = $pref_multi.$login_user."_".$r;
+			$create = mkdir($pref_arbo."/temp/".$dirname, 0700);
 
 			if($create){
-				$fich=fopen("./temp/".$dirname."/index.html","w+");
+				$fich=fopen($pref_arbo."/temp/".$dirname."/index.html","w+");
 				fwrite($fich,'<html><head><script type="text/javascript">
-	document.location.replace("../../login.php")
+	document.location.replace("'.$pref_arbo.'/login.php")
 </script></head></html>
 ');
 				fclose($fich);
 
-				$sql="UPDATE utilisateurs SET temp_dir='$dirname' WHERE login='".$_SESSION['login']."'";
+				$sql="UPDATE utilisateurs SET temp_dir='$dirname' WHERE login='".$login_user."'";
 				$res_update=mysql_query($sql);
 				if($res_update){
 					return TRUE;
@@ -1451,16 +1554,16 @@ function check_user_temp_directory(){
 			}
 		}
 		else {
-			if(($pref_multi!='')&&(!preg_match("/^$pref_multi/", $dirname))&&(file_exists("./temp/".$dirname))) {
+			if(($pref_multi!='')&&(!preg_match("/^$pref_multi/", $dirname))&&(file_exists("$pref_arbo/temp/".$dirname))) {
 				// Il faut renommer le dossier
-				if(!rename("./temp/".$dirname,"./temp/".$pref_multi.$dirname)) {
+				if(!rename("$pref_arbo/temp/".$dirname,"$pref_arbo/temp/".$pref_multi.$dirname)) {
 					return FALSE;
 					exit();
 				}
 				else {
 					$dirname=$pref_multi.$dirname;
 
-					$sql="UPDATE utilisateurs SET temp_dir='$dirname' WHERE login='".$_SESSION['login']."'";
+					$sql="UPDATE utilisateurs SET temp_dir='$dirname' WHERE login='".$login_user."'";
 					$res_update=mysql_query($sql);
 					if(!$res_update){
 						return FALSE;
@@ -1469,15 +1572,15 @@ function check_user_temp_directory(){
 				}
 			}
 
-			if(!file_exists("./temp/".$dirname)){
+			if(!file_exists("$pref_arbo/temp/".$dirname)){
 				// Le dossier n'existe pas
 				// On créé le répertoire temp
-				$create = mkdir("./temp/".$dirname, 0700);
+				$create = mkdir("$pref_arbo/temp/".$dirname, 0700);
 
 				if($create){
-					$fich=fopen("./temp/".$dirname."/index.html","w+");
+					$fich=fopen("$pref_arbo/temp/".$dirname."/index.html","w+");
 					fwrite($fich,'<html><head><script type="text/javascript">
-	document.location.replace("../../login.php")
+	document.location.replace("'.$pref_arbo.'/login.php")
 </script></head></html>
 ');
 					fclose($fich);
@@ -1488,11 +1591,11 @@ function check_user_temp_directory(){
 				}
 			}
 			else{
-				$fich=fopen("./temp/".$dirname."/test_ecriture.tmp","w+");
+				$fich=fopen("$pref_arbo/temp/".$dirname."/test_ecriture.tmp","w+");
 				$ecriture=fwrite($fich,'Test d écriture.');
 				$fermeture=fclose($fich);
-				if(file_exists("./temp/".$dirname."/test_ecriture.tmp")){
-					unlink("./temp/".$dirname."/test_ecriture.tmp");
+				if(file_exists("$pref_arbo/temp/".$dirname."/test_ecriture.tmp")){
+					unlink("$pref_arbo/temp/".$dirname."/test_ecriture.tmp");
 				}
 
 				if(($fich)&&($ecriture)&&($fermeture)){
@@ -1509,10 +1612,15 @@ function check_user_temp_directory(){
 /**
  * Renvoie le nom du répertoire temporaire de l'utilisateur
  *
+ * @param string $login_user Le login de l'utilisateur (si vide, on utilise $_SESSION['login'])
+ *
  * @return bool|string retourne FALSE s'il n'existe pas et le nom du répertoire s'il existe, sans le chemin
  */
-function get_user_temp_directory(){
-	$sql="SELECT temp_dir FROM utilisateurs WHERE login='".$_SESSION['login']."'";
+function get_user_temp_directory($login_user=""){
+	if($login_user=="") {
+		$login_user=$_SESSION['login'];
+	}
+	$sql="SELECT temp_dir FROM utilisateurs WHERE login='".$login_user."'";
 	$res_temp_dir=mysql_query($sql);
 	if(mysql_num_rows($res_temp_dir)>0){
 		$lig_temp_dir=mysql_fetch_object($res_temp_dir);
@@ -1522,7 +1630,7 @@ function get_user_temp_directory(){
 			if(file_exists("temp/".$dirname)){
 				return $dirname;
 			}
-			else if(file_exists("../temp/".$dirname)) {
+			elseif(file_exists("../temp/".$dirname)) {
 				return $dirname;
 			}
 			else if(file_exists("../../temp/".$dirname)) {
@@ -1606,39 +1714,30 @@ function volume_dir($dir){
 }
 
 /**
- * Cette fonction supprime le BOM éventuel d'un fichier encodé en UTF-8
- * A appeler immédiatement après ouverture du fichier
- * Exemple :
- * $handle=fopen("....");
- * skip_bom_uf8($handle)
- *
- * @param handle $h_file : Le pointeur de fichier à tester
- * @return boolean : true si pas de BOM ou si BOM sauté, false dans les autres cas 
- */
-function skip_bom_uf8($h_file)
-	{
-	if (ftell($h_file)!=0) return false;
-	$bytes=fread($h_file,3);
-	if ($bytes===false) return false;
-	if ($bytes!="\xEF\xBB\xBF") return rewind($h_file);
-	return true;
-	}
-
-
-/**
  * Supprime les fichiers d'un dossier
  *
  * @param string $dir le répertoire à vider
+ * @param array $tab_exclusion tableau de fichiers ou dossiers à exclure de la suppression
+ *
  * @return boolean TRUE si tout c'est bien passé
+ *                 FALSE si un dossier a été trouvé ou si une erreur s'est produite
+ *         array   si un des fichiers ou dossiers exclus de la suppression a été trouvé
+ *
  * @todo En ajoutant un paramètre à la fonction, on pourrait activer la suppression récursive (avec une profondeur par exemple)
  */
-function vider_dir($dir){
+function vider_dir($dir, $tab_exclusion=array()){
 	$statut=TRUE;
 	$handle = @opendir($dir);
 	while ($file = @readdir ($handle)){
 		if (preg_match("/^\.{1,2}$/i",$file)){
 			continue;
 		}
+
+		if(in_array($file, $tab_exclusion)) {
+			$fichiers_exclus_trouves[]=$file;
+			continue;
+		}
+
 		if(is_dir("$dir/$file")){
 			// On ne cherche pas à vider récursivement.
 			$statut=FALSE;
@@ -1656,9 +1755,90 @@ function vider_dir($dir){
 	}
 	@closedir($handle);
 
-	return $statut;
+	if(isset($fichiers_exclus_trouves)) {
+		return $fichiers_exclus_trouves;
+	}
+	else {
+		return $statut;
+	}
 }
 
+
+/**
+ * Additionne la taille des documents joints dans le CDT d'un groupe
+ *
+ * @param int $id_groupe Identifiant du groupe
+ * @return int la taille totale des documents joints
+ */
+function volume_docs_joints($id_groupe, $mode="all"){
+	$volume_cdt_groupe=0;
+
+	/*
+	$sql="SELECT DISTINCT cd.id_ct FROM ct_documents cd, ct_entry ce WHERE cd.id_ct=ce.id_ct AND ce.id_groupe='".$groupe->getId()."';";
+	//echo "$sql<br />";
+	$res_doc=mysql_query($sql);
+	if(mysql_num_rows($res_doc)>0) {
+		while($lig_doc=mysql_fetch_object($res_doc)) {
+			$volume_cdt_groupe+=volume_dir("../documents/cl".$lig_doc->id_ct);
+		}
+	}
+	$sql="SELECT DISTINCT cde.id_ct FROM ct_devoirs_documents cdd, ct_devoirs_entry cde WHERE cdd.id_ct_devoir=cde.id_ct AND cde.id_groupe='".$groupe->getId()."';";
+	//echo "$sql<br />";
+	$res_doc=mysql_query($sql);
+	if(mysql_num_rows($res_doc)>0) {
+		while($lig_doc=mysql_fetch_object($res_doc)) {
+			$volume_cdt_groupe+=volume_dir("../documents/cl_dev".$lig_doc->id_ct);
+		}
+	}
+	*/
+
+	if($mode=="devoirs") {
+		$sql="SELECT DISTINCT cdd.emplacement FROM ct_devoirs_documents cdd, ct_devoirs_entry cde WHERE cdd.id_ct_devoir=cde.id_ct AND cde.id_groupe='".$id_groupe."';";
+	}
+	elseif($mode=="compte_rendus") {
+		$sql="SELECT DISTINCT cd.emplacement FROM ct_documents cd, ct_entry ce WHERE cd.id_ct=ce.id_ct AND ce.id_groupe='".$id_groupe."';";
+	}
+	else {
+		$sql="(SELECT DISTINCT cd.emplacement FROM ct_documents cd, ct_entry ce WHERE cd.id_ct=ce.id_ct AND ce.id_groupe='".$id_groupe."') UNION (SELECT DISTINCT cdd.emplacement FROM ct_devoirs_documents cdd, ct_devoirs_entry cde WHERE cdd.id_ct_devoir=cde.id_ct AND cde.id_groupe='".$id_groupe."');";
+	}
+	//echo "$sql<br />";
+	$res_doc=mysql_query($sql);
+	if(mysql_num_rows($res_doc)>0) {
+		while($lig_doc=mysql_fetch_object($res_doc)) {
+			if(file_exists($lig_doc->emplacement)) {
+				$tabtmpsize=stat($lig_doc->emplacement);
+				if(isset($tabtmpsize[7])) {
+					$size=$tabtmpsize[7];
+					$volume_cdt_groupe+=$size;
+				}
+			}
+		}
+	}
+
+	return($volume_cdt_groupe);
+}
+
+
+
+
+/**
+ * Cette fonction supprime le BOM éventuel d'un fichier encodé en UTF-8
+ * A appeler immédiatement après ouverture du fichier
+ * Exemple :
+ * $handle=fopen("....");
+ * skip_bom_utf8($handle)
+ *
+ * @param handle $h_file : Le pointeur de fichier à tester
+ * @return boolean : true si pas de BOM ou si BOM sauté, false dans les autres cas 
+ */
+function skip_bom_utf8($h_file)
+	{
+	if (ftell($h_file)!=0) return false;
+	$bytes=fread($h_file,3);
+	if ($bytes===false) return false;
+	if ($bytes!="\xEF\xBB\xBF") return rewind($h_file);
+	return true;
+	}
 
 /**
  * Cette méthode prend une chaîne de caractères et s'assure qu'elle est bien retournée en UTF-8
@@ -1704,13 +1884,24 @@ function ensure_utf8($str, $from_encoding = null) {
  */
 function detect_utf8 ($str) {
 	// Inspiré de http://w3.org/International/questions/qa-forms-utf-8.html
-	return preg_match('%^(?:[\x09\x0A\x0D\x20-\x7E])*$%xs', $str) | // ASCII
-		preg_match('#[\xC2-\xDF][\x80-\xBF]#', $str) | // non-overlong 2-byte
-		preg_match('#\xE0[\xA0-\xBF][\x80-\xBF]#', $str) | // excluding overlongs
-		preg_match('#[\xE1-\xEC\xEE\xEF][\x80-\xBF]{2}#', $str) | // straight 3-byte
+	//
+	// on s'assure de bien opérer sur une chaîne de caractère
+	$str=(string)$str;
+	// La chaîne ne comporte que des octets <= 7F ?
+	$full_ascii=true; $i=0;
+	while ($full_ascii && $i<strlen($str)) {
+		$full_ascii = $full_ascii && (ord($str[$i])<=0x7F);
+		$i++;
+	}
+	// Si oui c'est de l'utf8 sinon on cherche si la chaîne contient
+	// au moins une suite d'octets valide en UTF8
+	if ($full_ascii) return true;
+	else return preg_match('#[\xC2-\xDF][\x80-\xBF]#', $str) || // non-overlong 2-byte
+		preg_match('#\xE0[\xA0-\xBF][\x80-\xBF]#', $str) || // excluding overlongs
+		preg_match('#[\xE1-\xEC\xEE\xEF][\x80-\xBF]{2}#', $str) || // straight 3-byte
 		preg_match('#\xED[\x80-\x9F][\x80-\xBF]#', $str) | // excluding surrogates
-		preg_match('#\xF0[\x90-\xBF][\x80-\xBF]{2}#', $str) | // planes 1-3
-		preg_match('#[\xF1-\xF3][\x80-\xBF]{3}#', $str) | // planes 4-15
+		preg_match('#\xF0[\x90-\xBF][\x80-\xBF]{2}#', $str) || // planes 1-3
+		preg_match('#[\xF1-\xF3][\x80-\xBF]{3}#', $str) || // planes 4-15
 		preg_match('# \xF4[\x80-\x8F][\x80-\xBF]{2}#', $str) ; // plane 16
  }
 
@@ -1913,7 +2104,13 @@ function nettoyer_caracteres_nom($chaine, $mode="a", $chaine_autres_caracteres_a
 	// Pour que le tiret soit à la fin si on le met dans $chaine_autres_caracteres_acceptes
 	$chaine_autres_caracteres_acceptes="ÆæŒœ".$chaine_autres_caracteres_acceptes;
 
-	$retour=trim(ensure_utf8($chaine));
+	if(is_numeric(trim($chaine))) {
+		$retour=trim($chaine);
+	}
+	else {
+		$retour=trim(ensure_utf8($chaine));
+	}
+
 	if($remplacer_oe_ae=="y") {$retour=preg_replace("#Æ#u","AE",preg_replace("#æ#u","ae",preg_replace("#Œ#u","OE",preg_replace("#œ#u","oe",$retour))));}
 	//if($remplacer_oe_ae=="y") {$retour=preg_replace("/Æ/","AE",preg_replace("/æ/","ae",preg_replace("/Œ/","OE",preg_replace("/œ/","oe",$retour))));}
 
@@ -2002,22 +2199,65 @@ function get_noms_classes_from_ele_login($ele_login){
 }
 
 /**
+ * Retourne la chaine des classes d'un élève ordonnées par périodes puis classes
+ *
+ * @param string $ele_login Login de l'élève
+ * @return string 
+ */
+function get_chaine_liste_noms_classes_from_ele_login($ele_login) {
+	$sql="SELECT DISTINCT jec.id_classe, c.classe FROM j_eleves_classes jec, classes c WHERE jec.id_classe=c.id AND jec.login='$ele_login' ORDER BY periode,classe;";
+	$res_class=mysql_query($sql);
+
+	$chaine="";
+	if(mysql_num_rows($res_class)>0){
+		while($lig_tmp=mysql_fetch_object($res_class)){
+			if($chaine!="") {$chaine.=", ";}
+			$chaine=$lig_tmp->classe;
+		}
+	}
+	return $chaine;
+}
+
+/**
  * Renvoie les élèves liés à un responsable
  *
  * @param string $resp_login Login du responsable
  * @param string $mode Si avec_classe renvoie aussi la classe
+ * @param string $meme_en_resp_legal_0 'y'
+ *               (on récupère même les enfants dont $resp_login est resp_legal=0)
+ *               'yy' (on récupère aussi les resp_legal=0 mais seulement s'ils ont l'accès aux données en tant qu'utilisateur
+ *               ou 'n' (on ne récupère que les enfants dont $resp_login est resp_legal=1 ou 2)
  * @return array 
  * @see get_class_from_ele_login()
  */
-function get_enfants_from_resp_login($resp_login,$mode='simple'){
-	$sql="SELECT e.nom,e.prenom,e.login FROM eleves e,
+function get_enfants_from_resp_login($resp_login, $mode='simple', $meme_en_resp_legal_0="n") {
+	$sql="(SELECT e.nom,e.prenom,e.login FROM eleves e,
 											responsables2 r,
 											resp_pers rp
 										WHERE e.ele_id=r.ele_id AND
 											rp.pers_id=r.pers_id AND
 											rp.login='$resp_login' AND
-											(r.resp_legal='1' OR r.resp_legal='2')
-										ORDER BY e.nom,e.prenom;";
+										(r.resp_legal='1' OR r.resp_legal='2') ORDER BY e.nom,e.prenom)";
+	if($meme_en_resp_legal_0=="y") {
+		$sql.=" UNION (SELECT e.nom,e.prenom,e.login FROM eleves e,
+											responsables2 r,
+											resp_pers rp
+										WHERE e.ele_id=r.ele_id AND
+											rp.pers_id=r.pers_id AND
+											rp.login='$resp_login' AND
+										r.resp_legal='0' ORDER BY e.nom,e.prenom)";
+	}
+	elseif($meme_en_resp_legal_0=="yy") {
+		$sql.=" UNION (SELECT e.nom,e.prenom,e.login FROM eleves e,
+											responsables2 r,
+											resp_pers rp
+										WHERE e.ele_id=r.ele_id AND
+											rp.pers_id=r.pers_id AND
+											rp.login='$resp_login' AND
+											r.acces_sp='y' AND
+										r.resp_legal='0' ORDER BY e.nom,e.prenom)";
+	}
+	//echo "$sql<br />";
 	$res_ele=mysql_query($sql);
 
 	$tab_ele=array();
@@ -2047,36 +2287,80 @@ function get_enfants_from_resp_login($resp_login,$mode='simple'){
  *
  * @param string $pers_id identifiant sconet du responsable
  * @param string $mode Si avec_classe renvoie aussi la classe
+ * @param string $meme_en_resp_legal_0 'y'
+ *               (on récupère même les enfants dont $resp_login est resp_legal=0)
+ *               'yy' (on récupère aussi les resp_legal=0 mais seulement s'ils ont l'accès aux données en tant qu'utilisateur
+ *               ou 'n' (on ne récupère que les enfants dont $resp_login est resp_legal=1 ou 2)
  * @return array 
  * @see get_class_from_ele_login()
  */
-function get_enfants_from_pers_id($pers_id,$mode='simple'){
-	$sql="SELECT e.nom,e.prenom,e.login FROM eleves e,
+function get_enfants_from_pers_id($pers_id, $mode='simple', $meme_en_resp_legal_0="n"){
+	$sql="(SELECT e.nom,e.prenom,e.login FROM eleves e,
 											responsables2 r,
 											resp_pers rp
 										WHERE e.ele_id=r.ele_id AND
 											rp.pers_id=r.pers_id AND
-											rp.pers_id='$pers_id' AND
-											(r.resp_legal='1' OR r.resp_legal='2')
-										ORDER BY e.nom,e.prenom;";
+											rp.pers_id='$pers_id' AND 
+											(r.resp_legal='1' OR r.resp_legal='2') 
+										ORDER BY e.nom,e.prenom)";
+	if($meme_en_resp_legal_0=="y") {
+		$sql.=" UNION (SELECT e.nom,e.prenom,e.login FROM eleves e,
+											responsables2 r,
+											resp_pers rp
+										WHERE e.ele_id=r.ele_id AND
+											rp.pers_id=r.pers_id AND
+											rp.pers_id='$pers_id' AND 
+											r.resp_legal='0' 
+										ORDER BY e.nom,e.prenom)";
+	}
+	elseif($meme_en_resp_legal_0=="yy") {
+		$sql.=" UNION (SELECT e.nom,e.prenom,e.login FROM eleves e,
+											responsables2 r,
+											resp_pers rp
+										WHERE e.ele_id=r.ele_id AND
+											rp.pers_id=r.pers_id AND
+											rp.pers_id='$pers_id' AND 
+											r.acces_sp='y' AND
+											r.resp_legal='0' 
+										ORDER BY e.nom,e.prenom)";
+	}
 	$res_ele=mysql_query($sql);
 
 	$tab_ele=array();
 	if(mysql_num_rows($res_ele)>0){
 		while($lig_tmp=mysql_fetch_object($res_ele)){
-			$tab_ele[]=$lig_tmp->login;
-			if($mode=='avec_classe') {
-				$tmp_chaine_classes="";
+			if($mode=='csv') {
+				$tab_ele[]=$lig_tmp->login;
 
+				$tmp_chaine_classes="";
+				$tmp_chaine_classes2="";
 				$tmp_tab_clas=get_class_from_ele_login($lig_tmp->login);
 				if(isset($tmp_tab_clas['liste'])) {
 					$tmp_chaine_classes=" (".$tmp_tab_clas['liste'].")";
+					$tmp_chaine_classes2=$tmp_tab_clas['liste'];
 				}
 
-				$tab_ele[]=ucfirst(mb_strtolower($lig_tmp->prenom))." ".mb_strtoupper($lig_tmp->nom).$tmp_chaine_classes;
+				$chaine_prenom_nom=casse_mot($lig_tmp->prenom, 'majf2')." ".casse_mot($lig_tmp->nom, 'maj');
+				$tab_ele[]=$chaine_prenom_nom.$tmp_chaine_classes.";".
+							$lig_tmp->login.";".
+							$chaine_prenom_nom.";".
+							$tmp_chaine_classes2;
 			}
 			else {
-				$tab_ele[]=ucfirst(mb_strtolower($lig_tmp->prenom))." ".mb_strtoupper($lig_tmp->nom);
+				$tab_ele[]=$lig_tmp->login;
+				if($mode=='avec_classe') {
+					$tmp_chaine_classes="";
+
+					$tmp_tab_clas=get_class_from_ele_login($lig_tmp->login);
+					if(isset($tmp_tab_clas['liste'])) {
+						$tmp_chaine_classes=" (".$tmp_tab_clas['liste'].")";
+					}
+
+					$tab_ele[]=ucfirst(mb_strtolower($lig_tmp->prenom))." ".mb_strtoupper($lig_tmp->nom).$tmp_chaine_classes;
+				}
+				else {
+					$tab_ele[]=ucfirst(mb_strtolower($lig_tmp->prenom))." ".mb_strtoupper($lig_tmp->nom);
+				}
 			}
 		}
 	}
@@ -2147,19 +2431,27 @@ function get_nom_classe($id_classe){
  * @param string $date
  * @return string La date formatée
  */
-function formate_date($date) {
+function formate_date($date, $avec_heure="n") {
 	$tmp_date=explode(" ",$date);
 	$tab_date=explode("-",$tmp_date[0]);
 
+	$retour="";
+
 	if(isset($tab_date[2])) {
-		return sprintf("%02d",$tab_date[2])."/".sprintf("%02d",$tab_date[1])."/".$tab_date[0];
+		$retour.=sprintf("%02d",$tab_date[2])."/".sprintf("%02d",$tab_date[1])."/".$tab_date[0];
 	}
 	elseif(isset($tab_date[0])) {
-		return $tab_date[0];
+		$retour.=$tab_date[0];
 	}
 	else {
-		return $date;
+		$retour.=$date;
 	}
+
+	if(($avec_heure=="y")&&(isset($tmp_date[1]))&&(preg_match("/[0-9]{2}:[0-9]{2}:[0-9]{2}/", $tmp_date[1]))) {
+		$retour.=" à ".$tmp_date[1];
+	}
+
+	return $retour;
 }
 
 /**
@@ -2269,6 +2561,69 @@ function savePref($login,$item,$valeur){
 }
 
 /**
+ * Renvoie l'ensemle des paramètres d'une classe en interrogeant la table classes_param
+ *
+ * @param string $id_classe Identifiant de la classe
+ * @return array Tableau associatif des paramètres name=>value
+ */
+function getAllParamClasse($id_classe) {
+	$sql="SELECT * FROM classes_param WHERE id_classe='$id_classe' ORDER BY name;";
+	$res_param=mysql_query($sql);
+
+	$tab_param=array();
+	if(mysql_num_rows($res_param)>0){
+		while($ligne=mysql_fetch_object($res_param)) {
+			$tab_param[$ligne->name]=$ligne->value;
+		}
+	}
+
+	return $tab_param;
+}
+
+/**
+ * Renvoie les paramètres d'une classe pour un item en interrogeant la table classes_param
+ *
+ * @param string $id_classe Identifiant de la classe
+ * @param string $item Item recherché
+ * @param string $default Valeur par défaut
+ * @return string La valeur de l'item
+ */
+function getParamClasse($id_classe,$item,$default) {
+	$sql="SELECT value FROM classes_param WHERE id_classe='$id_classe' AND name='$item'";
+	$res_param=mysql_query($sql);
+
+	if(mysql_num_rows($res_param)>0){
+		$ligne=mysql_fetch_object($res_param);
+		return $ligne->value;
+	}
+	else{
+		return $default;
+	}
+}
+
+/**
+ * Enregistre les paramètres d'une classe pour un item dans la table classes_param
+ *
+ * @param string $id_classe Identifiant de la classe
+ * @param string $item Item recherché
+ * @param string $valeur Valeur à enregistrer
+ * @return boolean TRUE si tout c'est bien passé
+ */
+function saveParamClasse($id_classe,$item,$valeur) {
+	$sql="SELECT value FROM classes_param WHERE id_classe='$id_classe' AND name='$item'";
+	$res_param=mysql_query($sql);
+
+	if(mysql_num_rows($res_param)>0){
+		$sql="UPDATE classes_param SET value='$valeur' WHERE id_classe='$id_classe' AND name='$item';";
+	}
+	else{
+		$sql="INSERT INTO classes_param SET id_classe='$id_classe', name='$item', value='$valeur';";
+	}
+	$res=mysql_query($sql);
+	if($res) {return TRUE;} else {return FALSE;}
+}
+
+/**
  * Position horizontale initiale pour permettre un affichage sans superposition
  *
  * @global int $GLOBALS['$posDiv_infobulle']
@@ -2329,7 +2684,7 @@ $GLOBALS['class_special_infobulle'] = '';
  * @param string $bg_texte Couleur de fond du DIV contenant le texte
  * @param int $largeur Largeur du DIV conteneur
  * @param int $hauteur Hauteur (minimale) du DIV conteneur
- * @param string $drag 'y' ou 'n' pour rendre le DIV draggable
+ * @param string $drag 'y' ou 'n' pour rendre le DIV draggable ('yy' rend même le corps de l'infobulle poignée de drag)
  * @param string $bouton_close 'y' ou 'n' pour afficher le bouton Close
  * @param string $survol_close 'y' ou 'n' pour refermer le DIV automatiquement lorsque le survol quitte le DIV
  * @param string $overflow 'y' ou 'n' activer l'overflow automatique sur la partie Texte. Il faut que $hauteur soit non NULLe
@@ -2358,17 +2713,29 @@ function creer_div_infobulle($id,$titre,$bg_titre,$texte,$bg_texte,$largeur,$hau
 
 	// Conteneur:
 	if($bg_texte==''){
-		$div="<div id='$id' class='infobulle_corps";
+		$div="<div id='$id' class='infobulle_corps div_conteneur_infobulle";
 		if((isset($class_special_infobulle))&&($class_special_infobulle!='')) {$div.=" ".$class_special_infobulle;}
-		$div.="' style='$style_box width: ".$largeur.$unite_div_infobulle."; ";
+		$div.="' style='$style_box width: ".$largeur;
+		if(is_numeric($largeur)) {
+			$div.=$unite_div_infobulle;
+		}
+		$div.="; ";
 	}
 	else{
 		$div="<div id='$id' ";
-		if((isset($class_special_infobulle))&&($class_special_infobulle!='')) {$div.="class='".$class_special_infobulle."' ";}
-		$div.="style='$style_box background-color: $bg_texte; width: ".$largeur.$unite_div_infobulle."; ";
+		if((isset($class_special_infobulle))&&($class_special_infobulle!='')) {$div.="class='".$class_special_infobulle." div_conteneur_infobulle' ";} else {$div.="class='div_conteneur_infobulle' ";}
+		$div.="style='$style_box background-color: $bg_texte; width: ".$largeur;
+		if(is_numeric($largeur)) {
+			$div.=$unite_div_infobulle;
+		}
+		$div.="; ";
 	}
-	if($hauteur!=0){
-		$div.="height: ".$hauteur.$unite_div_infobulle."; ";
+	if(($hauteur!=0)||($hauteur!="")) {
+		$div.="height: ".$hauteur;
+		if(is_numeric($hauteur)) {
+			$div.=$unite_div_infobulle;
+		}
+		$div.=$unite_div_infobulle."; ";
 	}
 	// Position horizontale initiale pour permettre un affichage sans superposition si Javascript est désactivé:
 	$div.="left:".$posDiv_infobulle.$unite_div_infobulle.";";
@@ -2379,12 +2746,20 @@ function creer_div_infobulle($id,$titre,$bg_titre,$texte,$bg_texte,$largeur,$hau
 	// Elle n'est affichée que si le titre est non vide
 	if($titre!=""){
 		if($bg_titre==''){
-			$div.="<div class='infobulle_entete' style='$style_bar width: ".$largeur.$unite_div_infobulle.";'";
+			$div.="<div class='infobulle_entete' style='$style_bar width: ".$largeur;
+			if(is_numeric($largeur)) {
+				$div.=$unite_div_infobulle;
+			}
+			$div.=";'";
 		}
 		else{
-			$div.="<div style='$style_bar background-color: $bg_titre; width: ".$largeur.$unite_div_infobulle.";'";
+			$div.="<div style='$style_bar background-color: $bg_titre; width: ".$largeur;
+			if(is_numeric($largeur)) {
+				$div.=$unite_div_infobulle;
+			}
+			$div.=";'";
 		}
-		if($drag=="y"){
+		if(($drag=="y")||($drag=="yy")){
 			// Là on utilise les fonctions de http://www.brainjar.com stockées dans brainjar_drag.js
 			$div.=" onmousedown=\"dragStart(event, '$id')\"";
 		}
@@ -2418,15 +2793,29 @@ function creer_div_infobulle($id,$titre,$bg_titre,$texte,$bg_texte,$largeur,$hau
 	//==================
 	// 20110113
 	$div.="<div id='".$id."_contenu_corps'";
+
+	if($drag=="yy"){
+		// Là on utilise les fonctions de http://www.brainjar.com stockées dans brainjar_drag.js
+		$div.=" onmousedown=\"dragStart(event, '$id')\"";
+	}
+
 	//==================
 	if($survol_close=="y"){
 		// On referme le DIV lorsque la souris quitte la zone de texte.
 		$div.=" onmouseout=\"cacher_div('$id');\"";
 	}
 	$div.=">\n";
-	if(($overflow=='y')&&($hauteur!=0)){
-		$hauteur_hors_titre=$hauteur-1;
-		$div.="<div style='width: ".$largeur.$unite_div_infobulle."; height: ".$hauteur_hors_titre.$unite_div_infobulle."; overflow: auto;'>\n";
+	if(($overflow=='y')&&(($hauteur!=0)||($hauteur!=""))) {
+		$hauteur_hors_titre=$hauteur-1; // Le calcul n'est correct que dans le cas où l'unité est 'em'
+		$div.="<div style='width: ".$largeur;
+		if(is_numeric($largeur)) {
+			$div.=$unite_div_infobulle;
+		}
+		$div.="; height: ".$hauteur_hors_titre;
+		if(is_numeric($hauteur)) {
+			$div.=$unite_div_infobulle;
+		}
+		$div.="; overflow: auto;'>\n";
 		$div.="<div style='padding-left: 1px;'>\n";
 		$div.=$texte;
 		$div.="</div>\n";
@@ -2451,6 +2840,171 @@ function creer_div_infobulle($id,$titre,$bg_titre,$texte,$bg_texte,$largeur,$hau
 
 	return $div;
 }
+
+// Fonction de création d'infobulle redimensionnable (http://www.twinhelix.com/javascript/dragresize/)
+function creer_div_infobulle2($id,$titre,$bg_titre,$texte,$bg_texte,$largeur,$hauteur,$drag,$bouton_close,$survol_close,$overflow,$zindex_infobulle=1){
+	/*	
+		
+		$overflow:		
+	*/
+	global $posDiv_infobulle;
+	global $tabid_infobulle;
+	global $unite_div_infobulle;
+	global $niveau_arbo;
+	global $pas_de_decalage_infobulle;
+	global $class_special_infobulle;
+
+	$style_box="color: #000000; border: 1px solid #000000; padding: 0px; position: absolute; z-index:$zindex_infobulle;";
+	
+	$style_bar="color: #ffffff; cursor: move; font-weight: bold; padding: 0px;";
+	$style_close="color: #ffffff; cursor: move; font-weight: bold; float:right; width: 16px; margin-right: 1px;";
+
+	// On fait la liste des identifiants de DIV pour cacher les Div avec javascript en fin de chargement de la page (dans /lib/footer.inc.php).
+	$tabid_infobulle[]=$id;
+
+	// Conteneur:
+	if($bg_texte==''){
+		$div="<div id='$id' class='drsElement infobulle_corps";
+		if((isset($class_special_infobulle))&&($class_special_infobulle!='')) {$div.=" ".$class_special_infobulle;}
+		$div.="' style='$style_box width: ".$largeur;
+		if(is_numeric($largeur)) {
+			$div.=$unite_div_infobulle;
+		}
+		$div.="; ";
+	}
+	else{
+		$div="<div id='$id' ";
+		if((isset($class_special_infobulle))&&($class_special_infobulle!='')) {$div.="class='drsElement ".$class_special_infobulle."' ";}
+		else {$div.="class='drsElement' ";}
+		$div.="style='$style_box background-color: $bg_texte; width: ".$largeur;
+		if(is_numeric($largeur)) {
+			$div.=$unite_div_infobulle;
+		}
+		$div.="; ";
+	}
+	if(($hauteur!=0)||($hauteur!="")) {
+		$div.="height: ".$hauteur;
+		if(is_numeric($hauteur)) {
+			$div.=$unite_div_infobulle;
+		}
+		$div.=$unite_div_infobulle."; ";
+	}
+	// Position horizontale initiale pour permettre un affichage sans superposition si Javascript est désactivé:
+	$div.="left:".$posDiv_infobulle.$unite_div_infobulle.";";
+	$div.="'>\n";
+
+
+	// Barre de titre:
+	// Elle n'est affichée que si le titre est non vide
+	if($titre!=""){
+		if($bg_titre==''){
+			/*
+			$div.="<div class='drsMoveHandle infobulle_entete' style='$style_bar width: ".$largeur;
+			if(is_numeric($largeur)) {
+				$div.=$unite_div_infobulle;
+			}
+			*/
+			$div.="<div class='drsMoveHandle infobulle_entete' style='$style_bar";
+			$div.=";'";
+		}
+		else{
+			/*
+			$div.="<div class='drsMoveHandle' style='$style_bar background-color: $bg_titre; width: ".$largeur;
+			if(is_numeric($largeur)) {
+				$div.=$unite_div_infobulle;
+			}
+			*/
+			$div.="<div class='drsMoveHandle' style='$style_bar background-color: $bg_titre; ";
+			$div.=";'";
+		}
+
+		/*
+		if(($drag=="y")||($drag=="yy")){
+			// Là on utilise les fonctions de http://www.brainjar.com stockées dans brainjar_drag.js
+			$div.=" onmousedown=\"dragStart(event, '$id')\"";
+		}
+		*/
+		$div.=">\n";
+
+		if($bouton_close=="y"){
+			//$div.="<div style='$style_close'><a href='#' onclick=\"cacher_div('$id'); return false;\">";
+			$div.="<div style='$style_close'><a href=\"javascript:cacher_div('$id')\">";
+			if(isset($niveau_arbo)&&$niveau_arbo==0){
+				$div.="<img src='./images/icons/close16.png' width='16' height='16' alt='Fermer' />";
+			}
+			else if(isset($niveau_arbo)&&$niveau_arbo==1) {
+				$div.="<img src='../images/icons/close16.png' width='16' height='16' alt='Fermer' />";
+			}
+			else if(isset($niveau_arbo)&&$niveau_arbo==2) {
+				$div.="<img src='../../images/icons/close16.png' width='16' height='16' alt='Fermer' />";
+			}
+			else {
+				$div.="<img src='../images/icons/close16.png' width='16' height='16' alt='Fermer' />";
+			}
+			$div.="</a></div>\n";
+		}
+		$div.="<span style='padding-left: 1px;'>\n";
+		$div.=$titre."\n";
+		$div.="</span>\n";
+		$div.="</div>\n";
+	}
+
+
+	// Partie texte:
+	//==================
+	// 20110113
+	$div.="<div id='".$id."_contenu_corps'";
+
+	if($drag=="yy"){
+		// Là on utilise les fonctions de http://www.brainjar.com stockées dans brainjar_drag.js
+		//$div.=" onmousedown=\"dragStart(event, '$id')\"";
+		$div.=" class=\"drsMoveHandle\"";
+	}
+
+	//==================
+	if($survol_close=="y"){
+		// On referme le DIV lorsque la souris quitte la zone de texte.
+		$div.=" onmouseout=\"cacher_div('$id');\"";
+	}
+	$div.=">\n";
+	if(($overflow=='y')&&(($hauteur!=0)||($hauteur!=""))) {
+		$hauteur_hors_titre=$hauteur-1; // Le calcul n'est correct que dans le cas où l'unité est 'em'
+		$div.="<div style='width: ".$largeur;
+		if(is_numeric($largeur)) {
+			$div.=$unite_div_infobulle;
+		}
+		// Je n'arrive pas à ce que l'overflow s'adapte au redimensionnement du div via dragresize
+		$div.="; height: ".$hauteur_hors_titre;
+		if(is_numeric($hauteur)) {
+			$div.=$unite_div_infobulle;
+		}
+		
+		$div.="; overflow: auto;'>\n";
+		$div.="<div style='padding-left: 1px;'>\n";
+		$div.=$texte;
+		$div.="</div>\n";
+		$div.="</div>\n";
+	}
+	else{
+		$div.="<div style='padding-left: 1px;'>\n";
+		$div.=$texte;
+		$div.="</div>\n";
+	}
+	$div.="</div>\n";
+
+	$div.="</div>\n";
+
+	// Les div vont s'afficher côte à côte sans superposition en bas de page si JavaScript est désactivé:
+	if (isset($pas_de_decalage_infobulle) AND $pas_de_decalage_infobulle == "oui") {
+		// on ne décale pas les div des infobulles
+		$posDiv_infobulle = $posDiv_infobulle;
+	}else{
+		$posDiv_infobulle = $posDiv_infobulle+$largeur;
+	}
+
+	return $div;
+}
+
 
 /**
  * tableau des variables transmises d'une page à l'autre
@@ -2545,16 +3099,18 @@ function debug_var() {
 
 		echo "<table id='container_debug_var_$cpt_debug_debug_var' summary=\"Tableau de debug\">\n";
 		foreach($tableau as $post => $val) {
-			echo "<tr><td valign='top'>".$pref_chaine."['".$post."']=</td><td>".$val;
+			echo "<tr><td valign='top'>".$pref_chaine."['".$post."']=</td><td>";
 
 			if(is_array($tableau[$post])) {
 				$cpt_debug_debug_var++;
 
+				echo "Array";
 				tab_debug_var($chaine_tab_niv1,$tableau[$post],$pref_chaine.'['.$post.']');
 
 				$cpt_debug_debug_var++;
 			}
 			elseif(isset($debug_var_count[$chaine_tab_niv1])) {
+				echo $val;
 				$debug_var_count[$chaine_tab_niv1]++;
 			}
 
@@ -2566,15 +3122,16 @@ function debug_var() {
 
 	echo "<table summary=\"Tableau de debug\">\n";
 	foreach($_POST as $post => $val) {
-		echo "<tr><td valign='top'>\$_POST['".$post."']=</td><td>".$val;
+		echo "<tr><td valign='top'>\$_POST['".$post."']=</td><td>";
 
 		if(is_array($_POST[$post])) {
-			echo "<a name='ancre_debug_var_$cpt_debug_debug_var'></a>\n";
+			echo "<a name='ancre_debug_var_$cpt_debug_debug_var'></a>Array\n";
 			tab_debug_var('POST',$_POST[$post],'$_POST['.$post.']');
 
 			$cpt_debug_debug_var++;
 		}
 		else {
+			echo $val;
 			$debug_var_count['POST']++;
 		}
 
@@ -2602,15 +3159,16 @@ function debug_var() {
 	echo "<table summary=\"Tableau de debug sur GET\">";
 	foreach($_GET as $get => $val){
 		
-		echo "<tr><td valign='top'>\$_GET['".$get."']=</td><td>".$val;
+		echo "<tr><td valign='top'>\$_GET['".$get."']=</td><td>";
 
 		if(is_array($_GET[$get])) {
-			echo "<a name='ancre_debug_var_$cpt_debug_debug_var'></a>\n";
+			echo "<a name='ancre_debug_var_$cpt_debug_debug_var'></a>Array\n";
 			tab_debug_var('GET',$_GET[$get],'$_GET['.$get.']');
 
 			$cpt_debug_debug_var++;
 		}
 		else {
+			echo $val;
 			$debug_var_count['GET']++;
 		}
 
@@ -2639,14 +3197,15 @@ function debug_var() {
 	echo "<table summary=\"Tableau de debug sur SESSION\">";
 	foreach($_SESSION as $variable => $val){
 		
-		echo "<tr><td valign='top'>\$_SESSION['".$variable."']=</td><td>".$val;
+		echo "<tr><td valign='top'>\$_SESSION['".$variable."']=</td><td>";
 		if(is_array($_SESSION[$variable])) {
-			echo "<a name='ancre_debug_var_$cpt_debug_debug_var'></a>\n";
+			echo "<a name='ancre_debug_var_$cpt_debug_debug_var'></a>Array\n";
 			tab_debug_var('SESSION',$_SESSION[$variable],'$_SESSION['.$variable.']');
 
 			$cpt_debug_debug_var++;
 		}
 		else {
+			echo $val;
 			$debug_var_count['SESSION']++;
 		}
 		echo "</td></tr>\n";
@@ -2698,15 +3257,18 @@ function debug_var() {
 
 		echo "<table summary=\"Tableau de debug\">\n";
 		foreach($_FILES as $key => $val) {
-			echo "<tr><td valign='top'>\$_FILES['".$key."']=</td><td>".$val;
+			echo "<tr><td valign='top'>\$_FILES['".$key."']=</td><td>";
 	
 			if(is_array($_FILES[$key])) {
-				echo "<a name='ancre_debug_var_$cpt_debug_debug_var'></a>\n";
+				echo "<a name='ancre_debug_var_$cpt_debug_debug_var'></a>Array\n";
 				tab_debug_var('FILES',$_FILES[$key],'$_FILES['.$key.']');
 	
 				$cpt_debug_debug_var++;
 			}
-	
+			else {
+				echo $val;
+			}
+
 			echo "</td></tr>\n";
 		}
 		echo "</table>\n";
@@ -2731,15 +3293,16 @@ function debug_var() {
 	echo "<table summary=\"Tableau de debug sur COOKIE\">";
 	foreach($_COOKIE as $variable => $val){
 
-		echo "<tr><td valign='top'>\$_COOKIE['".$variable."']=</td><td>".$val;
+		echo "<tr><td valign='top'>\$_COOKIE['".$variable."']=</td><td>";
 
 		if(is_array($val)) {
-			echo "<a name='ancre_debug_var_$cpt_debug_debug_var'></a>\n";
+			echo "<a name='ancre_debug_var_$cpt_debug_debug_var'></a>Array\n";
 			tab_debug_var('COOKIE',$val,'$_COOKIE['.$variable.']');
 
 			$cpt_debug_debug_var++;
 		}
 		else {
+			echo $val;
 			$debug_var_count['COOKIE']++;
 		}
 
@@ -3320,6 +3883,37 @@ function get_nom_prenom_eleve($login_ele,$mode='simple') {
 }
 
 /**
+ * Renvoie le nom et le prénom d'un élève
+ *
+ * @param string $ele_id ele_id de l'élève
+ * @param string $mode si 'avec_classe' on retourne aussi la(les) classe(s)
+ * @return string 
+ * @see civ_nom_prenom()
+ * @see get_class_from_ele_login()
+ * @see casse_mot()
+ */
+function get_nom_prenom_eleve_from_ele_id($ele_id, $mode='simple') {
+	$sql="SELECT login, nom,prenom FROM eleves WHERE ele_id='$ele_id';";
+	$res=mysql_query($sql);
+	if(mysql_num_rows($res)==0) {
+		return "Elève inconnu ($ele_id)";
+	}
+	else {
+		$lig=mysql_fetch_object($res);
+
+		$ajout="";
+		if($mode=='avec_classe') {
+			$tmp_tab_clas=get_class_from_ele_login($lig->login);
+			if((isset($tmp_tab_clas['liste']))&&($tmp_tab_clas['liste']!='')) {
+				$ajout=" (".$tmp_tab_clas['liste'].")";
+			}
+		}
+
+		return casse_mot($lig->nom)." ".casse_mot($lig->prenom,'majf2').$ajout;
+	}
+}
+
+/**
  * Retourne une commune à partir de son code insee
  * 
  * $mode :
@@ -3368,10 +3962,12 @@ function get_commune($code_commune_insee,$mode){
 }
 
 /**
- * Renvoi civilite nom prénom d'un utilisateur
+ * Renvoie civilite nom prénom d'un utilisateur avec compte (table 'utilisateurs')
  *
  * @param string $login Login de l'utilisateur recherché
  * @param string $mode si 'prenom' inverse le nom et le prénom
+ * @param string $avec_statut avec affichage ou non du statut entre parenthèses
+ *
  * @return string civilite nom prénom de l'utilisateur
  */
 function civ_nom_prenom($login,$mode='prenom',$avec_statut="n") {
@@ -3404,6 +4000,34 @@ function civ_nom_prenom($login,$mode='prenom',$avec_statut="n") {
 			else {
 				$retour.=" ($lig_user->statut)";
 			}
+		}
+	}
+	return $retour;
+}
+
+/**
+ * Renvoie civilite nom prénom d'un responsable
+ *
+ * @param string $pers_id pers_id de l'utilisateur recherché
+ * @param string $mode si 'prenom' inverse le nom et le prénom
+ *
+ * @return string civilite nom prénom de l'utilisateur
+ */
+function civ_nom_prenom_from_pers_id($pers_id,$mode='prenom') {
+	$retour="";
+	$sql="SELECT nom,prenom,civilite FROM resp_pers WHERE pers_id='$pers_id';";
+	$res_user=mysql_query($sql);
+	if (mysql_num_rows($res_user)>0) {
+		$lig_user=mysql_fetch_object($res_user);
+		if($lig_user->civilite!="") {
+			$retour.=$lig_user->civilite." ";
+		}
+		if($mode=='prenom') {
+			$retour.=my_strtoupper($lig_user->nom)." ".casse_mot($lig_user->prenom,'majf2');
+		}
+		else {
+			// Initiale
+			$retour.=my_strtoupper($lig_user->nom)." ".my_strtoupper(mb_substr($lig_user->prenom,0,1));
 		}
 	}
 	return $retour;
@@ -3443,64 +4067,6 @@ function test_ecriture_style_screen_ajout() {
  *                                  Fonctions Trombinoscope
  **********************************************************************************************/
 
-/**
- * Crée les répertoires photos/RNE_Etablissement, photos/RNE_Etablissement/eleves et
- * photos/RNE_Etablissement/personnels s'ils n'existent pas
- * @return boolean TRUE si tout se passe bien ou FALSE si la création d'un répertoire échoue
- * @see getSettingValue()
- */
-function cree_repertoire_multisite() {
-  if (isset($GLOBALS['multisite']) AND $GLOBALS['multisite'] == 'y') {
-		// On récupère le RNE de l'établissement
-	if (!$repertoire=$_COOKIE['RNE'])
-	  return FALSE;
-	//on vérifie que le dossier photos/RNE_Etablissement n'existe pas
-	if (!is_dir("../photos/".$repertoire)){
-	  // On crée le répertoire photos/RNE_Etablissement
-	  if (!mkdir("../photos/".$repertoire, 0700))
-		return FALSE;
-	  // On enregistre un fichier index.html dans photos/RNE_Etablissement
-	  if (!copy  (  "../photos/index.html"  ,  "../photos/".$repertoire."/index.html" ))
-		return FALSE;
-	}
-	//on vérifie que le dossier photos/RNE_Etablissement/eleves n'existe pas
-	if (!is_dir("../photos/".$repertoire."/eleves")){
-	  // On crée le répertoire photos/RNE_Etablissement/eleves
-	  if (!mkdir("../photos/".$repertoire."/eleves", 0700))
-		return FALSE;
-	  // On enregistre un fichier index.html dans photos/RNE_Etablissement/eleves
-	  if (!copy  (  "../photos/index.html"  ,  "../photos/".$repertoire."/eleves/index.html" ))
-		return FALSE;
-	 }
-	//on vérifie que le dossier photos/RNE_Etablissement/personnels n'existe pas
-	if (!is_dir("../photos/".$repertoire."/personnels")){
-	  // On crée le répertoire photos/RNE_Etablissement/personnels
-	  if (!mkdir("../photos/".$repertoire."/personnels", 0700))
-		return FALSE;
-	  // On enregistre un fichier index.html dans photos/RNE_Etablissement/personnels
-	  if (!copy  (  "../photos/index.html"  ,  "../photos/".$repertoire."/personnels/index.html" ))
-		return FALSE;
-	  }
-	}
-	return TRUE;
-}
-
-/**
- * Crée si nécessaire l'entrée 'encodage_nom_photo' dans la table 'setting'
- * Crée ou modifie la valeur aléatoire 'alea_nom_photo' utilisée pour encoder
- *  le nom des fichiers photo des élèves et l'enregistre dans la table 'setting'
- * Renvoie true si l'encodage est activé ou réactivé, false sinon.
- *
- * @param string $alea_nom_photo Si non vide détermine la valeur à donner à 'alea_nom_photo'
- * @return boolean true : succès, false : échec
- * @see encode_nom_photo()
- */
-function active_encodage_nom_photo($alea_nom_photo="") {
-	$retour=true;
-	if ((getSettingValue('encodage_nom_photo')==NULL) || !getSettingAOui('encodage_nom_photo')) $retour=$retour && saveSetting('encodage_nom_photo','yes');
-	if ($alea_nom_photo=="") $alea_nom_photo=md5(time());
-	return $retour && saveSetting('alea_nom_photo',$alea_nom_photo);
-}
 
 /**
  * Ajoute au début d'un nom de fichier une chaîne 5 caractères pseudo alétaoires
@@ -3605,105 +4171,6 @@ function nom_photo($_elenoet_ou_login,$repertoire="eleves",$arbo=1) {
 	return $photo;
 }
 
-/**
- * Recherche les élèves sans photos
- *
- * @return array tableau de login - nom - prénom - classe - classe court - eleonet
- * @see nom_photo()
- */
-function recherche_eleves_sans_photo() {
-  $eleve=NULL;
-  $requete_liste_eleve = "SELECT e.elenoet, e.login, e.nom, e.prenom, c.nom_complet, c.classe
-	FROM eleves e, j_eleves_classes jec, classes c
-	WHERE e.login = jec.login
-	AND jec.id_classe = c.id
-	GROUP BY e.login
-	ORDER BY id_classe, nom, prenom ASC";
-  $res_eleve = mysql_query($requete_liste_eleve);
-  while ($row = mysql_fetch_object($res_eleve)) {
-	$nom_photo = nom_photo($row->elenoet);
-	if (!($nom_photo and file_exists($nom_photo))) {
-	  $eleve[]=$row;
-	}
-  }
-  return $eleve;
-}
-
-/**
- *
- * @param string $statut statut recherché
- * @return array tableau des personnels sans photo ou NULL
- * @see nom_photo()
- */
-function recherche_personnel_sans_photo($statut='professeur') {
-  $personnel=NULL;
-  $requete_liste_personnel = "SELECT login,nom,prenom FROM utilisateurs u
-	WHERE u.statut='".$statut."' AND u.etat='actif' 
-	ORDER BY nom, prenom ASC";
-  $res_personnel = mysql_query($requete_liste_personnel);
-  while ($row = mysql_fetch_object($res_personnel)) {
-	$nom_photo = nom_photo($row->login,"personnels");
-	if (!($nom_photo and file_exists($nom_photo))) {
-	  $personnel[]=$row;
-	}
-  }
-  return $personnel;
-}
-
-/**
- * Efface le dossier photo passé en argument
- * @param string $photos le dossier à effacer personnels ou eleves
- * @return string L'état de la suppression
- * @see cree_zip_archive()
- * @see getSettingValue()
- */
-function efface_photos($photos) {
-// on liste les fichier du dossier photos/personnels ou photos/eleves
-  if (!($photos=="eleves" || $photos=="personnels"))
-	return ("Le dossier <strong>".$photos."</strong> n'est pas valide.");
-  if (cree_zip_archive("photos")==TRUE){
-	$fichier_sup=array();
-	if (isset($GLOBALS['multisite']) AND $GLOBALS['multisite'] == 'y') {
-		  // On récupère le RNE de l'établissement
-	  if (!$repertoire=$_COOKIE['RNE'])
-		return ("Erreur lors de la récupération du dossier établissement.");
-	} else {
-	  $repertoire="";
-	}
-	$folder = "../photos/".$repertoire.$photos."/";
-	$dossier = opendir($folder);
-	while ($Fichier = readdir($dossier)) {
-	  if (mb_strtolower(pathinfo($Fichier,PATHINFO_EXTENSION))=="jpg") {
-		$nomFichier = $folder."".$Fichier;
-		$fichier_sup[] = $nomFichier;
-	  }
-	}
-	closedir($dossier);
-	if(count($fichier_sup)==0) {
-	  return ("Le dossier <strong>".$folder."</strong> ne contient pas de photo.") ;
-	} else {
-	  $nb_erreurs=0; $erreurs="";
-	  foreach ($fichier_sup as $fic_efface) {
-		if(file_exists($fic_efface)) {
-		  @unlink($fic_efface);
-		  if(file_exists($fic_efface)) {
-			$nb_erreurs++;
-			$erreurs.="Le fichier  <strong>".$fic_efface."</strong> n'a pas pu être effacé.<br />";
-		  }
-		}
-	  }
-	  unset ($fic_efface);
-	  if ($nb_erreurs>0) {
-		if ($nb_erreurs>10) return $nb_erreurs." fichiers n'ont pu être effacés.";
-			else return $erreurs;
-	  }
-		else return ("Le dossier <strong>".$folder."</strong> a été vidé.") ;
-	}
-  }else{
-	return ("Erreur lors de la création de l'archive.") ;
-  }
-
-}
 
 /**
  * Redimensionne un fichier photo JPG en conservant son ratio d'origine
@@ -3738,7 +4205,9 @@ function redim_photo($file_source,$largeur_destination,$hauteur_destination,$ang
 	if ($largeur_source===false) return false;
 	$hauteur_source=imagesy($source);
 	if ($hauteur_source===false) return false;
-	if ($largeur_source==0 || $hauteur_source==0 || ($largeur_source==$largeur_destination && $hauteur_source==$hauteur_destination)) return false;
+
+	if ($largeur_source==0 || $hauteur_source==0) return false;
+	if ($largeur_source==$largeur_destination && $hauteur_source==$hauteur_destination) return true;
 
 	$ratio_lh_source=$largeur_source/$hauteur_source;
 	$ratio_lh_destination=$largeur_destination/$hauteur_destination;
@@ -3768,37 +4237,6 @@ function redim_photo($file_source,$largeur_destination,$hauteur_destination,$ang
 	imagedestroy($destination);
 	return true;
 	}
-
-/**
- * Calcule les dimensions pour afficher une photo
- * dans un cadre de dimensions largeur_max X hauteur_max
- * en conservant le ratio initial
- *
- * @param string $photo L'adresse de la photo
- * @param integer $largeur_max Largeur du cadre
- * @param integer $hauteur_max Hauteur du cadre
- * @return array Les nouvelles dimensions de l'image (largeur, hauteur)
- */
-function dimensions_affichage_photo($photo,$photo_largeur_max, $photo_hauteur_max) {
-
-	// prendre les informations sur l'image
-	$info_image=getimagesize($photo);
-	// largeur et hauteur de l'image d'origine
-	$largeur=$info_image[0];
-	$hauteur=$info_image[1];
-
-	// calcule le ratio de redimensionnement
-	$ratio_l=$largeur/$photo_largeur_max;
-	$ratio_h=$hauteur/$photo_hauteur_max;
-	$ratio=($ratio_l>$ratio_h)?$ratio_l:$ratio_h;
-
-	// définit largeur et hauteur pour la nouvelle image
-	$nouvelle_largeur=round($largeur/$ratio);
-	$nouvelle_hauteur=round($hauteur/$ratio);
-
-	return array($nouvelle_largeur, $nouvelle_hauteur);
-}
-
 /**********************************************************************************************
  *                               Fin Fonctions Trombinoscope
  **********************************************************************************************/
@@ -4122,17 +4560,31 @@ function lignes_options_select_eleve($id_classe,$login_eleve_courant,$sql_ele=""
  * $login_eleve : login de l'élève à tester (si vide, on teste juste si le prof est PP 
  * (éventuellement pour la classe si id_classe est non vide))
  * 
- * @param type $login_prof login de l'utilisateur à tester
- * @param type $id_classe identifiant de la classe
- * @param type $login_eleve login de l'élève
+ * @param type string $login_prof login de l'utilisateur à tester
+ * @param type integer $id_classe identifiant de la classe
+ * @param type string $login_eleve login de l'élève
+ * @param type integer $num_periode numéro de la période
+ * @param type string $login_resp login d'un responsable de l'élève
  * @return boolean 
  */
-function is_pp($login_prof,$id_classe="",$login_eleve="") {
+function is_pp($login_prof,$id_classe="",$login_eleve="", $num_periode="", $login_resp="") {
 	$retour=FALSE;
+
 	if($login_eleve=='') {
 		$sql="SELECT 1=1 FROM j_eleves_professeurs WHERE ";
 		if($id_classe!="") {$sql.="id_classe='$id_classe' AND ";}
 		$sql.="professeur='$login_prof';";
+	}
+	elseif($login_resp!="") {
+		$sql="SELECT 1=1 FROM j_eleves_professeurs jep, 
+							eleves e, 
+							responsables2 r, 
+							resp_pers rp 
+						WHERE jep.professeur='".$login_prof."' AND 
+							jep.login=e.login AND 
+							e.ele_id=r.ele_id AND 
+							r.pers_id=rp.pers_id AND 
+							rp.login='$login_resp'";
 	}
 	else {
 		$sql="SELECT 1=1 FROM j_eleves_professeurs WHERE ";
@@ -4143,6 +4595,38 @@ function is_pp($login_prof,$id_classe="",$login_eleve="") {
 	if(mysql_num_rows($test)>0) {$retour=TRUE;}
 
 	return $retour;
+}
+
+/**
+ * Récupère le tableau des classes/élèves dont un utilisateur est prof principal (gepi_prof_suivi)
+ * 
+ * @param type string $login_prof login de l'utilisateur à tester
+ *
+ * @return array Tableau d'indices ['login'][] et ['id_classe'][] et ['classe'][]
+ */
+function get_tab_ele_clas_pp($login_prof) {
+	$tab=array();
+	$tab['login']=array();
+	$tab['id_classe']=array();
+
+	$sql="SELECT DISTINCT jep.login FROM j_eleves_professeurs jep, eleves e, j_eleves_classes jec, classes c WHERE jep.professeur='$login_prof' AND jep.login=e.login AND jec.login=e.login AND jec.id_classe=c.id ORDER BY c.classe, e.nom, e.prenom;";
+	$res=mysql_query($sql);
+	if(mysql_num_rows($res)>0) {
+		while($lig=mysql_fetch_object($res)) {
+			$tab['login'][]=$lig->login;
+		}
+	}
+
+	$sql="SELECT DISTINCT jec.id_classe, c.classe FROM j_eleves_professeurs jep, j_eleves_classes jec, classes c WHERE jep.professeur='$login_prof' AND jep.login=jec.login AND jec.id_classe=c.id ORDER BY c.classe;";
+	$res=mysql_query($sql);
+	if(mysql_num_rows($res)>0) {
+		while($lig=mysql_fetch_object($res)) {
+			$tab['id_classe'][]=$lig->id_classe;
+			$tab['classe'][]=$lig->classe;
+		}
+	}
+
+	return $tab;
 }
 
 /**
@@ -4167,9 +4651,10 @@ function is_cpe($login_cpe,$id_classe="",$login_eleve="") {
 	elseif($id_classe!='') {
 		$sql="SELECT 1=1 FROM j_eleves_cpe jecpe, j_eleves_classes jec WHERE jec.id_classe='$id_classe' AND jec.login=jecpe.e_login AND jecpe.cpe_login='$login_cpe';";
 	}
-	$test=mysql_query($sql);
-	if(mysql_num_rows($test)>0) {$retour=TRUE;}
-
+        if(isset($sql)) {
+            $test=mysql_query($sql);
+            if(mysql_num_rows($test)>0) {$retour=TRUE;}
+        }
 	return $retour;
 }
 
@@ -4287,7 +4772,7 @@ function enregistre_infos_actions($titre,$texte,$destinataire,$mode) {
 		$tab_dest=array($destinataire);
 	}
 
-	$sql="INSERT INTO infos_actions SET titre='".addslashes($titre)."', description='".addslashes($texte)."', date=NOW();";
+	$sql="INSERT INTO infos_actions SET titre='".mysql_real_escape_string($titre)."', description='".mysql_real_escape_string($texte)."', date=NOW();";
 	$insert=mysql_query($sql);
 	if(!$insert) {
 		return FALSE;
@@ -4310,24 +4795,39 @@ function enregistre_infos_actions($titre,$texte,$destinataire,$mode) {
 /**
  * Supprime une action à effectuer de la base
  *
- * @param type $id_info Id de l'action a effacer de la base
+ * @param type $id_info Id de l'action à effacer de la base
+ * @param type $_login   Login concerné par l'action à effacer de la base
+ * @param type $_statut  Statut concerné par l'action à effacer de la base
+ * (on peut fournir login ou statut)
+ *
  * @return boolean TRUE si l'action a été effacée de la base 
  */
-function del_info_action($id_info) {
+function del_info_action($id_info, $_login="", $_statut="") {
 	// Dans le cas des infos destinées à un statut... c'est le premier qui supprime qui vire pour tout le monde?
 	// S'il s'agit bien de loguer des actions à effectuer... elle ne doit être effectuée qu'une fois.
 	// Ou alors il faudrait ajouter des champs pour marquer les actions comme effectuées et n'afficher par défaut que les actions non effectuées
 
-	$sql="SELECT 1=1 FROM infos_actions_destinataires WHERE id_info='$id_info' AND ((nature='statut' AND valeur='".$_SESSION['statut']."') OR (nature='individu' AND valeur='".$_SESSION['login']."'));";
+	if($_SESSION['statut']=="administrateur") {
+		$sql="SELECT 1=1 FROM infos_actions_destinataires WHERE id_info='$id_info';";
+	}
+	else {
+		$_login=$_SESSION['login'];
+		$_statut=$_SESSION['statut'];
+
+		$sql="SELECT 1=1 FROM infos_actions_destinataires WHERE id_info='$id_info' AND ((nature='statut' AND valeur='".$_statut."') OR (nature='individu' AND valeur='".$_login."'));";
+	}
+	//echo "$sql<br />";
 	$test=mysql_query($sql);
 	if(mysql_num_rows($test)>0) {
 		$sql="DELETE FROM infos_actions_destinataires WHERE id_info='$id_info';";
+		//echo "$sql<br />";
 		$del=mysql_query($sql);
 		if(!$del) {
 			return FALSE;
 		}
 		else {
 			$sql="DELETE FROM infos_actions WHERE id='$id_info';";
+			//echo "$sql<br />";
 			$del=mysql_query($sql);
 			if(!$del) {
 				return FALSE;
@@ -4481,18 +4981,40 @@ function deltree($rep,$repaussi=TRUE) {
  * @param type $mode
  * @return boolean  
  */
-function check_mail($email,$mode='simple') {
+function check_mail($email,$mode='simple',$test_mail="n") {
+	$debug_test_mail="n";
+
 	if(!preg_match("/^([a-zA-Z0-9])+([a-zA-Z0-9\._-])*@([a-zA-Z0-9_-])+([a-zA-Z0-9\._-]+)+$/" , $email)) {
+		if($debug_test_mail=="y") {
+			$f=fopen("/tmp/debug_check_mail.txt", "a+");
+			fwrite($f, strftime("%Y-%m-%d %H:%M:%S")." check_mail(): Le format de la chaine '$email' est invalide.\n");
+			fclose($f);
+		}
 		return FALSE;
 	}
 	else {
 		if(($mode=='simple')||(!function_exists('checkdnsrr'))) {
+			if($debug_test_mail=="y") {
+				$f=fopen("/tmp/debug_check_mail.txt", "a+");
+				fwrite($f, strftime("%Y-%m-%d %H:%M:%S")." check_mail(): Le format de la chaine '$email' est valide.\n");
+				fclose($f);
+			}
 			return TRUE;
 		}
 		else {
+			if($debug_test_mail=="y") {
+				$f=fopen("/tmp/debug_check_mail.txt", "a+");
+				fwrite($f, strftime("%Y-%m-%d %H:%M:%S")." check_mail(): Le format de la chaine '$email' est valide; On teste avec checkdnsrr().\n");
+				fclose($f);
+			}
+
 			$tab=explode('@', $email);
 			if(checkdnsrr($tab[1], 'MX')) {return TRUE;}
-			elseif(checkdnsrr($tab[1], 'A')) {return TRUE;}
+			elseif($test_mail=="n") {
+				if(checkdnsrr($tab[1], 'A')) {return TRUE;}
+				else {return FALSE;}
+			}
+			else {return FALSE;}
 		}
 	}
 }
@@ -4519,6 +5041,24 @@ function get_date_slash_from_mysql_date($mysql_date) {
 	}
 	else {
 		return "Date '$mysql_date' mal formatée?";
+	}
+}
+
+/**
+ * Fonction destinée à prendre une date au format jj/mm/aaaa
+ * et à retourner une date mysql aaaa-mm-jj HH:MM:SS
+ * 
+ * @param string $slash_date (jj/mm/aaaa)
+ * @return date $mysql_date date (aaaa-mm-jj HH:MM:SS)
+ * @todo on a déjà cette fonction
+ */
+function get_mysql_date_from_slash_date($slash_date) {
+	$tmp_tab=explode("/",$slash_date);
+	if(isset($tmp_tab[2])) {
+		return $tmp_tab[2]."-".$tmp_tab[1]."-".$tmp_tab[0]." 00:00:00";
+	}
+	else {
+		return "Date '$slash_date' mal formatée?";
 	}
 }
 
@@ -4624,6 +5164,7 @@ function get_tab_prof_suivi($id_classe) {
  * - message_accueil_utilisateur("UNTEL","Bonjour Untel",130674844) : affiche le message "Bonjour Untel" sur la page du destinataire de login "UNTEL" à partir de la date 130674844, pour une durée de 7 jours, avec décompte sur le 7ième jour	
  *  - message_accueil_utilisateur("UNTEL","Bonjour Untel",130674844,130684567) : affiche le message "Bonjour Untel" sur la page du destinataire de login "UNTEL" à partir de la date 130674844, jusqu'à la date 130684567, avec décompte sur la date 130684567
  * - message_accueil_utilisateur("UNTEL","Bonjour Untel",130674844,130684567,130690844) : affiche le message "Bonjour Untel" sur la page du destinataire de login "UNTEL" à partir de la date 130674844, jusqu'à la date 130684567, avec décompte sur la date 130690844
+ * - message_accueil_utilisateur("UNTEL","Bonjour Untel",130674844,130684567,130690844,true) : affiche le message "Bonjour Untel" sur la page du destinataire de login "UNTEL" à partir de la date 130674844, jusqu'à la date 130684567, avec décompte sur la date 130690844, et autorise l'utilisateur à supprimer ce message
  * 
  * @param type string $login_destinataire login du destinataire (obligatoire)
  * @param type string $texte texte du message contenant éventuellement des balises HTML et encodé en iso-8859-1 (obligatoire)
@@ -4635,7 +5176,7 @@ function get_tab_prof_suivi($id_classe) {
  */
 function message_accueil_utilisateur($login_destinataire,$texte,$date_debut=0,$date_fin=0,$date_decompte=0,$bouton_supprimer=false)
 {
-	// On arrondit le timestamp d'appel à l'heure (pas néceassaire mais pour l'esthétique)
+	// On arrondit le timestamp d'appel à l'heure (pas nécessaire mais pour l'esthétique)
 	$t_appel=time()-(time()%3600);
 	// suivant le nombre de paramètres passés :
 	switch (func_num_args())
@@ -4648,6 +5189,7 @@ function message_accueil_utilisateur($login_destinataire,$texte,$date_debut=0,$d
 			$date_decompte=$date_fin;
 			break;
 		case 5:
+		case 6:
 			break;
 		default :
 			// valeurs par défaut
@@ -4663,7 +5205,7 @@ function message_accueil_utilisateur($login_destinataire,$texte,$date_debut=0,$d
 		$contenu='
 		<form method="POST" action="#" name="f_suppression_message">
 		<input type="hidden" name="supprimer_message" value="'.$id_message.'">
-		<button type="submit" title=" Supprimer ce message " style="border: none; background: none; float: right;"><img style="vertical-align: bottom;" src="images/icons/delete.png"></button>
+		<button type="submit" title=" Supprimer ce message " style="border: none; background: none; float: right;"><img style="vertical-align: bottom;" src="images/icons/delete.png" alt="" /></button>
 		</form>'.addslashes($texte);
 		$r_sql="UPDATE `messages` SET `texte`='".$contenu."' WHERE `id`='".$id_message."'";
 		$retour=mysql_query($r_sql)?true:false;
@@ -4990,12 +5532,28 @@ function lien_image_compte_utilisateur($login, $statut='', $target='', $avec_lie
 
 	$retour="";
 
-	if($target!="") {$target=" target='$target'";}
+	if($target!="") {
+		/*
+		// Cela masque le title Compte actif/inactif
+		if($target=='_blank') {
+			$target=" target='$target' title='Ouverture dans un nouvel onglet.'";
+		}
+		else {
+		*/
+			$target=" target='$target'";
+		//}
+	}
 
 	$test=check_compte_actif($login);
 	if($test!=0) {
 		if($statut=="") {
 			$statut=get_statut_from_login($login);
+		}
+		else {
+			$tmp_statut=get_statut_from_login($login);
+			if($tmp_statut!=$statut) {$retour.="<img src='../images/icons/flag2.gif' width='17' height='18' alt='' title=\"ANOMALIE : Le statut du compte ne coïncide pas avec le statut attendu.
+                    Le compte est '$tmp_statut' alors que vous avez fait
+                    une recherche pour un compte '$statut'.\" /> ";}
 		}
 
 		if($statut!="") {
@@ -5160,15 +5718,27 @@ function acces_ele_disc($login_ele) {
 /**
  * Renvoie un tableau des responsables d'un élève
  * 
- * $tab[indice] = array('login','nom','prenom','civilite','designation'=>civilite nom prenom)
+ * $tab[indice] = array('login','nom','prenom','civilite','designation'=>civilite nom prenom, 'pers_id')
  *
  * @param string $ele_login Login de l'élève
+ * @param string $meme_en_resp_legal_0 'y'
+ *               (on récupère même les enfants dont $resp_login est resp_legal=0)
+ *               'yy' (on récupère aussi les resp_legal=0 mais seulement s'ils ont l'accès aux données en tant qu'utilisateur
+ *               ou 'n' (on ne récupère que les enfants dont $resp_login est resp_legal=1 ou 2)
+ *
  * @return array Le tableau
  */
-function get_resp_from_ele_login($ele_login) {
+function get_resp_from_ele_login($ele_login, $meme_en_resp_legal_0="n") {
 	$tab="";
 
-	$sql="SELECT rp.* FROM resp_pers rp, responsables2 r, eleves e WHERE e.login='$ele_login' AND rp.pers_id=r.pers_id AND r.ele_id=e.ele_id AND (r.resp_legal='1' OR r.resp_legal='2');";
+	$sql="(SELECT rp.* FROM resp_pers rp, responsables2 r, eleves e WHERE e.login='$ele_login' AND rp.pers_id=r.pers_id AND r.ele_id=e.ele_id AND (r.resp_legal='1' OR r.resp_legal='2'))";
+	if($meme_en_resp_legal_0=="y") {
+		$sql.=" UNION (SELECT rp.* FROM resp_pers rp, responsables2 r, eleves e WHERE e.login='$ele_login' AND rp.pers_id=r.pers_id AND r.ele_id=e.ele_id AND r.resp_legal='0')";
+	}
+	elseif($meme_en_resp_legal_0=="yy") {
+		$sql.=" UNION (SELECT rp.* FROM resp_pers rp, responsables2 r, eleves e WHERE e.login='$ele_login' AND rp.pers_id=r.pers_id AND r.ele_id=e.ele_id AND r.resp_legal='0' AND r.acces_sp='y')";
+	}
+	$sql.=";";
 	//echo "$sql<br />";
 	$res=mysql_query($sql);
 	if(mysql_num_rows($res)>0) {
@@ -5182,6 +5752,8 @@ function get_resp_from_ele_login($ele_login) {
 			$tab[$cpt]['civilite']=$lig->civilite;
 
 			$tab[$cpt]['designation']=$lig->civilite." ".$lig->nom." ".$lig->prenom;
+
+			$tab[$cpt]['pers_id']=$lig->pers_id;
 
 			$cpt++;
 		}
@@ -5244,8 +5816,8 @@ function joueAlarme($niveau_arbo = "0") {
 	  }
 
 	  if(file_exists($chemin_sound)) { 
-		$retour ="<audio id='id_footer_sound' preload='auto' autobuffer>
-	<source src=".$chemin_sound." />
+		$retour ="<audio id='id_footer_sound' preload='auto'>
+	<source src='".$chemin_sound."' />
 </audio>
 <script type='text/javascript'>
   function play_footer_sound() {
@@ -5631,7 +6203,10 @@ function get_img_formules_math($texte, $id_groupe, $type_notice="c") {
 function temoin_check_srv($id_div_retour="retour_ping", $nom_js_func="check_srv", $nom_var="cpt_ping", $taille=10, $intervalle_temps=10) {
 	global $gepiPath;
 
-	echo "<div id='retour_ping' style='width:".$taille."px; height:".$taille."px; background-color:red; border:1px solid black; float:left; margin:1px; display:none;' title=\"Témoin de réponse du serveur: Un test est effectué toutes les $intervalle_temps secondes. Si le témoin se maintient au rouge, c'est que le serveur n'est pas joignable.\"></div>\n";
+	echo "<div id='retour_ping' style='width:".$taille."px; height:".$taille."px; background-color:red; border:1px solid black; float:left; margin:1px; display:none;' title=\"Témoin de réponse du serveur: Un test est effectué toutes les $intervalle_temps secondes.
+Si le témoin se maintient au rouge, c'est que le serveur n'est pas joignable.
+Vous devriez dans ce cas (pour vous prémunir d'une perte de ce qui a été saisi et pas encore enregistré), copier dans un Bloc-notes tout ce qui n'a pas encore été enregistré.
+Provoquer l'enregistrement/validation des données vers le serveur risque de se solder par un échec (si le serveur est indisponible, il ne recevra pas ce que vous enverrez et tout sera perdu).\"></div>\n";
 
 	echo "<script type='text/javascript'>
 	var $nom_var=0;
@@ -5660,6 +6235,256 @@ function temoin_check_srv($id_div_retour="retour_ping", $nom_js_func="check_srv"
 </script>\n";
 }
 
+/** Fonction destinée à télécharger les images générées sur http://latex.codecogs.com/ 
+ *  et à corriger les notices en conséquence pour pointer sur uneURL locale
+ *
+ * @param integer $eff_parcours
+ *
+ * @return string le code HTML relatant le nombre de notices corrigées.
+ */
+
+function correction_notices_cdt_formules_maths($eff_parcours) {
+	$tab_grp=array();
+
+	$nb_corr=0;
+	$sql="SELECT * FROM ct_entry WHERE contenu LIKE '%http://latex.codecogs.com/%' LIMIT $eff_parcours;";
+	$res=mysql_query($sql);
+	while($lig=mysql_fetch_object($res)) {
+		$id_ct=$lig->id_ct;
+		$id_groupe=$lig->id_groupe;
+		$contenu=$lig->contenu;
+		$type_notice="c";
+
+		if(!isset($tab_grp[$id_groupe])) {
+			$tab_grp[$id_groupe]=get_group($id_groupe);
+		}
+
+		$contenu_corrige=get_img_formules_math($contenu, $id_groupe, $type_notice);
+		$sql="UPDATE ct_entry SET contenu='".mysql_real_escape_string($contenu_corrige)."' WHERE id_ct='$id_ct';";
+		$res_ct=mysql_query($sql);
+		if(!$res_ct) {
+			echo "<div style='border:1px solid red; margin:3px;'>";
+			echo "<p style='color:red;'>ERREUR sur<br />$sql";
+			echo "</div>\n";
+		}
+		else {
+			echo "<p>Correction sur une notice de <strong>compte-rendu</strong> en ".$tab_grp[$id_groupe]['name']." en ".$tab_grp[$id_groupe]['classlist_string']." : ".strftime("%d/%m/%Y", $lig->date_ct)."<br />\n";
+			$nb_corr++;
+		}
+		flush();
+	}
+	echo "<p>$nb_corr corrections effectuées sur 'ct_entry'.</p>";
+
+	$nb_corr=0;
+	$sql="SELECT * FROM ct_devoirs_entry WHERE contenu LIKE '%http://latex.codecogs.com/%' LIMIT $eff_parcours;";
+	$res=mysql_query($sql);
+	while($lig=mysql_fetch_object($res)) {
+		$id_ct=$lig->id_ct;
+		$id_groupe=$lig->id_groupe;
+		$contenu=$lig->contenu;
+		$type_notice="t";
+
+		if(!isset($tab_grp[$id_groupe])) {
+			$tab_grp[$id_groupe]=get_group($id_groupe);
+		}
+
+		$contenu_corrige=get_img_formules_math($contenu, $id_groupe, $type_notice);
+		$sql="UPDATE ct_devoirs_entry SET contenu='".mysql_real_escape_string($contenu_corrige)."' WHERE id_ct='$id_ct';";
+		$res_ct=mysql_query($sql);
+		if(!$res_ct) {
+			echo "<div style='border:1px solid red; margin:3px;'>";
+			echo "<p style='color:red;'>ERREUR sur<br />$sql";
+			echo "</div>\n";
+		}
+		else {
+			echo "<p>Correction sur une notice de <strong>devoir</strong> en ".$tab_grp[$id_groupe]['name']." en ".$tab_grp[$id_groupe]['classlist_string']." : ".strftime("%d/%m/%Y", $lig->date_ct)."<br />\n";
+			$nb_corr++;
+		}
+		flush();
+	}
+	echo "<p>$nb_corr corrections effectuées sur 'ct_devoirs_entry'.</p>";
+}
+
+
+/** Fonction destinée à retourner un tableau PHP des numéros de téléphone responsable (et élève)
+ *
+ * @param string $ele_login Login de l'élève
+ *
+ * @return array Tableau PHP des numéros de tel.
+ */
+function get_tel_resp_ele($ele_login) {
+	$tab_tel=array();
+
+	$cpt_resp=0;
+
+	$sql="SELECT rp.*, r.resp_legal, e.tel_pers AS ele_tel_pers, e.tel_port AS ele_tel_port, e.tel_prof AS ele_tel_prof FROM resp_pers rp, responsables2 r, eleves e WHERE e.login='$ele_login' AND e.ele_id=r.ele_id AND r.pers_id=rp.pers_id AND (r.resp_legal='1' OR r.resp_legal='2') ORDER BY r.resp_legal;";
+	$res=mysql_query($sql);
+	if(mysql_num_rows($res)>0) {
+		while($lig=mysql_fetch_object($res)) {
+			$tab_tel['responsable'][$cpt_resp]=array();
+			$tab_tel['responsable'][$cpt_resp]['resp_legal']=$lig->resp_legal;
+			$tab_tel['responsable'][$cpt_resp]['civ_nom_prenom']=$lig->civilite." ".casse_mot($lig->nom,'maj')." ".casse_mot($lig->prenom,'majf2');
+			if($lig->tel_pers!='') {
+				$tab_tel['responsable'][$cpt_resp]['tel_pers']=$lig->tel_pers;
+			}
+			if($lig->tel_port!='') {
+				$tab_tel['responsable'][$cpt_resp]['tel_port']=$lig->tel_port;
+			}
+			if($lig->tel_prof!='') {
+				$tab_tel['responsable'][$cpt_resp]['tel_prof']=$lig->tel_prof;
+			}
+
+			// On va remplir plusieurs fois les champs suivants (mais avec les mêmes valeurs) s'il y a plusieurs responsables
+			if((getSettingAOui('ele_tel_pers'))&&($lig->ele_tel_pers!='')) {
+				$tab_tel['eleve']['tel_pers']=$lig->ele_tel_pers;
+			}
+			if((getSettingAOui('ele_tel_port'))&&($lig->ele_tel_port!='')) {
+				$tab_tel['eleve']['tel_port']=$lig->ele_tel_port;
+			}
+			if((getSettingAOui('ele_tel_prof'))&&($lig->ele_tel_prof!='')) {
+				$tab_tel['eleve']['tel_prof']=$lig->ele_tel_prof;
+			}
+			$cpt_resp++;
+		}
+	}
+
+	$sql="SELECT rp.*, r.resp_legal FROM resp_pers rp, responsables2 r, eleves e WHERE e.login='$ele_login' AND e.ele_id=r.ele_id AND r.pers_id=rp.pers_id AND resp_legal='0' ORDER BY rp.civilite, rp.nom, rp.prenom;";
+	$res=mysql_query($sql);
+	if(mysql_num_rows($res)>0) {
+		while($lig=mysql_fetch_object($res)) {
+			$tab_tel['responsable'][$cpt_resp]=array();
+			$tab_tel['responsable'][$cpt_resp]['resp_legal']=$lig->resp_legal;
+			$tab_tel['responsable'][$cpt_resp]['civ_nom_prenom']=$lig->civilite." ".casse_mot($lig->nom,'maj')." ".casse_mot($lig->prenom,'majf2');
+			if($lig->tel_pers!='') {
+				$tab_tel['responsable'][$cpt_resp]['tel_pers']=$lig->tel_pers;
+			}
+			if($lig->tel_port!='') {
+				$tab_tel['responsable'][$cpt_resp]['tel_port']=$lig->tel_port;
+			}
+			if($lig->tel_prof!='') {
+				$tab_tel['responsable'][$cpt_resp]['tel_prof']=$lig->tel_prof;
+			}
+			$cpt_resp++;
+		}
+	}
+
+	return $tab_tel;
+}
+
+/** Fonction destinée à retourner un tableau HTML des numéros de téléphone responsable (et élève)
+ *
+ * @param string $ele_login Login de l'élève
+ *
+ * @return array Tableau HTML des numéros de tel.
+ */
+function tableau_tel_resp_ele($ele_login) {
+	$retour="";
+	$tab_tel=get_tel_resp_ele($ele_login);
+
+	$tab_style[1]="impair";
+	$tab_style[-1]="pair";
+
+	if(((isset($tab_tel['responsable']))&&(count($tab_tel['responsable'])>0))||((isset($tab_tel['eleve']))&&(count($tab_tel['eleve'])>0))) {
+		$retour.="<table class='boireaus' summary='Tableau des numéros de téléphone'>\n";
+		//$retour.="<table class='tb_absences' summary='Tableau des numéros de telephone'>\n";
+		$retour.="<tr>\n";
+		$retour.="<th></th>\n";
+		$retour.="<th>Identité</th>\n";
+		$retour.="<th>Personnel</th>\n";
+		$retour.="<th>Portable</th>\n";
+		$retour.="<th>Professionnel</th>\n";
+		$retour.="</tr>\n";
+
+		$alt=1;
+		//foreach($tab_tel['responsable'] as $resp_legal => $tab_resp_legal) {
+		for($i=0;$i<count($tab_tel['responsable']);$i++) {
+			$alt=$alt*(-1);
+			$retour.="<tr class='lig$alt white_hover'>\n";
+			//$retour.="<tr class='".$tab_style[$alt]." white_hover'>\n";
+			$retour.="<td title='Numéro de responsable légal'>".$tab_tel['responsable'][$i]['resp_legal']."</td>\n";
+			$retour.="<td>".$tab_tel['responsable'][$i]['civ_nom_prenom']."</td>\n";
+			$retour.="<td>";
+			if(isset($tab_tel['responsable'][$i]['tel_pers'])) {$retour.=$tab_tel['responsable'][$i]['tel_pers'];}
+			$retour.="</td>\n";
+			$retour.="<td>";
+			if(isset($tab_tel['responsable'][$i]['tel_port'])) {$retour.=$tab_tel['responsable'][$i]['tel_port'];}
+			$retour.="</td>\n";
+			$retour.="<td>";
+			if(isset($tab_tel['responsable'][$i]['tel_prof'])) {$retour.=$tab_tel['responsable'][$i]['tel_prof'];}
+			$retour.="</td>\n";
+			$retour.="</tr>\n";
+		}
+
+		if(isset($tab_tel['eleve'])) {
+			$alt=$alt*(-1);
+			$retour.="<tr class='lig$alt white_hover'>\n";
+			$retour.="<td colspan='2'>Élève</td>\n";
+
+			$retour.="<td>";
+			if(isset($tab_tel['eleve']['tel_pers'])) {$retour.=$tab_tel['eleve']['tel_pers'];}
+			$retour.="</td>\n";
+
+			$retour.="<td>";
+			if(isset($tab_tel['eleve']['tel_port'])) {$retour.=$tab_tel['eleve']['tel_port'];}
+			$retour.="</td>\n";
+
+			$retour.="<td>";
+			if(isset($tab_tel['eleve']['tel_prof'])) {$retour.=$tab_tel['eleve']['tel_prof'];}
+			$retour.="</td>\n";
+
+			$retour.="</tr>\n";
+		}
+		$retour.="</table>\n";
+	}
+	else {
+		$retour.="<p style='color:red'>Aucun numéro de téléphone n'a été trouvé.</p>\n";
+	}
+	return $retour;
+}
+
+/** Fonction destinée à retourner un tableau des dimensions et type d'une image après redimensionnement
+ *
+ * @param string $image chemin de l'image
+ * @param integer $dim_max_largeur la largeur maximale de l'image
+ * @param integer $dim_max_hauteur la hauteur maximale de l'image
+ * @param string $mode le type de redimensionnement:
+ *                      <vide> la hauteur ne doit pas dépasser $dim_max_hauteur, et la largeur retournées ne doit pas dépasser la $dim_max_largeur
+ *                      'largeur' on redimensionne en forçant la largeur à $dim_max_largeur
+ *                      'hauteur' on redimensionne en forçant la hauteur à $dim_max_hauteur
+ *
+ * @return array Tableau des dimensions et type
+ */
+function redim_img($image, $dim_max_largeur, $dim_max_hauteur, $mode="") {
+	$info_image=getimagesize($image);
+
+	$largeur=$info_image[0];
+	$hauteur=$info_image[1];
+
+	// calcule le ratio de redimensionnement
+	$ratio_l=$largeur/$dim_max_largeur;
+	$ratio_h=$hauteur/$dim_max_hauteur;
+	if($mode=="") {
+		$ratio=($ratio_l>$ratio_h)?$ratio_l:$ratio_h;
+	}
+	elseif($mode=="largeur") {
+		$ratio=$ratio_l;
+	}
+	else {
+		$ratio=$ratio_h;
+	}
+
+	// définit largeur et hauteur pour la nouvelle image
+	$nouvelle_largeur=round($largeur/$ratio);
+	$nouvelle_hauteur=round($hauteur/$ratio);
+
+	$type_img="";
+	if(isset($info_image[2])) {
+		// 1 = GIF, 2 = JPG, 3 = PNG, 4 = SWF, 5 = PSD, 6 = BMP, 7 = TIFF(orden de bytes intel), 8 = TIFF(orden de bytes motorola), 9 = JPC, 10 = JP2, 11 = JPX, 12 = JB2, 13 = SWC, 14 = IFF, 15 = WBMP, 16 = XBM.
+		$type_img=$info_image[2];
+	}
+
+	return array($nouvelle_largeur, $nouvelle_hauteur, $type_img);
+}
 
 /** Fonction destinée à supprimer les accents HTML dans des enregistrements de la table setting
  *
@@ -5684,6 +6509,37 @@ function virer_accents_html_setting($name) {
 		if(saveSetting($name, mysql_real_escape_string($correction))) {return 1;} else {return 2;}
 	}
 	else {return 0;}
+}
+
+/** Fonction destinée à enregistrer des détails sur la mise à jour Sconet en cours
+ *
+ * @param string $texte Texte à ajouter au log en cours
+ * @param string $fin 'y' ou 'n' pour mettre à jour la date de fin
+ *
+ * @return boolean Succès ou échec de l'enregistrement.
+ */
+
+function enregistre_log_maj_sconet($texte, $fin="n") {
+	$ts_maj_sconet=getSettingValue('ts_maj_sconet');
+	if($ts_maj_sconet=='') {
+		return false;
+	}
+	else {
+		$sql="SELECT * FROM log_maj_sconet WHERE date_debut='$ts_maj_sconet';";
+		$res=mysql_query($sql);
+		if(mysql_num_rows($res)>0) {
+			$lig=mysql_fetch_object($res);
+
+			$sql="UPDATE log_maj_sconet SET texte='".mysql_real_escape_string($lig->texte.$texte)."'";
+			if($fin!="n") {$sql.=", date_fin='".strftime("%Y-%m-%d %H:%M:%S")."'";}
+			$sql.=" WHERE date_debut='$ts_maj_sconet';";
+		}
+		else {
+			$sql="INSERT INTO log_maj_sconet SET date_debut='$ts_maj_sconet', login='".$_SESSION['login']."', date_fin='0000-00-00 00:00:00', texte='".mysql_real_escape_string($texte)."';";
+		}
+		$res=mysql_query($sql);
+		if($res) {return true;} else {return false;}
+	}
 }
 
 /** Fonction destinée à faire un test in_array() insensible à la casse
@@ -5711,26 +6567,279 @@ function in_array_i($chaine, $tableau) {
  * @param string $login_eleve Login de l'élève
  * @param string $login_resp Login du responsable
  * @param string $pers_id Identifiant pers_id du responsable
+ * @param string $meme_en_resp_legal_0 'y'
+ *               (on récupère même les enfants dont $resp_login est resp_legal=0)
+ *               'yy' (on récupère aussi les resp_legal=0 mais seulement s'ils ont l'accès aux données en tant qu'utilisateur
+ *               ou 'n' (on ne récupère que les enfants dont $resp_login est resp_legal=1 ou 2)
+ *
  *
  * @return boolean true/false
  */
 
-function is_responsable($login_eleve, $login_resp="", $pers_id="") {
+function is_responsable($login_eleve, $login_resp="", $pers_id="", $meme_en_resp_legal_0="n") {
 	$retour=false;
 	if($login_resp!="") {
-		$sql="SELECT 1=1 FROM resp_pers rp, responsables2 r, eleves e WHERE r.pers_id=rp.pers_id AND rp.login='$login_resp' AND e.ele_id=r.ele_id AND e.login='$login_eleve' AND (r.resp_legal='1' OR r.resp_legal='2');";
+		$sql="(SELECT 1=1 FROM resp_pers rp, responsables2 r, eleves e WHERE r.pers_id=rp.pers_id AND rp.login='$login_resp' AND e.ele_id=r.ele_id AND e.login='$login_eleve' AND (r.resp_legal='1' OR r.resp_legal='2'))";
+		if($meme_en_resp_legal_0=="y") {
+			$sql.=" UNION (SELECT 1=1 FROM resp_pers rp, responsables2 r, eleves e WHERE r.pers_id=rp.pers_id AND rp.login='$login_resp' AND e.ele_id=r.ele_id AND e.login='$login_eleve' AND r.resp_legal='0')";
+		}
+		elseif($meme_en_resp_legal_0=="yy") {
+			$sql.=" UNION (SELECT 1=1 FROM resp_pers rp, responsables2 r, eleves e WHERE r.pers_id=rp.pers_id AND rp.login='$login_resp' AND e.ele_id=r.ele_id AND e.login='$login_eleve' AND r.resp_legal='0' AND r.acces_sp='y')";
+		}
+		$sql.=";";
 		$test=mysql_query($sql);
 		if(mysql_num_rows($test)>0) {
 			$retour=true;
 		}
 	}
 	elseif($pers_id!="") {
-		$sql="SELECT 1=1 FROM responsables2 r, eleves e WHERE r.pers_id='$pers_id' AND e.ele_id=r.ele_id AND e.login='$login_eleve' AND (r.resp_legal='1' OR r.resp_legal='2');";
+		$sql="(SELECT 1=1 FROM responsables2 r, eleves e WHERE r.pers_id='$pers_id' AND e.ele_id=r.ele_id AND e.login='$login_eleve' AND (r.resp_legal='1' OR r.resp_legal='2'))";
+		if($meme_en_resp_legal_0=="y") {
+			$sql.=" UNION (SELECT 1=1 FROM responsables2 r, eleves e WHERE r.pers_id='$pers_id' AND e.ele_id=r.ele_id AND e.login='$login_eleve' AND r.resp_legal='0')";
+		}
+		elseif($meme_en_resp_legal_0=="yy") {
+			$sql.=" UNION (SELECT 1=1 FROM responsables2 r, eleves e WHERE r.pers_id='$pers_id' AND e.ele_id=r.ele_id AND e.login='$login_eleve' AND r.resp_legal='0' AND r.acces_sp='y')";
+		}
+		$sql.=";";
 		$test=mysql_query($sql);
 		if(mysql_num_rows($test)>0) {
 			$retour=true;
 		}
 	}
+	return $retour;
+}
+
+// http://www.siteduzero.com/tutoriel-3-56199-les-captchas-textuels.html
+function captchaMath()
+{
+	$n1 = mt_rand(0,10);
+	$n2 = mt_rand(0,10);
+	$nbrFr = array('zero','un','deux','trois','quatre','cinq','six','sept','huit','neuf','dix');
+	$resultat = $n1 + $n2;
+	$phrase = $nbrFr[$n1] .' plus '.$nbrFr[$n2];
+	
+	return array($resultat, $phrase);	
+}
+
+function captcha()
+{
+	list($resultat, $phrase) = captchaMath();
+	$_SESSION['captcha'] = $resultat;
+	return $phrase;
+}
+
+/** Fonction destinée à retourner un tableau des ouvertures par période en 
+ *  consultation parent/élève pour telle classe sur telle à telle période
+ *
+ * @param integer $periode1  La première période à tester
+ * @param integer $periode2  La dernière période à tester
+ * @param integer $id_classe L'identifiant de la classe à tester
+ * @param string $statut     Le statut 'responsable' ou 'eleve'
+ *                           Si le statut est vide, on prend le statut de 
+ *                           l'utilisateur connecté.
+ *
+ * @return array Tableau avec les numéros de période en indice et 'y' ou 'n' 
+ *               selon que les appréciations sont ou non accessibles
+ */
+function acces_appreciations($periode1, $periode2, $id_classe, $statut='') {
+	global $delais_apres_cloture;
+	global $date_ouverture_acces_app_classe;
+
+	if($delais_apres_cloture==="") {
+		$delais_apres_cloture=getSettingValue('delais_apres_cloture');
+	}
+
+	$tab_acces_app=array();
+
+	if($statut=="") {
+		$statut=$_SESSION['statut'];
+	}
+
+	if(($statut=='eleve')||($statut=='responsable')) {
+		if(getSettingValue('acces_app_ele_resp')=='periode_close') {
+			$timestamp_limite=time()-$delais_apres_cloture*24*3600;
+			for($i=$periode1;$i<=$periode2;$i++) {
+				$sql="SELECT 1=1 FROM periodes WHERE UNIX_TIMESTAMP(date_verrouillage)<='".$timestamp_limite."' AND id_classe='$id_classe' AND num_periode='$i';";
+				//echo "$sql<br />";
+				$res=mysql_query($sql);
+				if(mysql_num_rows($res)>0) {
+					$tab_acces_app[$i]="y";
+				}
+				else {
+					$tab_acces_app[$i]="n";
+				}
+			}
+		}
+		elseif(getSettingValue('acces_app_ele_resp')=='date') {
+			for($i=$periode1;$i<=$periode2;$i++) {
+				$sql="SELECT * FROM matieres_appreciations_acces WHERE id_classe='$id_classe' AND
+													statut='".$statut."' AND
+													periode='$i';";
+				//echo "$sql<br />";
+				$res=mysql_query($sql);
+				if($res) {
+					if(mysql_num_rows($res)>0) {
+						$lig=mysql_fetch_object($res);
+						//echo "\$lig->acces=$lig->acces<br />";
+						if($lig->acces=="date") {
+							//echo "<p>Période $i: Date limite: $lig->date<br />";
+							$tab_date=explode("-",$lig->date);
+							$timestamp_limite=mktime(0,0,0,$tab_date[1],$tab_date[2],$tab_date[0]);
+							//echo "$timestamp_limite<br />";
+							$timestamp_courant=time();
+							//echo "$timestamp_courant<br />";
+
+							$date_ouverture_acces_app_classe[$i]=$lig->date;
+
+							if($timestamp_courant>$timestamp_limite){
+								$tab_acces_app[$i]="y";
+							}
+							else {
+								$tab_acces_app[$i]="n";
+							}
+						}
+						else {
+							$tab_acces_app[$i]="n";
+						}
+					}
+					else {
+						$tab_acces_app[$i]="n";
+					}
+				}
+				else {
+					$tab_acces_app[$i]="n";
+				}
+			}
+		}
+		else {
+			// Ouverture manuelle
+			for($i=$periode1;$i<=$periode2;$i++) {
+				$sql="SELECT * FROM matieres_appreciations_acces WHERE id_classe='$id_classe' AND
+													statut='".$statut."' AND
+													periode='$i';";
+				//echo "$sql<br />";
+				$res=mysql_query($sql);
+				if($res) {
+					if(mysql_num_rows($res)>0) {
+						$lig=mysql_fetch_object($res);
+						//echo "\$lig->acces=$lig->acces<br />";
+						if($lig->acces=="y") {
+							$tab_acces_app[$i]="y";
+						}
+						else {
+							$tab_acces_app[$i]="n";
+						}
+					}
+					else {
+						$tab_acces_app[$i]="n";
+					}
+				}
+				else {
+					$tab_acces_app[$i]="n";
+				}
+			}
+		}
+	}
+	else {
+		// Pas de limitations d'accès pour les autres statuts.
+		for($i=$periode1;$i<=$periode2;$i++) {
+			$tab_acces_app[$i]="y";
+		}
+	}
+	return $tab_acces_app;
+}
+
+
+/** Fonction destinée à tester si les responsables légaux habitent à des adresses distinctes
+ *
+ * @param string $login_eleve Login de l'élève
+ *
+ * @return boolean true/false
+ */
+function responsables_adresses_separees($login_eleve) {
+	$retour=false;
+
+	$sql="SELECT DISTINCT adr1, adr2, adr3, adr4, cp, commune, pays FROM resp_adr ra, resp_pers rp, responsables2 r, eleves e WHERE ra.adr_id=rp.adr_id AND r.pers_id=rp.pers_id AND e.ele_id=r.ele_id AND e.login='$login_eleve' AND (r.resp_legal='1' OR r.resp_legal='2');";
+	//echo "$sql<br />";
+	$test=mysql_query($sql);
+	if(mysql_num_rows($test)>1) {
+		$retour=true;
+	}
+
+	return $retour;
+}
+
+/** Fonction destinée à récupérer le rang de l'élève
+ *
+ * @param string $login_eleve Login de l'élève
+ * @param integer $id_classe Identifiant de la classe
+ * @param integer $periode_num Numéro de la période
+ * @param string $forcer_recalcul "y" ou "n" Forcer le recalcul du rang avant extraction du rang
+ * @param string $recalcul_si_rang_nul "y" ou "n" 
+ *
+ * @return integer rang de l'élève
+ */
+function get_rang_eleve($login_eleve, $id_classe, $periode_num, $forcer_recalcul="n", $recalcul_si_rang_nul="n") {
+	global $affiche_categories, $test_coef;
+	$retour=0;
+
+	$recalcul_rang="";
+	for($loop=1;$loop<=$periode_num;$loop++) {
+		$recalcul_rang.="y";
+	}
+
+	if($forcer_recalcul=="y") {
+		$test_coef = mysql_num_rows(mysql_query("SELECT coef FROM j_groupes_classes WHERE (id_classe='".$id_classe."' and coef > 0)"));
+
+		$sql="UPDATE groupes SET recalcul_rang='$recalcul_rang' WHERE id in (SELECT id_groupe FROM j_groupes_classes WHERE id_classe='$id_classe');";
+		//echo "$sql<br />";
+		$res=mysql_query($sql);
+		// Les rangs seront recalculés lors de l'appel à calcul_rang.inc.php
+
+		include("../lib/calcul_rang.inc.php");
+	}
+
+	$sql="SELECT rang FROM j_eleves_classes WHERE periode='".$periode_num."' AND id_classe='".$id_classe."' AND login = '".$login_eleve."';";
+	//echo "$sql<br />";
+	$res=mysql_query($sql);
+	if(mysql_num_rows($res)>0) {
+		$retour=mysql_result($res, 0, "rang");
+		if(($retour==0)&&($recalcul_si_rang_nul=='y')) {
+			$test_coef = mysql_num_rows(mysql_query("SELECT coef FROM j_groupes_classes WHERE (id_classe='".$id_classe."' and coef > 0)"));
+
+			$sql="UPDATE groupes SET recalcul_rang='$recalcul_rang' WHERE id in (SELECT id_groupe FROM j_groupes_classes WHERE id_classe='$id_classe');";
+			//echo "$sql<br />";
+			$res=mysql_query($sql);
+			// Les rangs seront recalculés lors de l'appel à calcul_rang.inc.php
+
+			include("../lib/calcul_rang.inc.php");
+
+			$sql="SELECT rang FROM j_eleves_classes WHERE periode='".$periode_num."' AND id_classe='".$id_classe."' AND login = '".$login_eleve."';";
+			//echo "$sql<br />";
+			$res=mysql_query($sql);
+			if(mysql_num_rows($res)>0) {
+				$retour=mysql_result($res, 0, "rang");
+			}
+		}
+	}
+	elseif($recalcul_si_rang_nul=='y') {
+		$test_coef = mysql_num_rows(mysql_query("SELECT coef FROM j_groupes_classes WHERE (id_classe='".$id_classe."' and coef > 0)"));
+
+		$sql="UPDATE groupes SET recalcul_rang='$recalcul_rang' WHERE id in (SELECT id_groupe FROM j_groupes_classes WHERE id_classe='$id_classe');";
+		//echo "$sql<br />";
+		$res=mysql_query($sql);
+		// Les rangs seront recalculés lors de l'appel à calcul_rang.inc.php
+
+		include("../lib/calcul_rang.inc.php");
+
+		$sql="SELECT rang FROM j_eleves_classes WHERE periode='".$periode_num."' AND id_classe='".$id_classe."' AND login = '".$login_eleve."';";
+		//echo "$sql<br />";
+		$res=mysql_query($sql);
+		if(mysql_num_rows($res)>0) {
+			$retour=mysql_result($res, 0, "rang");
+		}
+	}
+
 	return $retour;
 }
 
@@ -5757,5 +6866,1514 @@ function get_class_dates_from_ele_login($login_eleve) {
 	}
 
 	return $tab;
+}
+
+
+/** Fonction destinée à passer outre le paramètre PHP session.gc_maxlifetime
+ *  s'il est inférieur au paramétrage sessionMaxLength de la table setting
+ */
+
+function maintien_de_la_session() {
+	global $gepiPath;
+
+	$session_gc_maxlifetime=ini_get("session.gc_maxlifetime");
+	// On fait réagir 3min avant la fin de session PHP
+	$nb_sec=max(60, $session_gc_maxlifetime-60*3);
+
+	echo "<p>
+	<span id='span_maintien_session'></span>
+	</p>
+
+<script type='text/javascript'>
+	var nb_millisec_maintien_session=$nb_sec*1000;
+
+	function function_maintien_session() {
+		new Ajax.Updater($('span_maintien_session'),'$gepiPath/lib/echo.php?var=maintien_session',{method: 'get'});
+		setTimeout('function_maintien_session()', nb_millisec_maintien_session);
+	}
+
+	setTimeout('function_maintien_session()', nb_millisec_maintien_session);
+</script>\n";
+}
+
+/** Fonction destinée à récupérer la liste des enseignants associés à une matière
+ */
+function get_profs_for_matiere($matiere) {
+	$tab=array();
+
+	$sql="SELECT u.login, u.civilite, u.nom, u.prenom FROM utilisateurs u, j_professeurs_matieres jpm WHERE jpm.id_professeur=u.login AND jpm.id_matiere='".$matiere."' ORDER BY u.nom, u.prenom;";
+	//echo "$sql<br />";
+	$res=mysql_query($sql);
+	if(mysql_num_rows($res)>0) {
+		$cpt=0;
+		while($lig=mysql_fetch_object($res)) {
+			$tab[$cpt]['login']=$lig->login;
+			$tab[$cpt]['nom']=$lig->nom;
+			$tab[$cpt]['prenom']=$lig->prenom;
+			$tab[$cpt]['civilite']=$lig->civilite;
+			$tab[$cpt]['civ_nom_prenom']=$lig->civilite." ".$lig->nom." ".$lig->prenom;
+			$cpt++;
+		}
+	}
+
+	return $tab;
+}
+
+/** Fonction destinée à générer des fichiers de debug
+ *  Nécessite de modifier la valeur de $debug
+ *
+ * @param string $fichier Le chemin/fichier
+ * @param string $mode Le mode (a+, w+,...)
+ * @param string $texte Le texte à écrire
+ */
+function fwrite_debug($fichier, $mode, $texte) {
+	$debug="n";
+
+	if($debug=="y") {
+		$f=fopen($fichier, $mode);
+		fwrite($f, $texte);
+		fclose($f);
+	}
+}
+
+/** Fonction destinée à retourner la période courante associée à une classe
+ *
+ * @param integer $id_classe identifiant de la classe
+ * @param integer $ts Timestamp unix (par défaut, si vide "", on prend le timestamp courant)
+ * @param integer $valeur_par_defaut La valeur par défaut à prendre si aucun retour n'est trouvé dans les tables.
+ * @param string $pour bulletins 'y' ou 'n' Si on cherche une période avec bulletins remplis, on se base sur la période suivante ouverte en saisie.
+ *
+ * @return integer Numéro de la période
+ */
+function cherche_periode_courante($id_classe, $ts, $valeur_par_defaut="", $pour_bulletins="n") {
+	//echo "<pre>\$ts=$ts</pre>";
+	$retour=$valeur_par_defaut;
+
+	if($ts=="") {
+		$ts=time();
+	}
+
+	$fich_debug="/tmp/cherche_periode_courante.txt";
+	fwrite_debug($fich_debug, "a+", "=================================================\n");
+
+	$periode_trouvee="n";
+	if($pour_bulletins=="y") {
+		$sql="select * from periodes where id_classe='$id_classe' order by num_periode ASC;";
+		fwrite_debug($fich_debug, "a+", $sql."\n");
+		$res=mysql_query($sql);
+		if(mysql_num_rows($res)>0) {
+			while($lig=mysql_fetch_object($res)) {
+				$num_per_temp=$lig->num_periode;
+				if($lig->verouiller=='N') {
+					if($num_per_temp>1) {
+						$retour=$num_per_temp-1;
+					}
+					else {
+						// Si la première période est ouverte en saisie, on est en début d'année,
+						// pas la peine d'espérer que les bulletins soient remplis
+						$retour=1;
+					}
+					$periode_trouvee="y";
+					break;
+				}
+			}
+		}
+
+		fwrite_debug($fich_debug, "a+", "\$periode_trouvee=".$periode_trouvee."\n");
+
+		if($periode_trouvee=="n") {
+			//$sql="select * from periodes where id_classe='$id_classe' and date_fin>CURRENT_TIMESTAMP order by num_periode ASC LIMIT 1;";
+			$sql="select * from periodes where id_classe='$id_classe' and date_fin<FROM_UNIXTIME($ts) order by num_periode DESC LIMIT 1;";
+			fwrite_debug($fich_debug, "a+", $sql."\n");
+			$res=mysql_query($sql);
+			if(mysql_num_rows($res)>0) {
+				$retour=mysql_result($res, 0, "num_periode");
+			}
+		}
+	}
+	else {
+		//$sql="select * from periodes where id_classe='$id_classe' and date_fin>CURRENT_TIMESTAMP order by num_periode ASC LIMIT 1;";
+		$sql="select * from periodes where id_classe='$id_classe' and date_fin>FROM_UNIXTIME($ts) order by num_periode ASC LIMIT 1;";
+		fwrite_debug($fich_debug, "a+", $sql."\n");
+		$res=mysql_query($sql);
+		if(mysql_num_rows($res)>0) {
+			$retour=mysql_result($res, 0, "num_periode");
+		}
+		else {
+			$sql="select p.num_periode from periodes p, edt_calendrier e where (classe_concerne_calendrier like '%;$id_classe;%' or classe_concerne_calendrier like '$id_classe;%') and etabferme_calendrier='1' and $ts<fin_calendrier_ts and $ts>debut_calendrier_ts and p.nom_periode=e.nom_calendrier and p.id_classe='$id_classe';";
+			//echo "$sql<br />";
+			fwrite_debug($fich_debug, "a+", $sql."\n");
+			$res=mysql_query($sql);
+			if(mysql_num_rows($res)>0) {
+				$retour=mysql_result($res, 0, "num_periode");
+			}
+		}
+	}
+
+	if(!is_numeric($retour)) {$retour=$valeur_par_defaut;}
+
+	return $retour;
+}
+
+/** Fonction destinée à retourner la période courante associée à un élève
+ *
+ * @param string $login_eleve Le login de l'élève
+ * @param integer $ts Timestamp unix (par défaut, si vide "", on prend le timestamp courant)
+ * @param integer $valeur_par_defaut La valeur par défaut à prendre si aucun retour n'est trouvé dans les tables.
+ * @param string $pour bulletins 'y' ou 'n' Si on cherche une période avec bulletins remplis, on se base sur la période suivante ouverte en saisie.
+ *
+ * @return integer Numéro de la période
+ */
+function cherche_periode_courante_eleve($login_eleve, $ts, $valeur_par_defaut="", $pour_bulletins="n") {
+	//echo "<pre>\$ts=$ts</pre>";
+	$retour=$valeur_par_defaut;
+
+	if($ts=="") {
+		$ts=time();
+	}
+
+	$fich_debug="/tmp/cherche_periode_courante_eleve.txt";
+	fwrite_debug($fich_debug, "a+", "=================================================\n");
+
+	$periode_trouvee="n";
+	if($pour_bulletins=="y") {
+		$sql="select * from periodes p, j_eleves_classes jec where p.id_classe=jec.id_classe AND jec.login='$login_eleve' order by num_periode ASC;";
+		fwrite_debug($fich_debug, "a+", $sql."\n");
+		$res=mysql_query($sql);
+		if(mysql_num_rows($res)>0) {
+			while($lig=mysql_fetch_object($res)) {
+				$num_per_temp=$lig->num_periode;
+				if($lig->verouiller=='N') {
+					if($num_per_temp>1) {
+						$retour=$num_per_temp-1;
+					}
+					else {
+						// Si la première période est ouverte en saisie, on est en début d'année,
+						// pas la peine d'espérer que les bulletins soient remplis
+						$retour=1;
+					}
+					$periode_trouvee="y";
+					break;
+				}
+			}
+		}
+
+		fwrite_debug($fich_debug, "a+", "\$periode_trouvee=".$periode_trouvee."\n");
+
+		if($periode_trouvee=="n") {
+			//$sql="select * from periodes where id_classe='$id_classe' and date_fin>CURRENT_TIMESTAMP order by num_periode ASC LIMIT 1;";
+			$sql="select * from periodes p, j_eleves_classes jec where p.id_classe=jec.id_classe AND jec.login='$login_eleve' and date_fin<FROM_UNIXTIME($ts) order by num_periode DESC LIMIT 1;";
+			fwrite_debug($fich_debug, "a+", $sql."\n");
+			$res=mysql_query($sql);
+			if(mysql_num_rows($res)>0) {
+				$retour=mysql_result($res, 0, "num_periode");
+			}
+		}
+	}
+	else {
+		//$sql="select * from periodes where id_classe='$id_classe' and date_fin>CURRENT_TIMESTAMP order by num_periode ASC LIMIT 1;";
+		$sql="select * from periodes p, j_eleves_classes jec where p.id_classe=jec.id_classe AND jec.login='$login_eleve' and date_fin>FROM_UNIXTIME($ts) order by num_periode ASC LIMIT 1;";
+		fwrite_debug($fich_debug, "a+", $sql."\n");
+		$res=mysql_query($sql);
+		if(mysql_num_rows($res)>0) {
+			$retour=mysql_result($res, 0, "num_periode");
+		}
+	}
+
+	if(!is_numeric($retour)) {$retour=$valeur_par_defaut;}
+
+	return $retour;
+}
+
+
+/*
+CREATE TABLE IF NOT EXISTS messagerie (
+  id int(11) NOT NULL AUTO_INCREMENT,
+  in_reply_to int(11) NOT NULL,
+  login_src varchar(50) NOT NULL,
+  login_dest varchar(50) NOT NULL,
+  sujet varchar(100) NOT NULL,
+  message text NOT NULL,
+  date_msg timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  vu tinyint(4) NOT NULL,
+  date_vu timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
+  PRIMARY KEY (id)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;
+*/
+
+function enregistre_message($sujet, $message, $login_src, $login_dest, $date_visibilite="", $in_reply_to=-1) {
+	$retour="";
+
+	$date_courante=strftime("%Y-%m-%d %H:%M:%S");
+	if(($date_visibilite=="")||($date_visibilite<$date_courante)) {
+		$date_visibilite=$date_courante;
+	}
+
+	$sql="INSERT INTO messagerie SET sujet='".mysql_real_escape_string($sujet)."',
+									message='".mysql_real_escape_string($message)."',
+									login_src='".$login_src."',
+									login_dest='".$login_dest."',
+									in_reply_to='".$in_reply_to."',
+									date_msg='".$date_courante."',
+									date_visibilite='".$date_visibilite."';";
+	//echo "$sql<br />";
+	$res=mysql_query($sql);
+	if($res) {
+		$retour=mysql_insert_id();
+	}
+	return $retour;
+}
+/*
+function form_saisie_message($in_reply_to=-1) {
+	$chaine="<form action='../mod_alerte/form_message.php' method='post'>
+		<fieldset style='border:1px solid grey; background-image: url(\"../images/background/opacite50.png\");'>
+			
+		</fieldset>
+	</form>\n";
+}
+*/
+
+function affiche_historique_messages($login_src, $mode="tous",$tri="date") {
+	global $gepiPath;
+
+	$retour="";
+	if($mode=='tous') {
+		$sql="SELECT * FROM messagerie WHERE login_src='$login_src'";
+	}
+	else {
+		// Pour le moment aucun autre cas que Tous n'est géré
+		$sql="SELECT * FROM messagerie WHERE login_src='$login_src' ORDER BY date_msg DESC, login_dest ASC, sujet;";
+	}
+
+	if($tri=="sujet") {
+		$sql.=" ORDER BY sujet, date_msg DESC, login_dest ASC;";
+	}
+	elseif($tri=="dest") {
+		$sql.=" ORDER BY login_dest, date_msg DESC, login_dest ASC, sujet;";
+	}
+	elseif($tri=="vu") {
+		$sql.=" ORDER BY vu, date_msg DESC, login_dest ASC, sujet;";
+	}
+	else {
+		$sql.=" ORDER BY date_msg DESC, login_dest ASC, sujet;";
+	}
+	$res=mysql_query($sql);
+	if(mysql_num_rows($res)==0) {
+		$retour="<p>Aucun message.</p>";
+	}
+	else {
+		$retour.="<a name='tableau_historique_messages_envoyes'></a>
+<table class='boireaus boireaus_alt'>
+	<tr>
+		<th><a href=\"javascript:trie_affiche_historique_messages('date')\" title='Trier par date'>Date</a></th>
+		<th><a href=\"javascript:trie_affiche_historique_messages('dest')\" title='Trier par date'>Destinataire</a></th>
+		<th><a href=\"javascript:trie_affiche_historique_messages('sujet')\" title='Trier par date'>Sujet</a></th>
+		";
+		if(peut_poster_message($_SESSION['statut'])) {
+			$retour.="<th title=\"En cliquant sur le texte du message souhaité, vous pouvez compléter le champ Message d'un message que vous êtes en train de rédiger.\">Message <img src='../images/icons/ico_ampoule.png' width='9' height='15' alt='' /></th>";
+		}
+		else {
+			$retour.="<th>Message</th>";
+		}
+		$retour.="
+		<th title='Témoin indiquant si votre message a été vu/lu'><a href=\"javascript:trie_affiche_historique_messages('vu')\" title='Trier selon que le message est lu ou non'>Lu/vu</a></th>
+		<th>Relancer</th>
+		<th title=\"Marquer le message comme clos/traité.
+Cela permet d'indiquer au destinataire que le message peut ne pas être pris en compte.
+Exemple: Si vous avez demandé à plusieurs destinataires à ce que tel élève vous soit envoyé,
+         une fois l'élève vu, la lecture du message n'est plus nécessaire.\">Clore</th>
+	</tr>";
+		$cpt_ahm=0;
+		while($lig=mysql_fetch_object($res)) {
+			$precision_visibilite="";
+			if($lig->date_visibilite>$lig->date_msg) {
+				$precision_visibilite=" title='Message du ".formate_date($lig->date_msg,'y')." visible à compter de ".formate_date($lig->date_visibilite,'y')."'";
+			}
+			$temoin_visibilite="";
+			if($lig->date_visibilite>strftime("%Y-%m-%d %H:%M:%S")) {
+				$temoin_visibilite="<img src='../images/icons/flag.png' width='17' height='18' alt='Visibilité décalée' />";
+			}
+			$retour.="
+	<tr>
+		<td$precision_visibilite>".formate_date($lig->date_msg,'y')."$temoin_visibilite</td>
+		<td>".civ_nom_prenom($lig->login_dest)."</td>
+		<td>$lig->sujet</td>
+		<td id='td_ahm_".$cpt_ahm."' onclick=\"copie_ahm($cpt_ahm)\">".stripslashes(nl2br(preg_replace("/\\\\n/", "\n", $lig->message)))."</td>
+		<td id='td_lu_message_envoye_".$lig->id."'>";
+			if($lig->vu==1) {
+				$retour.="<img src='../images/enabled.png' width='20' height='20' alt='Lu' title='Votre message a été lu/vu le ".formate_date($lig->date_vu,'y')."' /></td>
+		<td id='td_relance_message_envoye_".$lig->id."'>
+            <a href='$gepiPath/mod_alerte/form_message.php?mode=relancer&amp;mode_no_js=y&amp;id_msg=".$lig->id.add_token_in_url()."' onclick=\"relancer_message(".$lig->id.");return false;\" title=\"Relancer le message au même destinataire.
+Concrètement, le témoin est juste remis à non lu.\" target='_blank'>
+            <img src='../images/icons/forward.png' width='16' height='16' alt='Relancer' />
+            </a>";
+			}
+			elseif($lig->vu==2) {
+				$retour.="<img src='../images/icons/securite.png' width='16' height='16' alt='Non lu/vu' title='Non lu/vu' /></td>
+		<td>";
+			}
+			else {
+				$retour.="<img src='../images/disabled.png' width='20' height='20' alt='Non lu/vu' title='Non lu/vu' /></td>
+		<td>";
+			}
+			$retour.="</td>
+		<td>
+			<a href='$gepiPath/mod_alerte/form_message.php?mode=clore&amp;mode_no_js=y&amp;id_msg=".$lig->id.add_token_in_url()."' onclick=\"clore_message(".$lig->id.");return false;\"><img src='../images/icons/wizard.png' width='16' height='16' alt='Clore' /></a>
+		</td>
+	</tr>";
+			$cpt_ahm++;
+		}
+		$retour.="</table>
+<script type='text/javascript'>
+	function copie_ahm(num) {
+		if(document.getElementById('message_messagerie')) {
+			document.getElementById('message_messagerie').innerHTML+=ahm_nettoyage(document.getElementById('td_ahm_'+num).innerHTML);
+		}
+	}
+
+	function ahm_nettoyage(str) {
+		//return str.replace(/<br\s*\/?>/mg,\"\\n\");
+		chaine=str.replace(/<br\s*\/?>/mg,\"\\n\")
+		chaine=chaine.replace(/\\r\\n\\r\\n/g, \"\\r\\n\");
+		chaine=chaine.replace(/\\n\\n/g, \"\\n\");
+		return chaine;
+	}
+
+	function relancer_message(id_msg) {
+		csrf_alea=document.getElementById('csrf_alea').value;
+		new Ajax.Updater($('td_lu_message_envoye_'+id_msg),'$gepiPath/mod_alerte/form_message.php?mode=relancer&id_msg='+id_msg+'&csrf_alea='+csrf_alea,{method: 'get'});
+		document.getElementById('td_relance_message_envoye_'+id_msg).innerHTML='';
+	}
+
+	function clore_message(id_msg) {
+		csrf_alea=document.getElementById('csrf_alea').value;
+		new Ajax.Updater($('td_lu_message_envoye_'+id_msg),'$gepiPath/mod_alerte/form_message.php?mode=clore&id_msg='+id_msg+'&csrf_alea='+csrf_alea,{method: 'get'});
+	}
+
+	function trie_affiche_historique_messages(tri) {
+		new Ajax.Updater($('div_messages_envoyes'),'$gepiPath/mod_alerte/form_message.php?mode=affiche_messages&tri='+tri+'&mode_affiche_historique_messages=$mode',{method: 'get'});
+	}
+</script>
+";
+	}
+	return $retour;
+}
+
+function affiche_historique_messages_recus($login_dest, $mode="tous", $tri="date") {
+	global $gepiPath;
+
+	$retour="";
+	if($mode=='tous') {
+		$sql="SELECT * FROM messagerie WHERE login_dest='$login_dest' AND date_visibilite<='".strftime("%Y-%m-%d %H:%M:%S")."'";
+	}
+	elseif($mode=='non_lus') {
+		$sql="SELECT * FROM messagerie WHERE login_dest='$login_dest' AND date_visibilite<='".strftime("%Y-%m-%d %H:%M:%S")."' AND vu='0'";
+	}
+	if($tri=="sujet") {
+		$sql.=" ORDER BY sujet, date_msg DESC;";
+	}
+	elseif($tri=="source") {
+		$sql.=" ORDER BY login_src, date_msg DESC, sujet;";
+	}
+	elseif($tri=="vu") {
+		$sql.=" ORDER BY vu, date_msg DESC, sujet;";
+	}
+	else {
+		$sql.=" ORDER BY date_msg DESC, sujet;";
+	}
+
+	$res=mysql_query($sql);
+	if(mysql_num_rows($res)==0) {
+		$retour="<p>Aucun message.</p>";
+	}
+	else {
+		$peut_poster_message=peut_poster_message($_SESSION['statut']);
+		$retour.=add_token_field(true)."<table class='boireaus boireaus_alt'>
+	<tr>
+		<th><a href=\"javascript:trie_affiche_historique_messages_recus('date')\" title='Trier par date'>Date</a></th>
+		<th><a href=\"javascript:trie_affiche_historique_messages_recus('source')\" title='Trier par expéditeur'>Source</a></th>
+		<th><a href=\"javascript:trie_affiche_historique_messages_recus('sujet')\" title='Trier par sujet'>Sujet</a></th>
+		";
+		if($peut_poster_message) {
+			$retour.="<th title=\"En cliquant sur le texte du message souhaité, vous pouvez compléter le champ Message d'un message que vous êtes en train de rédiger.\">Message <img src='../images/icons/ico_ampoule.png' width='9' height='15' alt='Astuce' /></th>";
+		}
+		else {
+			$retour.="<th>Message</th>";
+		}
+		$retour.="
+		<th><a href=\"javascript:trie_affiche_historique_messages_recus('vu')\" title='Trier selon que le message est lu ou non'>Lu/vu</a></th>
+		<!-- A FAIRE : Ajouter une colonne pour Répondre si on en a le droit -->";
+
+		if($peut_poster_message) {
+			$retour.="
+		<th>Répondre</th>";
+		}
+
+		$retour.="
+	</tr>";
+
+
+		$cpt_ahmr=0;
+		while($lig=mysql_fetch_object($res)) {
+			$retour.="
+	<tr>
+		<td>".formate_date($lig->date_msg,'y')."</td>
+		<td>".civ_nom_prenom($lig->login_src)."</td>
+		<td>$lig->sujet</td>
+		<td id='td_ahmr_".$cpt_ahmr."' onclick=\"copie_ahmr($cpt_ahmr)\">".stripslashes(nl2br(preg_replace("/\\\\n/", "\n", $lig->message)))."</td>
+		<td>";
+			if($lig->vu==1) {
+				$retour.="<img src='../images/enabled.png' width='20' height='20' alt='Lu' title='Vous avez marqué/lu/vu ce message le ".formate_date($lig->date_vu,'y')."' />";
+			}
+			elseif($lig->vu==2) {
+				$retour.="<img src='../images/icons/securite.png' width='16' height='16' alt='' title=\"Ce message a été marqué comme clos/traité par l'expéditeur le ".formate_date($lig->date_vu,'y')."\" />";
+			}
+			else {
+				$retour.="<span id='span_message_$lig->id'><a href='$gepiPath/mod_alerte/form_message.php?mode=marquer_lu&amp;id_msg=$lig->id&amp;mode_no_js=y".add_token_in_url()."' onclick=\"marquer_message_lu($lig->id);return false;\" target='_blank'><img src='../images/disabled.png' width='20' height='20' alt='Non lu/vu' title='Non lu/vu. Cliquez pour marquer ce message comme lu.' /></a></span>";
+			}
+			$retour.="</td>";
+
+			if($peut_poster_message) {
+				/*
+				$retour.="
+		<td><a href='$gepiPath/mod_alerte/form_message.php?mode=repondre&amp;id_msg=$lig->id".add_token_in_url()."' onclick=\"repondre_message($lig->id);return false;\" target='_blank' title='Répondre'><img src='../images/icons/back.png' width='16' height='16' /></a></td>";
+				*/
+				$retour.="
+		<td><a href='$gepiPath/mod_alerte/form_message.php?mode=repondre&amp;id_msg=$lig->id".add_token_in_url()."' title='Répondre'><img src='../images/icons/back.png' width='16' height='16' alt='Répondre' /></a></td>";
+			}
+
+			$retour.="
+	</tr>";
+			$cpt_ahmr++;
+		}
+		$retour.="</table>
+
+<script type='text/javascript'>
+	function marquer_message_lu(id_msg) {
+		csrf_alea=document.getElementById('csrf_alea').value;
+
+		new Ajax.Updater($('span_message_'+id_msg),'$gepiPath/mod_alerte/form_message.php?mode=marquer_lu&id_msg='+id_msg+'&csrf_alea='+csrf_alea,{method: 'get'});
+		new Ajax.Updater($('temoin_messagerie_non_vide'),'$gepiPath/mod_alerte/form_message.php?mode=check&sound=no&csrf_alea='+csrf_alea,{method: 'get'});
+		new Ajax.Updater($('temoin_messagerie_non_vide'),'$gepiPath/mod_alerte/form_message.php?mode=check2&csrf_alea='+csrf_alea,{method: 'get'});
+	}
+
+	function copie_ahmr(num) {
+		if(document.getElementById('message_messagerie')) {
+			document.getElementById('message_messagerie').innerHTML+=ahmr_nettoyage(document.getElementById('td_ahmr_'+num).innerHTML);
+		}
+	}
+
+	function ahmr_nettoyage(str) {
+		//return str.replace(/<br\s*\/?>/mg,\"\\n\");
+		chaine=str.replace(/<br\s*\/?>/mg,\"\\n\")
+		chaine=chaine.replace(/\\r\\n\\r\\n/g, \"\\r\\n\");
+		chaine=chaine.replace(/\\n\\n/g, \"\\n\");
+		return chaine;
+	}
+
+	function trie_affiche_historique_messages_recus(tri) {
+		new Ajax.Updater($('div_messages_recus'),'$gepiPath/mod_alerte/form_message.php?mode=affiche_messages_recus&tri='+tri+'&mode_affiche_historique_messages_recus=$mode',{method: 'get'});
+	}
+</script>";
+	}
+	return $retour;
+}
+
+function check_messages_recus($login_dest) {
+	$retour="";
+	//$sql="SELECT 1=1 FROM messagerie WHERE login_dest='$login_dest' AND vu='0';";
+	$sql="SELECT 1=1 FROM messagerie WHERE login_dest='$login_dest' AND vu='0' AND date_visibilite<=CURRENT_TIMESTAMP;";
+	$res=mysql_query($sql);
+	if(mysql_num_rows($res)==1) {
+		$retour=mysql_num_rows($res)." message non lu.";
+	}
+	elseif(mysql_num_rows($res)>1) {
+		$retour=mysql_num_rows($res)." messages non lus.";
+	}
+	return $retour;
+}
+
+// A faire: check_mes_messages_lus() pour signaler qu'un de ses messages a été lu?
+
+function marquer_message_lu($id_msg, $etat=true) {
+	$retour="";
+
+	if($etat) {
+		$sql="UPDATE messagerie SET vu='1', date_vu=CURRENT_TIMESTAMP WHERE id='$id_msg' AND login_dest='".$_SESSION['login']."';";
+	}
+	else {
+		$sql="UPDATE messagerie SET vu='0', date_vu=CURRENT_TIMESTAMP WHERE id='$id_msg';";
+	}
+	$update=mysql_query($sql);
+	if($update) {
+		$retour="Succès";
+	}
+	else {
+		$retour="Erreur";
+	}
+
+	return $retour;
+}
+
+function clore_declore_message($id_msg) {
+	$retour="";
+
+	$sql="SELECT 1=1 FROM messagerie WHERE id='$id_msg' AND login_dest='".$_SESSION['login']."' AND vu='2';";
+	$test=mysql_query($sql);
+	if(mysql_num_rows($test)==0) {
+		$sql="UPDATE messagerie SET vu='2', date_vu=CURRENT_TIMESTAMP WHERE id='$id_msg' AND login_dest='".$_SESSION['login']."';";
+		$update=mysql_query($sql);
+		if($update) {
+			$retour=2;
+		}
+		else {
+			$retour="Erreur";
+		}
+	}
+	else {
+		$sql="UPDATE messagerie SET vu='0', date_vu=CURRENT_TIMESTAMP WHERE id='$id_msg';";
+		$update=mysql_query($sql);
+		if($update) {
+			$retour=0;
+		}
+		else {
+			$retour="Erreur";
+		}
+	}
+
+	return $retour;
+}
+
+function peut_poster_message($statut) {
+	// A FAIRE: Gérer le statut Autre...
+	if(getSettingAOui('active_mod_alerte')) {
+		if(($_SESSION['statut']!='autre')&&(!acces('/mod_alerte/form_message.php', $statut))) {
+			return false;
+		}
+		else {
+			if(getSettingAOui('PeutPosterMessage'.ucfirst(mb_strtolower($statut)))) {
+				return true;
+			}
+			else {
+				return false;
+			}
+		}
+	}
+	else {
+		return false;
+	}
+}
+
+function affichage_temoin_messages_recus($portee="header_et_fixe") {
+	global $gepiPath;
+
+	$MessagerieDelaisTest=getSettingValue('MessagerieDelaisTest');
+	if(($MessagerieDelaisTest=='')||(!preg_match('/^[0-9]$/', $MessagerieDelaisTest))||($MessagerieDelaisTest==0)) {
+		$MessagerieDelaisTest=1;
+	}
+
+	// On teste la présence de messages toutes les 1min, 2min,...
+	$nb_sec=60*$MessagerieDelaisTest;
+
+	$retour="";
+
+	if(peut_poster_message($_SESSION['statut'])) {
+		$retour.="<span id='span_messages_recus'><a href='$gepiPath/mod_alerte/form_message.php' target='_blank'><img src='$gepiPath/images/icons/no_mail.png' width='16' height='16' title='Aucun message' alt='Aucun message' /></a></span>";
+	}
+	else {
+		$sql="SELECT 1=1 FROM messagerie WHERE login_dest='".$_SESSION['login']."' OR login_src='".$_SESSION['login']."';";
+		$test=mysql_query($sql);
+		if(mysql_num_rows($test)>0) {
+			$retour.="<span id='span_messages_recus'><a href='$gepiPath/mod_alerte/form_message.php' target='_blank'><img src='$gepiPath/images/icons/no_mail.png' width='16' height='16' title='Aucun message' alt='Aucun message' /></a></span>";
+		}
+		else {
+			$retour.="<span id='span_messages_recus'><img src='$gepiPath/images/icons/no_mail.png' width='16' height='16' title='Aucun message' alt='Aucun message' /></span>";
+		}
+	}
+
+	$retour.="
+<script type='text/javascript'>
+	var nb_millisec_check_message=$nb_sec*1000;
+
+	function function_check_message() {
+		new Ajax.Updater($('span_messages_recus'),'$gepiPath/mod_alerte/form_message.php?mode_js=y&mode=check',{method: 'get'});";
+	if($portee!="header_seul") {
+		$retour.="
+		new Ajax.Updater($('temoin_messagerie_non_vide'),'$gepiPath/mod_alerte/form_message.php?mode_js=y&mode=check2',{method: 'get'});";
+	}
+	$retour.="
+		setTimeout('function_check_message()', nb_millisec_check_message);
+	}
+
+	//alert('plop')
+	//setTimeout('function_check_message()', nb_millisec_check_message);
+	// On lance le premier test 10s après l'affichage de la page
+	setTimeout('function_check_message()', 10000);
+	// En fait, en cas de changement de page, on va tester la présence de message dans la seconde qui suit.
+</script>\n";
+
+	return $retour;
+}
+
+
+function joueSon($sound, $id_son="") {
+	global $gepiPath, $niveau_arbo;
+
+	$retour="";
+	if(!in_array($sound, array("KDE_Beep_Pop.wav", "libreoffice_gong.wav", "libreoffice_nature1.wav", "pluck.wav", "verre_brise.wav", "default_alarm.wav"))) {
+		$sound="KDE_Beep_Pop.wav";
+	}
+
+	if ($niveau_arbo == "0") {
+		//$chemin_sound="./sounds/".$sound;
+		$chemin_sound="sounds/".$sound;
+	} elseif ($niveau_arbo == "1") {
+		$chemin_sound="../sounds/".$sound;
+	} elseif ($niveau_arbo == "2") {
+		$chemin_sound="../../sounds/".$sound;
+	} elseif ($niveau_arbo == "3") {
+		$chemin_sound="../../../sounds/".$sound;
+	} else {
+		$chemin_sound="../sounds/".$sound;
+	}
+
+	//$chemin_sound=$gepiPath."/sounds/".$sound;
+
+	if((isset($_SERVER['HTTP_REFERER']))&&((preg_match("#/accueil.php#", $_SERVER['HTTP_REFERER']))||(preg_match("#/accueil_simpl_prof.php#", $_SERVER['HTTP_REFERER'])))) {
+		//$chemin_sound="./sounds/".$sound;
+		$chemin_sound="sounds/".$sound;
+	}
+
+	$debug="n";
+	if($debug=="y") {
+		$f=fopen("/tmp/debug_gepi_sound.txt", "a+");
+		fwrite($f, strftime("%Y-%m-%d %H:%M:%S")." : ================================\n");
+		if(isset($_SERVER['HTTP_REFERER'])) {
+			fwrite($f, strftime("%Y-%m-%d %H:%M:%S")." : \$_SERVER['HTTP_REFERER']=".$_SERVER['HTTP_REFERER']."\n");
+		}
+		fwrite($f, strftime("%Y-%m-%d %H:%M:%S")." : gepiPath=$gepiPath\n");
+		fwrite($f, strftime("%Y-%m-%d %H:%M:%S")." : niveau_arbo=$niveau_arbo\n");
+		fwrite($f, strftime("%Y-%m-%d %H:%M:%S")." : chemin_sound=$chemin_sound\n");
+		fclose($f);
+	}
+
+	if($id_son=="") {
+		$id_son="id_son_".preg_replace("/[^0-9]/","_",microtime());
+	}
+	if(file_exists($chemin_sound)) { 
+		$retour ="<audio id='$id_son' preload='auto' autobuffer autoplay>
+	<source src='".$chemin_sound."' />
+</audio>
+";
+	}
+	else {
+		$retour ="";
+	}
+	//$retour.="Bip";
+	return $retour;
+} 
+
+function acces_exceptionnel_saisie_bull_note_groupe_periode($id_groupe, $num_periode) {
+	$sql="SELECT 1=1 FROM acces_exceptionnel_matieres_notes WHERE id_groupe='$id_groupe' AND periode='$num_periode' AND date_limite>'".strftime("%Y-%m-%d %H:%M:%S")."';";
+	//echo "$sql<br />";
+	$test=mysql_query($sql);
+	if(mysql_num_rows($test)>0) {
+		return true;
+	}
+	else {
+		return false;
+	}
+}
+
+function log_modifs_acces_exceptionnel_saisie_bull_note_groupe_periode($id_groupe, $num_periode, $texte_ajoute) {
+	$sql="SELECT * FROM acces_exceptionnel_matieres_notes WHERE id_groupe='$id_groupe' AND periode='$num_periode';";
+	$res=mysql_query($sql);
+	if(mysql_num_rows($res)>0) {
+		// Il n'y a au plus qu'un enregistrement par (id_groupe;periode) dans acces_cn
+		$lig=mysql_fetch_object($res);
+		$texte=$lig->commentaires."\n".$texte_ajoute;
+		$sql="UPDATE acces_exceptionnel_matieres_notes SET commentaires='".mysql_real_escape_string($texte)."' WHERE id='$lig->id';";
+		$update=mysql_query($sql);
+		if($update) {
+			return true;
+		}
+		else {
+			return false;
+		}
+	}
+	else {
+		return false;
+	}
+}
+
+
+/**
+ * Retourne l'URI des élèves pour les flux rss
+ *
+ * @global string
+ * @param string $eleve Login de l'élève
+ * @param string $https La page est-elle sécurisée ? en https si 'y'
+ * @param string $type 'cdt' ou ''
+ * @return string
+ * @see getSettingValue()
+ */
+function retourneUri($eleve, $https, $type){
+
+	global $gepiPath;
+	$rep = array();
+
+	// on vérifie que la table en question existe déjà
+	$test_table = mysql_num_rows(mysql_query("SHOW TABLES LIKE 'rss_users'"));
+	if ($test_table >= 1) {
+
+		$sql = "SELECT user_uri FROM rss_users WHERE user_login = '".$eleve."' LIMIT 1";
+		$query = mysql_query($sql);
+		$nbre = mysql_num_rows($query);
+		if ($nbre == 1) {
+			$uri = mysql_fetch_array($query);
+			if ($https == 'y') {
+				$web = 'https://';
+			}else{
+				$web = 'http://';
+			}
+			if ($type == 'cdt') {
+				$rep["uri"] = $web.$_SERVER["SERVER_NAME"].$gepiPath.'/class_php/syndication.php?rne='.getSettingValue("gepiSchoolRne").'&amp;ele_l='.$eleve.'&amp;type=cdt&amp;uri='.$uri["user_uri"];
+				$rep["text"] = $web.$_SERVER["SERVER_NAME"].$gepiPath.'/class_php/syndication.php?rne='.getSettingValue("gepiSchoolRne").'&amp;ele_l='.$eleve.'&amp;type=cdt&amp;uri='.$uri["user_uri"];
+			}
+
+		} else {
+			$rep["text"] = 'Erreur : Votre URI n\'a peut-être pas encore été générée. Contactez votre administrateur.';
+			$rep["uri"] = '#';
+		}
+	}else{
+
+		$rep["text"] = 'Demandez à votre administrateur de générer les URI.';
+		$rep["uri"] = '#';
+
+	}
+
+	return $rep;
+}
+
+function prendre_en_compte_js_et_css_edt() {
+	global $javascript_specifique, $style_specifique;
+
+	// CSS et js particulier à l'EdT
+
+	if((is_array($javascript_specifique))) {
+		$javascript_specifique[] = "edt_organisation/script/fonctions_edt";
+	}
+	else {
+		$tmp_js=$javascript_specifique;
+		$javascript_specifique=array();
+		$javascript_specifique[]=$tmp_js;
+		$javascript_specifique[]="edt_organisation/script/fonctions_edt";
+	}
+
+	if((is_array($style_specifique))) {
+		$ua = getenv("HTTP_USER_AGENT");
+		if (strstr($ua, "MSIE 6.0")) {
+			//$style_specifique[] = "templates/".NameTemplateEDT()."/css/style_edt_ie6";
+			$style_specifique[] = "templates/".NameTemplateEDT()."/css/style_edt_ie6_infobulle";
+		}
+		else {
+			$style_specifique[] = "templates/".NameTemplateEDT()."/css/style_edt";
+			$style_specifique[] = "templates/".NameTemplateEDT()."/css/style_edt_infobulle";
+		}
+	}
+	else {
+		$tmp_css=$style_specifique;
+		$style_specifique=array();
+		$style_specifique[]=$tmp_css;
+
+		$ua = getenv("HTTP_USER_AGENT");
+		if (strstr($ua, "MSIE 6.0")) {
+			//$style_specifique[] = "templates/".NameTemplateEDT()."/css/style_edt_ie6";
+			$style_specifique[] = "templates/".NameTemplateEDT()."/css/style_edt_ie6_infobulle";
+		}
+		else {
+			$style_specifique[] = "templates/".NameTemplateEDT()."/css/style_edt";
+			$style_specifique[] = "templates/".NameTemplateEDT()."/css/style_edt_infobulle";
+		}
+	}
+}
+
+function get_next_tel_jour($jour, $decalage_aujourdhui=0) {
+	$retour="";
+
+	$debug="n";
+
+	if($debug=="y") {
+		$tab=array();
+		$tab[]="Mardi";
+		$tab[]="Mercredi";
+		$tab[]="Jeudi";
+		$tab[]="Vendredi";
+		$tab[]="Samedi";
+		$tab[]="Dimanche";
+		$tab[]="Lundi";
+
+		$f=fopen("/tmp/debug_get_next_tel_jour.txt","a+");
+		fwrite($f, "============================================\n");
+		fwrite($f, "get_next_tel_jour($jour, $decalage_aujourdhui)\n\n");
+		fwrite($f, "Recherche du prochain: ".$tab[$jour]."\n");
+		fwrite($f, "Aujourd'hui: ".strftime("%a %d/%m/%Y")."\n");
+	}
+
+	$indice_courant=strftime("%u");
+
+	for($i=$decalage_aujourdhui;$i<9;$i++) {
+		if($debug=="y") {
+			fwrite($f, "\n\$i=$i\n");
+		}
+		$jour_suivant=strftime("%u", time()+24*3600*$i);
+		if($debug=="y") {
+			fwrite($f, "\$jour_suivant=$jour_suivant\n");
+			fwrite($f, "soit ".strftime("%a %d/%m/%Y", time()+24*3600*$i)."\n");
+		}
+		if($jour_suivant==$jour) {
+			if($debug=="y") {
+				fwrite($f, "Jour trouvé \$i=$i\n");
+			}
+			$retour=$i;
+			break;
+		}
+	}
+
+	if($debug=="y") {
+		fclose($f);
+	}
+	return $retour;
+}
+
+function get_output_mode_pdf() {
+	$output_mode_pdf=getSettingValue("output_mode_pdf");
+	if(!in_array($output_mode_pdf, array("D", "I"))) {$output_mode_pdf='D';}
+	return getPref($_SESSION['login'], "output_mode_pdf", $output_mode_pdf);
+}
+
+function get_tab_mef($mode="indice_mef_code") {
+	$tab_mef=array();
+	$cpt=0;
+	$sql="SELECT * FROM mef ORDER BY libelle_edition, libelle_long, libelle_court;";
+	$res=mysql_query($sql);
+	if(mysql_num_rows($res)>0) {
+		while($lig=mysql_fetch_object($res)) {
+			if($mode=="indice_mef_code") {
+				$tab_mef[$lig->mef_code]['mef_code']=$lig->mef_code;
+				$tab_mef[$lig->mef_code]['libelle_court']=$lig->libelle_court;
+				$tab_mef[$lig->mef_code]['libelle_long']=$lig->libelle_long;
+				$tab_mef[$lig->mef_code]['libelle_edition']=$lig->libelle_edition;
+				$tab_mef[$lig->mef_code]['mef_rattachement']=$lig->mef_rattachement;
+				if($lig->libelle_edition!="") {
+					$tab_mef[$lig->mef_code]['designation_courte']=$lig->libelle_edition;
+				}
+				elseif($lig->libelle_long!="") {
+					$tab_mef[$lig->mef_code]['designation_courte']=$lig->libelle_long;
+				}
+				elseif($lig->libelle_court!="") {
+					$tab_mef[$lig->mef_code]['designation_courte']=$lig->libelle_court;
+				}
+				elseif($lig->mef_code!="") {
+					$tab_mef[$lig->mef_code]['designation_courte']=$lig->mef_code;
+				}
+			}
+			else {
+				$tab_mef[$cpt]['mef_code']=$lig->mef_code;
+				$tab_mef[$cpt]['libelle_court']=$lig->libelle_court;
+				$tab_mef[$cpt]['libelle_long']=$lig->libelle_long;
+				$tab_mef[$cpt]['libelle_edition']=$lig->libelle_edition;
+				$tab_mef[$cpt]['mef_rattachement']=$lig->mef_rattachement;
+				if($lig->libelle_edition!="") {
+					$tab_mef[$cpt]['designation_courte']=$lig->libelle_edition;
+				}
+				elseif($lig->libelle_long!="") {
+					$tab_mef[$cpt]['designation_courte']=$lig->libelle_long;
+				}
+				elseif($lig->libelle_court!="") {
+					$tab_mef[$cpt]['designation_courte']=$lig->libelle_court;
+				}
+				elseif($lig->mef_code!="") {
+					$tab_mef[$cpt]['designation_courte']=$lig->mef_code;
+				}
+				$cpt++;
+			}
+		}
+	}
+	return $tab_mef;
+}
+
+function clean_temp_tables() {
+	$retour="";
+	$tab_table=array("temp_abs_import",
+					"temp_ele_classe",
+					"temp_etab_import",
+					"temp_gep_import",
+					"temp_gep_import2",
+					"temp_grp",
+					"temp_matieres_import",
+					"temp_resp_adr_import",
+					"temp_resp_pers_import",
+					"temp_responsables2_import",
+					"tempo",
+					"tempo2",
+					"tempo3",
+					"tempo3_cdt",
+					"tempo4",
+					"tempo_utilisateurs");
+	$nb_tables_videes=0;
+	for($i=0;$i<count($tab_table);$i++) {
+		$sql="SHOW TABLES LIKE '$tab_table[$i]';";
+		//echo "$sql<br />\n";
+		$res_test=mysql_query($sql);
+		if(mysql_num_rows($res_test)>0) {
+			if($i>0) {$retour.=", ";}
+			$retour.=$tab_table[$i];
+
+			$sql="SELECT 1=1 FROM $tab_table[$i];";
+			//echo "$sql<br />\n";
+			$res_nb=mysql_query($sql);
+			$nb_reg=mysql_num_rows($res_nb);
+			$retour.=" (<em title=\"Nombre d'enregistrement avant vidage\">".$nb_reg."</em>)";
+
+			if($nb_reg>0) {
+				$sql="TRUNCATE TABLE $tab_table[$i];";
+				//echo "$sql<br />\n";
+				$suppr=mysql_query($sql);
+				if(!$suppr) {$retour.=" <span style='color:red'>ERREUR</span>";}
+				else {$nb_tables_videes++;}
+			}
+		}
+	}
+	$retour.="<br />$nb_tables_videes table(s) vidée(s).";
+	return $retour;
+}
+
+function get_tab_signature_bull($login_user="") {
+	global $niveau_arbo;
+	$tab=array();
+
+	if($login_user=="") {
+		$login_user=$_SESSION['login'];
+	}
+
+	if($niveau_arbo=="") {
+		$niveau_arbo=1;
+	}
+
+	$pref_arbo="..";
+	if($niveau_arbo==0) {
+		$pref_arbo=".";
+	}
+	if($niveau_arbo==1) {
+		$pref_arbo="..";
+	}
+	if($niveau_arbo==2) {
+		$pref_arbo="../..";
+	}
+
+	$user_temp_directory=get_user_temp_directory();
+
+	$sql="SELECT 1=1 FROM signature_droits WHERE login='$login_user';";
+	$test=mysql_query($sql);
+	if(mysql_num_rows($test)>0) {
+		$sql="SELECT * FROM signature_fichiers WHERE login='$login_user';";
+		$res=mysql_query($sql);
+		if(mysql_num_rows($res)>0) {
+			while($lig=mysql_fetch_object($res)) {
+				$tab['fichier'][$lig->id_fichier]['fichier']=$lig->fichier;
+				$tab['fichier'][$lig->id_fichier]['chemin']=$pref_arbo."/temp/".$user_temp_directory."/signature/".$lig->fichier;
+			}
+		}
+
+		$sql="SELECT * FROM signature_classes WHERE login='$login_user';";
+		$res=mysql_query($sql);
+		if(mysql_num_rows($res)>0) {
+			while($lig=mysql_fetch_object($res)) {
+				$tab['classe'][$lig->id_classe]['id_fichier']=$lig->id_fichier;
+				if($lig->id_fichier!=-1) {
+					$tab['fichier'][$lig->id_fichier]['id_classe'][]=$lig->id_classe;
+				}
+			}
+		}
+	}
+
+	return $tab;
+}
+
+/*
+# 1 : session ouverte, mais pas refermée (encore ouverte, ou fermée en fermant le navigateur)
+# 0 : logout normal
+# 2 : logout renvoyé par la fonction checkAccess (problème gepiPath ou accès interdit)
+# 3 : logout lié à un timeout
+# 10 : logout lié à une nouvelle connexion sous un nouveau profil
+
+# 4 : Erreur MDP
+*/
+function get_last_connexion($login, $reussie="y") {
+	$tab=array();
+
+	if($reussie=="y") {
+		$sql="SELECT * FROM log WHERE LOGIN='$login' AND (AUTOCLOSE='0' OR AUTOCLOSE='1' OR AUTOCLOSE='2' OR AUTOCLOSE='3' OR AUTOCLOSE='10') ORDER BY START DESC LIMIT 1;";
+	}
+	else {
+		$sql="SELECT * FROM log WHERE LOGIN='$login' AND AUTOCLOSE='4' ORDER BY START DESC LIMIT 1;";
+	}
+	$res=mysql_query($sql);
+	if(mysql_num_rows($res)>0) {
+		$lig=mysql_fetch_object($res);
+
+		$tab['START']=$lig->START;
+		$tab['REMOTE_ADDR']=$lig->REMOTE_ADDR;
+		$tab['USER_AGENT']=$lig->USER_AGENT;
+		$tab['REFERER']=$lig->REFERER;
+		$tab['AUTOCLOSE']=$lig->AUTOCLOSE;
+		$tab['END']=$lig->END;
+	}
+
+	return $tab;
+}
+
+function get_ele_clas_connexions($id_classe, $timestamp1, $timestamp2, $tab_autoclose=array()) {
+	$tab=array();
+
+	$chaine_autoclose="";
+	if(count($tab_autoclose)>0) {
+		$chaine_autoclose.=" AND (";
+		for($loop=0;$loop<count($tab_autoclose);$loop++) {
+			if($loop>0) {$chaine_autoclose.=" OR ";}
+			$chaine_autoclose.="AUTOCLOSE='".$tab_autoclose[$loop]."'";
+		}
+		$chaine_autoclose.=")";
+	}
+
+	$sql="SELECT DISTINCT jec.login FROM log l, j_eleves_classes jec WHERE jec.id_classe='$id_classe' AND jec.login=l.LOGIN AND l.START>='$timestamp1' AND l.START<='$timestamp2'".$chaine_autoclose.";";
+	$res=mysql_query($sql);
+	if(mysql_num_rows($res)>0) {
+		while($lig=mysql_fetch_object($res)) {
+			$tab[]=$lig->login;
+		}
+	}
+	return $tab;
+}
+
+function get_tab_etat_travail_fait($eleve_login) {
+	$tab_etat_travail_fait=array();
+	$sql="SELECT * FROM ct_devoirs_faits WHERE login='$eleve_login';";
+	$res_cdf=mysql_query($sql);
+	if(mysql_num_rows($res_cdf)>0) {
+		while($lig_cdf=mysql_fetch_object($res_cdf)) {
+			$tab_etat_travail_fait[$lig_cdf->id_ct]['etat']=$lig_cdf->etat;
+			$tab_etat_travail_fait[$lig_cdf->id_ct]['date_initiale']=$lig_cdf->date_initiale;
+			$tab_etat_travail_fait[$lig_cdf->id_ct]['date_modif']=$lig_cdf->date_modif;
+			$tab_etat_travail_fait[$lig_cdf->id_ct]['commentaire']=$lig_cdf->commentaire;
+		}
+	}
+	return $tab_etat_travail_fait;
+}
+
+function get_etat_et_img_cdt_travail_fait($id_ct) {
+	global $tab_etat_travail_fait,
+	$image_etat,
+	$texte_etat_travail,
+	$class_color_fond_notice;
+
+	if(array_key_exists($id_ct, $tab_etat_travail_fait)) {
+		if($tab_etat_travail_fait[$id_ct]['etat']=='fait') {
+			$image_etat="../images/edit16b.png";
+			$texte_etat_travail="FAIT: Le travail est actuellement pointé comme fait.\n";
+			if($tab_etat_travail_fait[$id_ct]['date_modif']!=$tab_etat_travail_fait[$id_ct]['date_initiale']) {
+				$texte_etat_travail.="Le travail a été pointé comme fait la première fois le ".formate_date($tab_etat_travail_fait[$id_ct]['date_initiale'], "y")."\net modifié pour la dernière fois par la suite le ".formate_date($tab_etat_travail_fait[$id_ct]['date_modif'], "y")."\n";
+			}
+			else {
+				$texte_etat_travail.="Le travail a été pointé comme fait le ".formate_date($tab_etat_travail_fait[$id_ct]['date_initiale'], "y")."\n";
+			}
+			$texte_etat_travail.="Cliquer pour corriger si le travail n'est pas encore fait.";
+			$class_color_fond_notice="color_fond_notices_t_fait";
+		}
+		else {
+			$image_etat="../images/edit16.png";
+			$texte_etat_travail="NON FAIT: Le travail n'est actuellement pas fait.\n";
+			if($tab_etat_travail_fait[$id_ct]['commentaire']!='') {
+				$texte_etat_travail.=$tab_etat_travail_fait[$id_ct]['commentaire']."\n";
+			}
+			$texte_etat_travail.="Cliquer pour pointer le travail comme fait.";
+		}
+	}
+	else {
+		$image_etat="../images/edit16.png";
+		$texte_etat_travail="NON FAIT: Le travail n'est actuellement pas fait.\nCliquer pour pointer le travail comme fait.";
+	}
+}
+
+function is_prof_ele($login_prof, $login_ele="", $login_resp="", $id_classe="") {
+	$is_prof_ele=false;
+
+	if($login_ele!="") {
+		$sql="SELECT 1=1 FROM j_eleves_groupes jeg, 
+							j_groupes_professeurs jgp
+						WHERE jgp.login='".$login_prof."' AND 
+							jgp.id_groupe=jeg.id_groupe AND 
+							jeg.login='$login_ele' LIMIT 1;";
+		$res=mysql_query($sql);
+		if(mysql_num_rows($res)>0) {
+			$is_prof_ele=true;
+		}
+	}
+	elseif($login_resp!="") {
+		$sql="SELECT 1=1 FROM j_eleves_groupes jeg, 
+							j_groupes_professeurs jgp, 
+							eleves e, 
+							responsables2 r, 
+							resp_pers rp 
+						WHERE jgp.login='".$login_prof."' AND 
+							jgp.id_groupe=jeg.id_groupe AND 
+							jeg.login=e.login AND 
+							e.ele_id=r.ele_id AND 
+							r.pers_id=rp.pers_id AND 
+							rp.login='$login_resp' LIMIT 1";
+		$res=mysql_query($sql);
+		if(mysql_num_rows($res)>0) {
+			$is_prof_ele=true;
+		}
+	}
+	elseif($id_classe!="") {
+		$is_prof_ele=is_prof_classe($login_prof, $id_classe);
+	}
+	else {
+		// Est-ce un prof avec des élèves?
+		$sql="SELECT 1=1 FROM j_eleves_groupes jeg, 
+							j_groupes_professeurs jgp
+						WHERE jgp.login='".$login_prof."' AND 
+							jgp.id_groupe=jeg.id_groupe LIMIT 1;";
+		$res=mysql_query($sql);
+		if(mysql_num_rows($res)>0) {
+			$is_prof_ele=true;
+		}
+	}
+
+	return $is_prof_ele;
+}
+
+function is_prof_classe($login_prof, $id_classe) {
+	$is_prof_classe=false;
+
+	$sql="SELECT 1=1 FROM j_groupes_classes jgc, 
+						j_groupes_professeurs jgp
+					WHERE jgp.login='".$login_prof."' AND 
+						jgp.id_groupe=jgc.id_groupe AND 
+						jgc.id_classe='$id_classe' LIMIT 1;";
+	$res=mysql_query($sql);
+	if(mysql_num_rows($res)>0) {
+		$is_prof_classe=true;
+	}
+
+	return $is_prof_classe;
+}
+
+function AccesDerniereConnexionEle($login_ele) {
+	$AccesDerniereConnexionEle=false;
+	if(($_SESSION['statut']=='administrateur')||
+	(($_SESSION['statut']=='scolarite')&&(getSettingAOui('AccesDerniereConnexionEleScolarite')))||
+	(($_SESSION['statut']=='cpe')&&(getSettingAOui('AccesDerniereConnexionEleCpe')))||
+	(($_SESSION['statut']=='professeur')&&(is_prof_ele($_SESSION['login'], $login_ele))&&((getSettingAOui('AccesDerniereConnexionEleProfesseur'))||(getSettingAOui('AccesDetailConnexionEleProfesseur'))))||
+	(($_SESSION['statut']=='professeur')&&(is_pp($_SESSION['login'], "", $login_ele))&&((getSettingAOui('AccesDerniereConnexionEleProfP'))||(getSettingAOui('AccesDetailConnexionEleProfP'))))) {
+		$AccesDerniereConnexionEle=true;
+	}
+	return $AccesDerniereConnexionEle;
+}
+
+function AccesDerniereConnexionResp($login_resp, $login_ele="") {
+	$is_pp=false;
+	$is_prof_ele=false;
+	if($login_ele=="") {
+		if(($_SESSION['statut']=='professeur')&&((getSettingAOui('AccesDerniereConnexionRespProfesseur'))||(getSettingAOui('AccesDetailConnexionRespProfesseur')))) {
+			$is_prof_ele=is_prof_ele($_SESSION['login'], "", $login_resp);
+		}
+
+		if(($_SESSION['statut']=='professeur')&&((getSettingAOui('AccesDerniereConnexionRespProfP'))||(getSettingAOui('AccesDetailConnexionRespProfP')))) {
+			$is_pp=is_pp($_SESSION['login'], "", "", "", $login_resp);
+		}
+	}
+	else {
+		if(($_SESSION['statut']=='professeur')&&((getSettingAOui('AccesDerniereConnexionRespProfesseur'))||(getSettingAOui('AccesDetailConnexionRespProfesseur')))) {
+			$is_prof_ele=is_prof_ele($_SESSION['login'], $login_ele);
+		}
+
+		if(($_SESSION['statut']=='professeur')&&(getSettingAOui('AccesDerniereConnexionRespProfP'))) {
+			$is_pp=is_pp($_SESSION['login'], "", $login_ele);
+		}
+	}
+
+	$AccesDerniereConnexionResp=false;
+	if(($_SESSION['statut']=='administrateur')||
+	(($_SESSION['statut']=='scolarite')&&(getSettingAOui('AccesDerniereConnexionRespScolarite')))||
+	(($_SESSION['statut']=='cpe')&&(getSettingAOui('AccesDerniereConnexionRespCpe')))||
+	(($_SESSION['statut']=='professeur')&&($is_prof_ele)&&((getSettingAOui('AccesDerniereConnexionRespProfesseur'))||(getSettingAOui('AccesDetailConnexionRespProfesseur'))))||
+	(($_SESSION['statut']=='professeur')&&($is_pp)&&((getSettingAOui('AccesDerniereConnexionRespProfP'))||(getSettingAOui('AccesDetailConnexionRespProfP'))))) {
+		$AccesDerniereConnexionResp=true;
+	}
+	return $AccesDerniereConnexionResp;
+}
+
+function AccesInfoEle($mode, $login_ele="", $id_classe="") {
+	$AccesInfoEle=false;
+	if(($_SESSION['statut']=='administrateur')||
+	(($_SESSION['statut']=='scolarite')&&(getSettingAOui($mode.'Scolarite')))||
+	(($_SESSION['statut']=='cpe')&&(getSettingAOui($mode.'Cpe')))||
+	(($_SESSION['statut']=='professeur')&&(is_prof_ele($_SESSION['login'], $login_ele, "", $id_classe))&&(getSettingAOui($mode.'Professeur')))||
+	(($_SESSION['statut']=='professeur')&&(is_pp($_SESSION['login'], $id_classe, $login_ele))&&(getSettingAOui($mode.'ProfP')))) {
+		$AccesInfoEle=true;
+	}
+	return $AccesInfoEle;
+}
+
+function AccesInfoResp($mode, $login_resp="", $login_ele="", $id_classe="") {
+	$is_pp=false;
+	$is_prof_ele=false;
+	if($login_resp!="") {
+		if(($_SESSION['statut']=='professeur')&&(getSettingAOui($mode.'Professeur'))) {
+			$is_prof_ele=is_prof_ele($_SESSION['login'], "", $login_resp);
+		}
+
+		if(($_SESSION['statut']=='professeur')&&(getSettingAOui($mode.'ProfP'))) {
+			$is_pp=is_pp($_SESSION['login'], "", "", "", $login_resp);
+		}
+	}
+	elseif($id_classe!="") {
+		if(($_SESSION['statut']=='professeur')&&(getSettingAOui($mode.'Professeur'))) {
+			$is_prof_ele=is_prof_ele($_SESSION['login'], $login_ele, "", $id_classe);
+		}
+
+		if(($_SESSION['statut']=='professeur')&&(getSettingAOui($mode.'ProfP'))) {
+			$is_pp=is_pp($_SESSION['login'], $id_classe, $login_ele);
+		}
+	}
+	else {
+		if(($_SESSION['statut']=='professeur')&&(getSettingAOui($mode.'Professeur'))) {
+			$is_prof_ele=is_prof_ele($_SESSION['login'], $login_ele);
+		}
+
+		if(($_SESSION['statut']=='professeur')&&(getSettingAOui($mode.'ProfP'))) {
+			$is_pp=is_pp($_SESSION['login'], "", $login_ele);
+		}
+	}
+
+	$AccesInfoResp=false;
+	if(($_SESSION['statut']=='administrateur')||
+	(($_SESSION['statut']=='scolarite')&&(getSettingAOui($mode.'Scolarite')))||
+	(($_SESSION['statut']=='cpe')&&(getSettingAOui($mode.'Cpe')))||
+	(($_SESSION['statut']=='professeur')&&($is_prof_ele)&&(getSettingAOui($mode.'Professeur')))||
+	(($_SESSION['statut']=='professeur')&&($is_pp)&&(getSettingAOui($mode.'ProfP')))) {
+		$AccesInfoResp=true;
+	}
+	return $AccesInfoResp;
+}
+
+function get_date_debut_log() {
+	$retour="";
+
+	$sql="SELECT START FROM log ORDER BY START LIMIT 1;";
+	$res=mysql_query($sql);
+	if(mysql_num_rows($res)>0) {
+		$retour=formate_date(mysql_result($res, 0, "START"), "y");
+	}
+
+	return $retour;
+}
+
+function get_info_grp($id_groupe, $tab_infos=array('description', 'matieres', 'classes', 'profs')) {
+	$group=get_group($id_groupe, $tab_infos);
+
+	$retour="";
+	if(isset($group['name'])) {
+		$retour=$group['name'];
+		if(in_array('description', $tab_infos)) {$retour.=" (<em>".$group['description']."</em>)";}
+		if(in_array('matieres', $tab_infos)) {$retour.=" ".$group['matiere']['matiere'];}
+		if(in_array('classes', $tab_infos)) {$retour.=" en ".$group['classlist_string'];}
+		if(in_array('profs', $tab_infos)) {$retour.=" (<em>".$group['profs']['proflist_string']."</em>)";}
+	}
+
+	return $retour;
+}
+
+function get_adresse_responsable($pers_id) {
+	$tab_adresse=array();
+
+	$tab_adresse['adr_id']="";
+	$tab_adresse['adr1']="";
+	$tab_adresse['adr2']="";
+	$tab_adresse['adr3']="";
+	$tab_adresse['cp']="";
+	$tab_adresse['commune']="";
+	$tab_adresse['pays']="";
+	$tab_adresse['en_ligne']="";
+
+	$sql="SELECT * FROM resp_adr ra, resp_pers rp WHERE rp.adr_id=ra.adr_id AND rp.pers_id='$pers_id';";
+	$res=mysql_query($sql);
+	if(mysql_num_rows($res)>0) {
+		$lig=mysql_fetch_object($res);
+		$tab_adresse['adr_id']=$lig->adr_id;
+		$tab_adresse['adr1']=$lig->adr1;
+		$tab_adresse['adr2']=$lig->adr2;
+		$tab_adresse['adr3']=$lig->adr3;
+		$tab_adresse['cp']=$lig->cp;
+		$tab_adresse['commune']=$lig->commune;
+		$tab_adresse['pays']=$lig->pays;
+
+		$tab_adresse['en_ligne']=$lig->adr1;
+
+		if($lig->adr2!="") {
+			if($tab_adresse['en_ligne']!="") {$tab_adresse['en_ligne'].=", ";}
+			$tab_adresse['en_ligne'].=$lig->adr2;
+		}
+
+		if($lig->adr3!="") {
+			if($tab_adresse['en_ligne']!="") {$tab_adresse['en_ligne'].=", ";}
+			$tab_adresse['en_ligne'].=$lig->adr3;
+		}
+
+		if($lig->cp!="") {
+			if($tab_adresse['en_ligne']!="") {$tab_adresse['en_ligne'].=", ";}
+			$tab_adresse['en_ligne'].=$lig->cp;
+		}
+
+		if($lig->commune!="") {
+			if($tab_adresse['en_ligne']!="") {$tab_adresse['en_ligne'].=", ";}
+			$tab_adresse['en_ligne'].=$lig->commune;
+		}
+
+		if(($tab_adresse['pays']!='')&&($tab_adresse['pays']!=getSettingValue('gepiSchoolPays'))) {
+			if($tab_adresse['en_ligne']!="") {$tab_adresse['en_ligne'].=", ";}
+			$tab_adresse['en_ligne'].=$tab_adresse['pays'];
+		}
+
+	}
+
+	return $tab_adresse;
+}
+
+function enregistrer_udt_corresp($champ, $nom_udt, $nom_gepi) {
+	$sql="SELECT * FROM udt_corresp WHERE champ='$champ' AND nom_udt='".mysql_real_escape_string($nom_udt)."' AND nom_gepi='$nom_gepi';";
+	$test=mysql_query($sql);
+	if(mysql_num_rows($test)==0) {
+		$sql="INSERT INTO udt_corresp SET champ='$champ', nom_udt='".mysql_real_escape_string($nom_udt)."', nom_gepi='$nom_gepi';";
+		$insert=mysql_query($sql);
+		return $insert;
+	}
+	else {
+		return true;
+	}
+}
+
+/**
+ * Affichage si le compte est auth_mode=sso et si on utilise la table de correspondance,
+ * si l'association est faite.
+ *
+ * @global string
+ * @param string $login id de l'utilisateur cherché
+ * @return string Le code html
+ */
+function temoin_compte_sso($login_user) {
+	global $gepiPath;
+
+	$retour="";
+
+	if(getSettingAOui('sso_cas_table')) {
+		$sql="SELECT auth_mode FROM utilisateurs WHERE login='$login_user' AND auth_mode='sso';";
+		$test=mysql_query($sql);
+		if(mysql_num_rows($test)>0) {
+			$sql="SELECT 1=1 FROM sso_table_correspondance WHERE login_gepi='$login_user';";
+			$test=mysql_query($sql);
+			if(mysql_num_rows($test)==0) {
+				$retour.="<img src='".$gepiPath."/images/icons/sens_interdit.png' width='16' height='16' alt=\"Correspondance SSO absente\" title=\"La correspondance SSO n'est pas enregistrée dans la table 'sso_table_correspondance' pour ce compte.\" />";
+			}
+		}
+	}
+
+	return $retour;
+}
+
+function check_mae($login_user) {
+	$test = sql_query1("SHOW TABLES LIKE 'mod_alerte_divers'");
+	if ($test == -1) {
+		return true;
+	}
+	else {
+		$sql="SELECT 1=1 FROM mod_alerte_divers WHERE name='login_exclus' AND value='".$login_user."';";
+		$test_mae=mysql_query($sql);
+		if(mysql_num_rows($test_mae)==0) {
+			return true;
+		}
+		else {
+			return false;
+		}
+	}
+}
+
+function clean_table_log($jusque_telle_date) {
+	if(($jusque_telle_date=="")||(!preg_match("#[0-9]{1,2}/[0-9]{1,2}/[0-9]{4}#", $jusque_telle_date))) {
+		return "<span style='color:red'>Date '$jusque_telle_date' invalide.</span>";
+	}
+	else {
+		$tmp_tab=explode("/", $jusque_telle_date);
+		$log_day=$tmp_tab[0];
+		$log_month=$tmp_tab[1];
+		$log_year=$tmp_tab[2];
+		if(!checkdate($log_month, $log_day, $log_year)) {
+			return "<span style='color:red'>Date '$jusque_telle_date' invalide.</span>";
+		}
+		else {
+
+			// Pour éviter de flinguer la session en cours
+			$hier_day=date('d', time() - 24*3600);
+			$hier_month=date('m', time() - 24*3600);
+			$hier_year=date('Y', time() - 24*3600);
+
+			//$sql="SELECT * FROM log WHERE start<'$log_year-$log_month-$log_day 00:00:00' AND start<'".date('Y')."-".date('m')."-".$hier." 00:00:00';";
+			$sql="DELETE FROM log WHERE start<'$log_year-$log_month-$log_day 00:00:00' AND start<'".$hier_year."-".$hier_month."-".$hier_day." 00:00:00';";
+			//echo "$sql<br />\n";
+			$del=mysql_query($sql);
+			if(!$del) {
+				return "<span style='color:red'>Echec du nettoyage.</span>\n";
+			}
+			else {
+				return "<span style='color:green'>Nettoyage effectué.</span>\n";
+			}
+		}
+	}
+}
+
+function clean_table_tentative_intrusion($jusque_telle_date) {
+	if(($jusque_telle_date=="")||(!preg_match("#[0-9]{1,2}/[0-9]{1,2}/[0-9]{4}#", $jusque_telle_date))) {
+		return "<span style='color:red'>Date '$jusque_telle_date' invalide.</span>";
+	}
+	else {
+		$tmp_tab=explode("/", $jusque_telle_date);
+		$log_day=$tmp_tab[0];
+		$log_month=$tmp_tab[1];
+		$log_year=$tmp_tab[2];
+		if(!checkdate($log_month, $log_day, $log_year)) {
+			return "<span style='color:red'>Date '$jusque_telle_date' invalide.</span>";
+		}
+		else {
+
+			// Pour éviter de flinguer la session en cours
+			$hier_day=date('d', time() - 24*3600);
+			$hier_month=date('m', time() - 24*3600);
+			$hier_year=date('Y', time() - 24*3600);
+
+			//$sql="SELECT * FROM log WHERE start<'$log_year-$log_month-$log_day 00:00:00' AND start<'".date('Y')."-".date('m')."-".$hier." 00:00:00';";
+			$sql="DELETE FROM tentatives_intrusion WHERE date<'$log_year-$log_month-$log_day 00:00:00' AND date<'".$hier_year."-".$hier_month."-".$hier_day." 00:00:00';";
+			//echo "$sql<br />\n";
+			$del=mysql_query($sql);
+			if(!$del) {
+				return "<span style='color:red'>Echec du nettoyage.</span>\n";
+			}
+			else {
+				return "<span style='color:green'>Nettoyage effectué.</span>\n";
+			}
+		}
+	}
 }
 ?>

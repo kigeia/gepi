@@ -1,7 +1,7 @@
 <?php
 /*
  *
- * Copyright 2001, 2011 Thomas Belliard, Laurent Delineau, Edouard Hue, Eric Lebrun
+ * Copyright 2001, 2012 Thomas Belliard, Laurent Delineau, Edouard Hue, Eric Lebrun
  *
  * This file is part of GEPI.
  *
@@ -66,6 +66,8 @@ if(isset($reg_matiere)){
 
 $reg_clazz = array();
 
+//debug_var();
+
 if (isset($_POST['is_posted'])) {
 	check_token();
 
@@ -104,6 +106,11 @@ if (isset($_POST['is_posted'])) {
     }
 
     $reg_clazz = $clazz;
+/*
+echo "<pre>";
+echo print_r($reg_clazz);
+echo "</pre>";
+*/
 
     if (empty($reg_clazz)) {
         $error = true;
@@ -126,6 +133,28 @@ if (isset($_POST['is_posted'])) {
             $msg = "Enseignement bien créé. ";
             $msg = urlencode($msg);
 
+			for($loo=0;$loo<count($tab_domaines);$loo++) {
+				$visibilite_groupe_domaine_courant=isset($_POST['visibilite_groupe_'.$tab_domaines[$loo]]) ? $_POST['visibilite_groupe_'.$tab_domaines[$loo]] : "n";
+				if($visibilite_groupe_domaine_courant=='n') {
+					$sql="INSERT j_groupes_visibilite SET id_groupe='".$create."', domaine='".$tab_domaines[$loo]."', visible='n';";
+					//echo "$sql<br />";
+					$insert=mysql_query($sql);
+					if(!$insert) {$msg.="Erreur lors de l'enregistrement de l'invisibilité du groupe n°".$create." sur les ".$tab_domaines_texte[$loo].".<br />";}
+				}
+			}
+
+			if(isset($_POST['coef'])) {
+				foreach($reg_clazz as $tmp_id_classe){
+					$sql="update j_groupes_classes set coef = '" . $_POST['coef'] . "' WHERE (id_groupe = '" . $create . "' and id_classe = '" . $tmp_id_classe . "');";
+					//echo "$sql<br />\n";
+					$res_coef=mysql_query($sql);
+					if(!$res_coef) {
+						$msg.="Erreur lors de l'enregistrement du coefficient du groupe n°".$create." en classe n°$tmp_id_classe.<br />";
+					}
+				}
+			}
+
+
             // On s'occupe des profs, s'il y en a.
                 $reg_professeurs = array();
                 foreach ($_POST as $key => $value) {
@@ -136,25 +165,124 @@ if (isset($_POST['is_posted'])) {
                     }
                 }
 
+				if(isset($_POST['associer_tous_les_profs_de_la_classe'])) {
+					for($loo=0;$loo<count($clazz);$loo++) {
+						$sql="SELECT DISTINCT u.login FROM utilisateurs u, 
+													j_groupes_professeurs jgp, 
+													j_groupes_classes jgc 
+											WHERE u.statut='professeur' AND 
+												u.etat='actif' AND
+												u.login=jgp.login AND
+												jgp.id_groupe=jgc.id_groupe AND
+												jgc.id_classe='".$clazz[$loo]."';";
+						$res_prof=mysql_query($sql);
+						if(mysql_num_rows($res_prof)>0) {
+							while($lig_prof=mysql_fetch_object($res_prof)) {
+								if(!in_array($lig_prof->login, $reg_professeurs)) {
+									$reg_professeurs[]=$lig_prof->login;
+								}
+							}
+						}
+					}
+				}
+				elseif(isset($_POST['associer_tous_les_profs_de_l_etablissement'])) {
+					$sql="SELECT login FROM utilisateurs WHERE statut='professeur' AND etat='actif';";
+					$res_prof=mysql_query($sql);
+					if(mysql_num_rows($res_prof)>0) {
+						while($lig_prof=mysql_fetch_object($res_prof)) {
+							if(!in_array($lig_prof->login, $reg_professeurs)) {
+								$reg_professeurs[]=$lig_prof->login;
+							}
+						}
+					}
+				}
 
+				$tab_profs_matiere=array();
+				$sql="SELECT DISTINCT id_professeur FROM j_professeurs_matieres WHERE id_matiere='$reg_matiere';";
+				$res_prof_matiere=mysql_query($sql);
+				if(mysql_num_rows($res_prof_matiere)>0){
+					while($lig_prof_matiere=mysql_fetch_object($res_prof_matiere)){
+						$tab_profs_matiere[]=$lig_prof_matiere->id_professeur;
+					}
+				}
+
+				// On vérifie que les profs de la liste sont bien associés à la matière:
+				for($loo=0;$loo<count($reg_professeurs);$loo++) {
+					if(!in_array($reg_professeurs[$loo], $tab_profs_matiere)) {
+						$sql="SELECT MAX(ordre_matieres) AS max_ordre_matiere FROM j_professeurs_matieres WHERE id_professeur='".$reg_professeurs[$loo]."';";
+						//echo "$sql<br />";
+						$res_ordre=mysql_query($sql);
+						if(mysql_num_rows($res_ordre)==0) {
+							$ordre_matiere=1;
+						}
+						else {
+							$ordre_matiere=mysql_result($res_ordre, 0, "max_ordre_matiere")+1;
+						}
+
+						$sql="INSERT INTO j_professeurs_matieres SET id_professeur='".$reg_professeurs[$loo]."', id_matiere='$reg_matiere', ordre_matieres='$ordre_matiere';";
+						//echo "$sql<br />";
+						$insert=mysql_query($sql);
+					}
+				}
+
+				//debug_var();
 				// METTRE TOUS LES ELEVES DES CLASSES CONCERNEES DANS LE GROUPE
 				$reg_eleves=array();
 				$current_group=get_group($create);
 				foreach ($current_group["periodes"] as $period) {
 					$reg_eleves[$period['num_periode']]=array();
-					foreach($reg_clazz as $tmp_id_classe){
-						$sql="SELECT login FROM j_eleves_classes WHERE id_classe='$tmp_id_classe' AND periode='".$period['num_periode']."'";
+
+					if((isset($_POST['eleves_order_by']))&&($_POST['eleves_order_by']=='classe')) {
+						$cpt_clas=0;
+						$sql="";
+						foreach($reg_clazz as $tmp_id_classe){
+							if($cpt_clas>0) {$sql.=" UNION ";}
+							$sql.="(SELECT jec.login FROM j_eleves_classes jec, eleves e, classes c WHERE id_classe='$tmp_id_classe' AND periode='".$period['num_periode']."' AND jec.login=e.login AND jec.id_classe=c.id ORDER BY e.nom, e.prenom)";
+							$cpt_clas++;
+						}
+						//$sql.=" ORDER BY c.classe, e.nom, e.prenom;";
+						//echo "$sql<br />";
 						$res_ele=mysql_query($sql);
-						if(mysql_num_rows($res_ele)>0){
-							while($lig_ele=mysql_fetch_object($res_ele)){
-								$reg_eleves[$period['num_periode']][]=$lig_ele->login;
+						$nb_ele=mysql_num_rows($res_ele);
+						if($nb_ele>0){
+							$cpt_ele=1;
+							while($lig_ele=mysql_fetch_object($res_ele)) {
+								if((!isset($_POST['eleves_frac_classe']))||
+									(($_POST['eleves_frac_classe']=='tous'))||
+									(($_POST['eleves_frac_classe']==1)&&($cpt_ele<=ceil($nb_ele/2)))||
+									(($_POST['eleves_frac_classe']==2)&&($cpt_ele>ceil($nb_ele/2)))) {
+									$reg_eleves[$period['num_periode']][]=$lig_ele->login;
+									//echo $lig_ele->login."<br />";
+								}
+								$cpt_ele++;
+							}
+						}
+					}
+					else {
+						foreach($reg_clazz as $tmp_id_classe){
+							$sql="SELECT jec.login FROM j_eleves_classes jec, eleves e, classes c WHERE id_classe='$tmp_id_classe' AND periode='".$period['num_periode']."' AND jec.login=e.login AND jec.id_classe=c.id ORDER BY e.nom, e.prenom;";
+							//echo "$sql<br />";
+							$res_ele=mysql_query($sql);
+							$nb_ele=mysql_num_rows($res_ele);
+							if($nb_ele>0){
+								$cpt_ele=1;
+								while($lig_ele=mysql_fetch_object($res_ele)) {
+									if((!isset($_POST['eleves_frac_classe']))||
+										(($_POST['eleves_frac_classe']=='tous'))||
+										(($_POST['eleves_frac_classe']==1)&&($cpt_ele<=ceil($nb_ele/2)))||
+										(($_POST['eleves_frac_classe']==2)&&($cpt_ele>ceil($nb_ele/2)))) {
+										$reg_eleves[$period['num_periode']][]=$lig_ele->login;
+										//echo $lig_ele->login."<br />";
+									}
+									$cpt_ele++;
+								}
 							}
 						}
 					}
 				}
 
 
-                if (count($reg_professeurs) == 0) {
+                if ((count($reg_professeurs) == 0)&&(count($reg_eleves) == 0)) {
                     header("Location: ./edit_group.php?id_groupe=$create&msg=$msg&id_classe=$id_classe&mode=$mode");
                 } else {
                     //$res = update_group($create, $reg_nom_groupe, $reg_nom_complet, $reg_matiere, $reg_clazz, $reg_professeurs, array());
@@ -167,6 +295,9 @@ if (isset($_POST['is_posted'])) {
 					else{
 						if($res){$msg.="Affectation des professeurs à cet enseignement effectuée. ";}else{$msg.="Echec de l'affectation des professeurs à cet enseignement. ";}
 					}
+
+					//die();
+
                     //header("Location: ./edit_class.php?id_classe=$id_classe");
                     header("Location: ./edit_class.php?id_classe=$id_classe&msg=$msg");
                 }
@@ -176,10 +307,12 @@ if (isset($_POST['is_posted'])) {
 
 }
 
+$themessage  = 'Des informations ont été modifiées. Voulez-vous vraiment quitter sans enregistrer ?';
 //**************** EN-TETE **************************************
 $titre_page = "Gestion des groupes";
 require_once("../lib/header.inc.php");
 //**************** FIN EN-TETE **********************************
+//echo "id_classe=$id_classe<br />";
 ?>
 <p class="bold">
 <a href="edit_class.php?id_classe=<?php echo $id_classe;?>"><img src='../images/icons/back.png' alt='Retour' class='back_link'/> Retour</a>
@@ -195,11 +328,18 @@ if ($mode == "groupe") {
 <form enctype="multipart/form-data" action="add_group.php" method=post>
 <div style="width: 95%;">
 <div style="width: 45%; float: left;">
-<p>Nom court : <input type=text size=30 name=groupe_nom_court value = "<?php echo $reg_nom_groupe; ?>" /></p>
+<p>Nom court&nbsp;: <input type="text" size="30" name="groupe_nom_court" id="groupe_nom_court" onchange="changement();" value = "<?php echo $reg_nom_groupe; ?>" /><?php
 
-<p>Nom complet : <input type=text size=30 name=groupe_nom_complet value = "<?php echo $reg_nom_complet; ?>" /></p>
+$titre_infobulle="Ajouter un suffixe au nom de l'enseignement";
+$texte_infobulle="<div align='center' style='padding:3px;'>".html_ajout_suffixe_ou_renommer('groupe_nom_court', 'groupe_nom_complet', 'matiere')."</div>";
+$tabdiv_infobulle[]=creer_div_infobulle('suffixe_nom_grp',$titre_infobulle,"",$texte_infobulle,"",30,0,'y','y','n','n');
+echo " <a href=\"javascript:afficher_div('suffixe_nom_grp','y',-100,20)\"><img src='../images/icons/wizard.png' width='16' height='16' alt='Suffixe' title=\"Ajouter un suffixe  ou renommer l'enseignement.\" /></a>";
 
-<p>Matière enseignée à ce groupe :
+?></p>
+
+<p>Nom complet&nbsp;: <input type="text" size="30" name="groupe_nom_complet" id="groupe_nom_complet" onchange="changement();" value = "<?php echo $reg_nom_complet; ?>" /></p>
+
+<p>Matière enseignée à ce groupe&nbsp;:
 <?php
 
 echo add_token_field();
@@ -207,7 +347,7 @@ echo add_token_field();
 $query = mysql_query("SELECT matiere, nom_complet FROM matieres ORDER BY matiere");
 $nb_mat = mysql_num_rows($query);
 
-echo "<select name='matiere' size='1'>\n";
+echo "<select name='matiere' id='matiere' size='1' onchange=\"changement();\">\n";
 
 for ($i=0;$i<$nb_mat;$i++) {
     $matiere = mysql_result($query, $i, "matiere");
@@ -215,24 +355,25 @@ for ($i=0;$i<$nb_mat;$i++) {
     echo "<option value='" . $matiere . "'";
     if ($reg_matiere == $matiere) {echo " SELECTED";}
     //echo ">" . $nom_matiere . "</option>\n";
-    echo ">" . htmlspecialchars($nom_matiere) . "</option>\n";
+    echo " nom_matiere=\"$nom_matiere\"";
+    echo ">".$matiere." (".htmlspecialchars($nom_matiere).")"."</option>\n";
 }
 echo "</select>\n";
 echo "</p>\n";
 
 if ($mode == "groupe") {
-    echo "<p>Classe à laquelle appartient le nouvel enseignement :\n";
-    echo "<select name='id_classe' size='1'>\n";
+    echo "<p>Classe à laquelle appartient le nouvel enseignement&nbsp;:\n";
+    echo "<select name='id_classe' size='1' onchange=\"changement();\">\n";
 
     $call_data = mysql_query("SELECT * FROM classes ORDER BY classe");
     $nombre_lignes = mysql_num_rows($call_data);
     if ($nombre_lignes != 0) {
         $i = 0;
         while ($i < $nombre_lignes){
-            $id_classe = mysql_result($call_data, $i, "id");
+            $tmp_id_classe = mysql_result($call_data, $i, "id");
             $classe = mysql_result($call_data, $i, "classe");
-                echo "<option value='" . $id_classe . "'";
-                if ($reg_id_classe == $id_classe) {echo " SELECTED";}
+                echo "<option value='" . $tmp_id_classe . "'";
+                if ($reg_id_classe == $tmp_id_classe) {echo " SELECTED";}
                 echo ">$classe</option>\n";
         $i++;
         }
@@ -244,7 +385,7 @@ if ($mode == "groupe") {
 
 } else if ($mode == "regroupement") {
     echo "<input type='hidden' name='id_classe' value='" . $id_classe . "' />\n";
-    echo "<p>Sélectionnez les classes auxquelles appartient le nouvel enseignement :<br />\n";
+    echo "<p>Sélectionnez les classes auxquelles appartient le nouvel enseignement&nbsp;:<br />\n";
     echo "<span style='color: red;'>Note : n'apparaissent que les classes ayant le même nombre de périodes.</span>\n";
     $current_classe_period_num = get_period_number($id_classe);
     $call_data = mysql_query("SELECT * FROM classes ORDER BY classe");
@@ -284,37 +425,11 @@ if ($mode == "groupe") {
 
 			if (in_array($_id_classe, $reg_clazz) OR $_id_classe == $id_classe) {echo " checked";}
 
-			echo " /><label for='classe_".$_id_classe."' style='cursor: pointer;'>$classe</label>\n";
+			echo " onchange=\"changement();\" /><label for='classe_".$_id_classe."' style='cursor: pointer;'>$classe</label>\n";
 			//echo ">$classe</option>\n";
 
 			echo "<br />\n";
         }
-		/*
-        echo "<table width='100%'>\n";
-        echo "<tr valign='top' align='left'>\n";
-        echo "<td>\n";
-        $nb_class_par_colonne=round($nombre_lignes/3);
-        while ($i < $nombre_lignes){
-            if(($i>0)&&(round($i/$nb_class_par_colonne)==$i/$nb_class_par_colonne)){
-                echo "</td>\n";
-                echo "<td>\n";
-            }
-
-            $_id_classe = mysql_result($call_data, $i, "id");
-            $classe = mysql_result($call_data, $i, "classe");
-            if (get_period_number($_id_classe) == $current_classe_period_num) {
-                echo "<input type='checkbox' name='classe_" . $_id_classe . "' id='classe_" . $_id_classe . "' value='yes'";
-
-                if (in_array($_id_classe, $reg_clazz) OR $_id_classe == $id_classe) {echo " checked";}
-
-                echo " /><label for='classe_".$_id_classe."' style='cursor: pointer;'>$classe</label>\n";
-                //echo ">$classe</option>\n";
-
-				echo "<br />\n";
-            }
-	        $i++;
-        }
-		*/
         //echo "</p>\n";
         echo "</td>\n";
         echo "</tr>\n";
@@ -323,8 +438,8 @@ if ($mode == "groupe") {
         echo "<p>Aucune classe définie !</p>\n";
     }
 }
-echo "<p>Catégorie de matière à laquelle appartient l'enseignement : ";
-echo "<select size='1' name='categorie'>\n";
+echo "<p>Catégorie de matière à laquelle appartient l'enseignement&nbsp;: ";
+echo "<select size='1' name='categorie' onchange=\"changement();\">\n";
 $get_cat = mysql_query("SELECT id, nom_court FROM matieres_categories");
 $test = mysql_num_rows($get_cat);
 
@@ -338,12 +453,44 @@ while ($row = mysql_fetch_array($get_cat, MYSQL_ASSOC)) {
 }
 echo "</select>\n";
 
-echo "</div>\n";
-// On affiche une sélection des profs si la matière a été choisie
+echo "<p>Coefficient de l'enseignement&nbsp;: ";
+echo "<select name='coef' id='coef'>\n";
+for($i=0;$i<10;$i++){
+	echo "<option value='$i'>$i</option>\n";
+}
+echo "</select>\n";
 
+echo "<p>Visibilité de l'enseignement sur&nbsp;: <br />\n";
+for($loop=0;$loop<count($tab_domaines);$loop++) {
+	echo "&nbsp;&nbsp;&nbsp;<input type='checkbox' name='visibilite_groupe_".$tab_domaines[$loop]."' id='visibilite_groupe_".$tab_domaines[$loop]."' value='y' checked ";
+	echo " onchange=\"checkbox_change_visibilite('visibilite_groupe_".$tab_domaines[$loop]."'); changement();\"";
+	echo "title='Visibilité ".$tab_domaines[$loop]."' /><label for='visibilite_groupe_".$tab_domaines[$loop]."' id='texte_visibilite_groupe_".$tab_domaines[$loop]."'";
+	echo "style='font-weight:bold;' ";
+	echo ">".$tab_domaines_texte[$loop]."</label><br />\n";
+}
+
+echo "<br />
+<p>Affecter dans l'enseignement&nbsp;:<br />
+<input type='radio' name='eleves_frac_classe' id='eleves_frac_classe_tous' value='tous' checked onchange=\"checkbox_change_frac_classe('eleves_frac_classe_tous');checkbox_change_frac_classe('eleves_frac_classe_1');checkbox_change_frac_classe('eleves_frac_classe_2');changement();\" /><label for='eleves_frac_classe_tous' id='texte_eleves_frac_classe_tous' style='font-weight:bold'> tous les élèves</label><br />
+<input type='radio' name='eleves_frac_classe' id='eleves_frac_classe_1' value='1' onchange=\"checkbox_change_frac_classe('eleves_frac_classe_tous');checkbox_change_frac_classe('eleves_frac_classe_1');checkbox_change_frac_classe('eleves_frac_classe_2');changement();\" /><label for='eleves_frac_classe_1' id='texte_eleves_frac_classe_1'> la première moitié</label><br />
+<input type='radio' name='eleves_frac_classe' id='eleves_frac_classe_2' value='2' onchange=\"checkbox_change_frac_classe('eleves_frac_classe_tous');checkbox_change_frac_classe('eleves_frac_classe_1');checkbox_change_frac_classe('eleves_frac_classe_2');changement();\" /><label for='eleves_frac_classe_2' id='texte_eleves_frac_classe_2'> la deuxième moitié</label></p>";
+
+if($mode == "regroupement") {
+	echo "<p>Dans le cas où vous ne mettez qu'une moitié des élèves dans le groupe, veuillez choisir le tri&nbsp;<br />
+	<input type='radio' name='eleves_order_by' id='eleves_order_by_classe' value='classe' onchange=\"checkbox_change_tri_eleves('eleves_order_by_alpha');checkbox_change_tri_eleves('eleves_order_by_classe');changement();\" checked /><label for='eleves_order_by_classe' id='texte_eleves_order_by_classe'>élèves triés par classe puis par ordre alphabétique</label><br />
+	<input type='radio' name='eleves_order_by' id='eleves_order_by_alpha' value='alpha' onchange=\"checkbox_change_tri_eleves('eleves_order_by_alpha');checkbox_change_tri_eleves('eleves_order_by_classe');changement();\" /><label for='eleves_order_by_alpha' id='texte_eleves_order_by_alpha'>élèves triés par ordre alphabétique</label></p>";
+
+}
+else {
+	echo "<input type='hidden' name='eleves_order_by' value='alpha' />";
+}
+
+echo "</div>\n";
+
+// On affiche une sélection des profs si la matière a été choisie
 if ($reg_matiere != null) {
     echo "<div style='width: 45%; float: right;'>\n";
-    echo "<p>Cochez les professeurs qui participent à cet enseignement : </p>\n";
+    echo "<p>Cochez les professeurs qui participent à cet enseignement&nbsp;: </p>\n";
 
     $sql="SELECT u.login, u.nom, u.prenom, u.civilite,u.statut FROM utilisateurs u, j_professeurs_matieres j WHERE (j.id_matiere = '$reg_matiere' and j.id_professeur = u.login and u.etat!='inactif') ORDER BY u.nom;";
     //echo "$sql<br />";
@@ -360,11 +507,11 @@ if ($reg_matiere != null) {
 
         $prof_list["list"][] = $prof_login;
         //$prof_list["users"][$prof_login] = array("login" => $prof_login, "nom" => $prof_nom, "prenom" => $prof_prenom, "civilite" => $civilite);
-        $prof_list["users"][$prof_login] = array("login" => $prof_login, "nom" => $prof_nom, "prenom" => $prof_prenom, "civilite" => $civilite, "statut" => $prof_statut);
+        $prof_list["users"][$prof_login] = array("login" => $prof_login, "nom" => casse_mot($prof_nom,'maj'), "prenom" => casse_mot($prof_prenom,'majf2'), "civilite" => $civilite, "statut" => $prof_statut);
     }
 
     if (count($prof_list["list"]) == "0") {
-        echo "<p><font color=red>ERREUR !</font> Aucun professeur n'a été défini comme compétent dans la matière considérée.</p>\n";
+        echo "<p><span style='color:red'>ERREUR !</span> Aucun professeur n'a été défini comme compétent dans la matière considérée.<br /><a href='../matieres/modify_matiere.php?current_matiere=$reg_matiere'>Associer des professeurs à $reg_matiere</a></p>\n";
     } else {
         $total_profs = array_unique($prof_list["list"]);
         $p = 0;
@@ -383,7 +530,7 @@ if ($reg_matiere != null) {
 				echo "</td>\n";
 				echo "<td style='text-align:left;'>\n";
 				echo "<label id='civ_nom_prenom_prof_$p' for='prof_".$p."' style='cursor: pointer;'>\n";
-				echo " " . $prof_list["users"][$prof_login]["nom"] . " " . $prof_list["users"][$prof_login]["prenom"];
+				echo " " . $prof_list["users"][$prof_login]["civilite"] . " " . $prof_list["users"][$prof_login]["nom"] . " " . $prof_list["users"][$prof_login]["prenom"];
 				echo "</label>\n";
 				echo "</td>\n";
 				echo "</tr>\n";
@@ -396,7 +543,7 @@ if ($reg_matiere != null) {
 				echo "</td>\n";
 				echo "<td style='text-align:left;'>\n";
 				echo "<b>ANOMALIE</b>&nbsp;:";
-				echo " " . $prof_list["users"][$prof_login]["nom"] . " " . $prof_list["users"][$prof_login]["prenom"];
+				echo " " . $prof_list["users"][$prof_login]["civilite"] . " " . $prof_list["users"][$prof_login]["nom"] . " " . $prof_list["users"][$prof_login]["prenom"];
 				echo " (<i style='color:red'>compte ".$prof_list["users"][$prof_login]["statut"]."</i>)";
 				echo "<br />\n";
 				$temoin_nettoyage_requis='y';
@@ -410,11 +557,41 @@ if ($reg_matiere != null) {
 			echo "Un <a href='../utilitaires/clean_tables.php'>nettoyage des tables</a> s'impose.";
 		}
     }
-    echo "</div>\n";
+
+	if ($mode == "groupe") {
+		echo "<br />
+<input type='checkbox' name='associer_tous_les_profs_de_la_classe' id='associer_tous_les_profs_de_la_classe' value='y' onchange=\"checkbox_change_divers(this.id)\" /><label for='associer_tous_les_profs_de_la_classe' id='texte_associer_tous_les_profs_de_la_classe'> Associer à cet enseignement tous les professeurs de la classe.</label><br />
+<input type='checkbox' name='associer_tous_les_profs_de_l_etablissement' id='associer_tous_les_profs_de_l_etablissement' value='y' onchange=\"checkbox_change_divers(this.id)\" /><label for='associer_tous_les_profs_de_l_etablissement' id='texte_associer_tous_les_profs_de_l_etablissement'> Associer à cet enseignement tous les professeurs de l'établissement.</label><br />
+";
+	}
+	else {
+		echo "<br />
+<input type='checkbox' name='associer_tous_les_profs_de_la_classe' id='associer_tous_les_profs_de_la_classe' value='y' onchange=\"checkbox_change_divers(this.id)\" /><label for='associer_tous_les_profs_de_la_classe' id='texte_associer_tous_les_profs_de_la_classe'> Associer à cet enseignement tous les professeurs de la (<em>ou des</em>) classe(<em>s</em>).</label><br />
+<input type='checkbox' name='associer_tous_les_profs_de_l_etablissement' id='associer_tous_les_profs_de_l_etablissement' value='y' onchange=\"checkbox_change_divers(this.id)\" /><label for='associer_tous_les_profs_de_l_etablissement' id='texte_associer_tous_les_profs_de_l_etablissement'> Associer à cet enseignement tous les professeurs de l'établissement.</label><br />
+";
+	}
+
+	echo "</div>\n";
+
+	//echo "id_classe=$id_classe<br />";
+
+	$avec_lien_edit_group="y";
+	$tab_autres_groupes=tableau_html_groupe_matiere_telle_classe($id_classe, $reg_matiere);
+	if($tab_autres_groupes!="") {
+		echo "<div style='width: 45%; float: right; font-size:small; margin-top:1em;'>\n";
+		echo "<p>Il existe d'autres enseignements dans la même matière pour cette classe&nbsp;:</p>\n";
+		echo $tab_autres_groupes;
+		echo "</div>\n";
+	}
 }
 // Fin : professeurs
 
-echo "<script type='text/javascript'>
+// S'il n'y a aucun prof, pas besoin de ce qui suit:
+if(isset($p)) {
+
+	// js_checkbox_change_style($nom_js_func='checkbox_change', $prefixe_texte='texte_', $avec_balise_script="n")
+
+	echo "<script type='text/javascript'>
 function checkbox_change(cpt) {
 	if(document.getElementById('prof_'+cpt)) {
 		if(document.getElementById('prof_'+cpt).checked) {
@@ -430,6 +607,14 @@ for(i=0;i<$p;i++) {
 	checkbox_change(i);
 }
 </script>\n";
+}
+echo "<script type='text/javascript'>\n";
+echo js_checkbox_change_style('checkbox_change_divers');
+echo js_checkbox_change_style('checkbox_change_visibilite');
+echo js_checkbox_change_style('checkbox_change_frac_classe');
+echo js_checkbox_change_style('checkbox_change_tri_eleves');
+
+echo "</script>\n";
 
 
 echo "<div style='float: left; width: 100%'>\n";

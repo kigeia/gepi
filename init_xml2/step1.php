@@ -81,7 +81,7 @@
 
 		echo "<p>Si des fichiers XML existent, ils seront supprimés...</p>\n";
 		//$tabfich=array("f_ele.csv","f_ere.csv");
-		$tabfich=array("eleves.xml","nomenclature.xml");
+		$tabfich=array("eleves.xml","fichier_nomenclature.xml");
 
 		for($i=0;$i<count($tabfich);$i++){
 			if(file_exists("../temp/".$tempdir."/$tabfich[$i]")) {
@@ -122,16 +122,41 @@
 			echo "<p>Cette page permet de remplir des tables temporaires avec les informations élèves.<br />\n";
 			echo "</p>\n";
 
-			echo "<form enctype='multipart/form-data' action='".$_SERVER['PHP_SELF']."' method='post'>\n";
+			echo "<form enctype='multipart/form-data' action='".$_SERVER['PHP_SELF']."' id='form_envoi_xml' method='post'>\n";
+			echo "<fieldset style='border: 1px solid grey;";
+			echo "background-image: url(\"../images/background/opacite50.png\"); ";
+			echo "'>\n";
 			echo add_token_field();
 			echo "<p>Veuillez fournir le fichier ElevesAvecAdresses.xml (<em>ou ElevesSansAdresses.xml</em>):<br />\n";
-			echo "<input type=\"file\" size=\"65\" name=\"eleves_xml_file\" /><br />\n";
+			echo "<input type=\"file\" size=\"65\" name=\"eleves_xml_file\" id='input_xml_file' style='border: 1px solid grey; background-image: url(\"../images/background/opacite50.png\"); padding:5px; margin:5px;' /><br />\n";
 			if ($gepiSettings['unzipped_max_filesize']>=0) {
 				echo "<p style=\"font-size:small; color: red;\"><em>REMARQUE&nbsp;:</em> Vous pouvez fournir à Gepi le fichier compressé issu directement de SCONET. (<em>Ex : ElevesSansAdresses.zip</em>)</p>";
 			}
 			echo "<input type='hidden' name='step' value='0' />\n";
 			echo "<input type='hidden' name='is_posted' value='yes' />\n";
-			echo "<p><input type='submit' value='Valider' /></p>\n";
+
+			//echo "<p><input type='submit' value='Valider' /></p>\n";
+
+			echo "<p><input type='submit' id='input_submit' value='Valider' />
+<input type='button' id='input_button' value='Valider' style='display:none;' onclick=\"check_champ_file()\" /></p>
+</fieldset>
+
+<script type='text/javascript'>
+	document.getElementById('input_submit').style.display='none';
+	document.getElementById('input_button').style.display='';
+
+	function check_champ_file() {
+		fichier=document.getElementById('input_xml_file').value;
+		//alert(fichier);
+		if(fichier=='') {
+			alert('Vous n\'avez pas sélectionné de fichier XML à envoyer.');
+		}
+		else {
+			document.getElementById('form_envoi_xml').submit();
+		}
+	}
+</script>\n";
+
 			echo "</form>\n";
 
 
@@ -304,7 +329,10 @@
 						`ELEOPT10` varchar(40) $chaine_mysql_collate NOT NULL default '',
 						`ELEOPT11` varchar(40) $chaine_mysql_collate NOT NULL default '',
 						`ELEOPT12` varchar(40) $chaine_mysql_collate NOT NULL default '',
-						`LIEU_NAISSANCE` varchar(50) $chaine_mysql_collate NOT NULL default ''
+						`LIEU_NAISSANCE` varchar(50) $chaine_mysql_collate NOT NULL default '',
+						`MEF_CODE` varchar(50) $chaine_mysql_collate NOT NULL default '',
+						DATE_SORTIE DATETIME,
+						DATE_ENTREE DATETIME
 						) ENGINE=MyISAM CHARACTER SET utf8 COLLATE utf8_general_ci;";
 						$create_table = mysql_query($sql);
 
@@ -427,7 +455,7 @@
 								//echo "$sql<br />\n";
 								$res_insert=mysql_query($sql);
 								if(!$res_insert){
-									echo "<span style='color:red'>Erreur lors de la requête $sql</span><br />\n";
+									echo "<span style='color:red'><strong>Erreur lors de la requête</strong> $sql</span><br />\n";
 									$nb_err++;
 								}
 								$id_tempo++;
@@ -461,7 +489,7 @@
 												`nom` char(50) NOT NULL default '',
 												`niveau` char(50) NOT NULL default '',
 												`type` char(50) NOT NULL default '',
-												`cp` int(10) NOT NULL default '0',
+												`cp` varchar(10) NOT NULL default '0',
 												`ville` char(50) NOT NULL default '',
 												PRIMARY KEY  (`id`)
 												) ENGINE=MyISAM CHARACTER SET utf8 COLLATE utf8_general_ci;";
@@ -507,11 +535,13 @@
 				"DATE_NAISS",
 				"DOUBLEMENT",
 				"DATE_SORTIE",
+				"DATE_ENTREE",
 				"CODE_REGIME",
 				"DATE_ENTREE",
 				"CODE_MOTIF_SORTIE",
 				"CODE_SEXE",
-				"CODE_COMMUNE_INSEE_NAISS"
+				"CODE_COMMUNE_INSEE_NAISS",
+				"CODE_MEF"
 				);
 
 				$tab_champs_scol_an_dernier=array("CODE_STRUCTURE",
@@ -670,12 +700,16 @@
 
 							if(isset($eleves[$i]["code_commune_insee_naiss"])){$sql.="lieu_naissance='".$eleves[$i]["code_commune_insee_naiss"]."', ";}
 
+							if(isset($eleves[$i]["code_mef"])){$sql.="mef_code='".$eleves[$i]["code_mef"]."', ";}
+
+							if(isset($eleves[$i]["date_entree"])){$sql.="date_entree='".get_mysql_date_from_slash_date($eleves[$i]["date_entree"])."', ";}
+
 							$sql=mb_substr($sql,0,mb_strlen($sql)-2);
 							$sql.=" WHERE ele_id='".$eleves[$i]['eleve_id']."';";
 							affiche_debug("$sql<br />\n");
 							$res_insert=mysql_query($sql);
 							if(!$res_insert){
-								echo "Erreur lors de la requête $sql<br />\n";
+								echo "<span style='color:red'><strong>Erreur lors de la requête</strong> $sql</span><br />\n";
 								$nb_err++;
 								flush();
 							}
@@ -797,7 +831,7 @@
 
 										$res_insert_etab=mysql_query($sql);
 										if(!$res_insert_etab){
-											echo "Erreur lors de la requête $sql<br />\n";
+											echo "<span style='color:red'><strong>Erreur lors de la requête</strong> $sql</span><br />\n";
 											$nb_err_etab++;
 											flush();
 										}
@@ -940,7 +974,7 @@
 							affiche_debug("$sql<br />\n");
 							$res_update=mysql_query($sql);
 							if(!$res_update){
-								echo "Erreur lors de la requête $sql<br />\n";
+								echo "<span style='color:red'><strong>Erreur lors de la requête</strong> $sql</span><br />\n";
 								flush();
 								$nb_err++;
 							}
@@ -970,11 +1004,14 @@
 			}
 			elseif($step==3){
 
-				echo "<form enctype='multipart/form-data' action='".$_SERVER['PHP_SELF']."' method='post'>\n";
+				echo "<form enctype='multipart/form-data' action='".$_SERVER['PHP_SELF']."' id='form_envoi_xml' method='post'>\n";
+				echo "<fieldset id='infosPerso' style='border: 1px solid grey;";
+				echo "background-image: url(\"../images/background/opacite50.png\"); ";
+				echo "'>\n";
 				echo add_token_field();
 				echo "<p>Les codes numériques des options doivent maintenant être traduits en leurs équivalents alphabétiques (<em>ex.: 030201 -&gt; AGL1</em>).</p>\n";
 				echo "<p>Veuillez fournir le fichier Nomenclature.xml:<br />\n";
-				echo "<input type=\"file\" size=\"65\" name=\"nomenclature_xml_file\" /></p>\n";
+				echo "<input type=\"file\" size=\"65\" name=\"nomenclature_xml_file\" id='input_xml_file' style='border: 1px solid grey; background-image: url(\"../images/background/opacite50.png\"); padding:5px; margin:5px;' /></p>\n";
 				if ($gepiSettings['unzipped_max_filesize']>=0) {
 					echo "<p style=\"font-size:small; color: red;\"><em>REMARQUE&nbsp;:</em> Vous pouvez fournir à Gepi le fichier compressé issu directement de SCONET. (<em>Ex&nbsp;: Nomenclature.zip</em>)</p>";
 				}
@@ -982,7 +1019,27 @@
 				echo "<input type='hidden' name='step' value='4' />\n";
 				echo "<input type='hidden' name='is_posted' value='yes' />\n";
 				//echo "</p>\n";
-				echo "<p><input type='submit' value='Valider' /></p>\n";
+				//echo "<p><input type='submit' value='Valider' /></p>\n";
+				echo "<p><input type='submit' id='input_submit' value='Valider' />
+<input type='button' id='input_button' value='Valider' style='display:none;' onclick=\"check_champ_file()\" /></p>
+</fieldset>
+
+<script type='text/javascript'>
+	document.getElementById('input_submit').style.display='none';
+	document.getElementById('input_button').style.display='';
+
+	function check_champ_file() {
+		fichier=document.getElementById('input_xml_file').value;
+		//alert(fichier);
+		if(fichier=='') {
+			alert('Vous n\'avez pas sélectionné de fichier XML à envoyer.');
+		}
+		else {
+			document.getElementById('form_envoi_xml').submit();
+		}
+	}
+</script>\n";
+
 				echo "</form>\n";
 				require("../lib/footer.inc.php");
 				die();
@@ -1037,7 +1094,7 @@
 
 					//$source_file=stripslashes($xml_file['tmp_name']);
 					$source_file=$xml_file['tmp_name'];
-					$dest_file="../temp/".$tempdir."/nomenclature.xml";
+					$dest_file="../temp/".$tempdir."/fichier_nomenclature.xml";
 					$res_copy=copy("$source_file" , "$dest_file");
 
 					//===============================================================
@@ -1106,7 +1163,7 @@
 					else{
 						// Lecture du fichier Nomenclature... pour changer les codes numériques d'options dans 'temp_gep_import2' en leur code gestion
 
-						$dest_file="../temp/".$tempdir."/nomenclature.xml";
+						$dest_file="../temp/".$tempdir."/fichier_nomenclature.xml";
 
 						$nomenclature_xml=simplexml_load_file($dest_file);
 						if(!$nomenclature_xml) {
@@ -1159,6 +1216,88 @@
 							}
 						}
 
+
+						echo "Recherche des MEFS...<br />\n";
+
+						$tab_champs_mef=array("CODE_MEF",
+						"FORMATION",
+						"LIBELLE_LONG",
+						"LIBELLE_EDITION",
+						"CODE_MEFSTAT",
+						"MEF_RATTACHEMENT"
+						);
+
+						$tab_mef=array();
+						$i=-1;
+
+						$objet_mefs=($nomenclature_xml->DONNEES->MEFS);
+						foreach ($objet_mefs->children() as $mef) {
+							$i++;
+			
+							$tab_mef[$i]=array();
+			
+							foreach($mef->attributes() as $key => $value) {
+								$tab_mef[$i][mb_strtolower($key)]=trim($value);
+							}
+
+							foreach($mef->children() as $key => $value) {
+								if(in_array(my_strtoupper($key),$tab_champs_mef)) {
+									$tab_mef[$i][mb_strtolower($key)]=preg_replace('/"/','',trim($value));
+								}
+							}
+						}
+						/*
+						echo "<pre>";
+						print_r($tab_mef);
+						echo "</pre>";
+						*/
+
+						for($loop=0;$loop<count($tab_mef);$loop++) {
+							$sql="SELECT 1=1 FROM mef WHERE mef_code='".$tab_mef[$loop]['code_mef']."';";
+							$test=mysql_query($sql);
+							if(mysql_num_rows($test)==0) {
+								// On n'importe que les MEF associés à des élèves
+								$sql="SELECT 1=1 FROM temp_gep_import2 WHERE MEF_CODE='".$tab_mef[$loop]['code_mef']."';";
+								$test=mysql_query($sql);
+								if(mysql_num_rows($test)>0) {
+									if((!isset($tab_mef[$loop]['libelle_long']))||($tab_mef[$loop]['libelle_long']=="")) {
+										echo "<span style='color:red'>ERREUR&nbsp;:</span> Pas de libelle_long pour&nbsp;:<br />";
+										echo print_r($tab_mef[$loop]);
+										echo "<br />";
+									}
+									else {
+										if((!isset($tab_mef[$loop]['formation']))||($tab_mef[$loop]['formation']=="")) {
+											$tab_mef[$loop]['formation']="";
+										}
+										if((!isset($tab_mef[$loop]['libelle_edition']))||($tab_mef[$loop]['libelle_edition']=="")) {
+											$tab_mef[$loop]['libelle_edition']=casse_mot($tab_mef[$loop]['libelle_long'],'majf2');
+										}
+
+										if((!isset($tab_mef[$loop]['mef_rattachement']))||($tab_mef[$loop]['mef_rattachement']=="")) {
+											$tab_mef[$loop]['mef_rattachement']=$tab_mef[$loop]['code_mef'];
+										}
+
+										if(!isset($tab_mef[$loop]['code_mefstat'])) {
+											$tab_mef[$loop]['code_mefstat']="";
+										}
+
+										$sql="INSERT INTO mef SET mef_code='".$tab_mef[$loop]['code_mef']."',
+																	libelle_court='".mysql_real_escape_string($tab_mef[$loop]['formation'])."',
+																	libelle_long='".mysql_real_escape_string($tab_mef[$loop]['libelle_long'])."',
+																	libelle_edition='".mysql_real_escape_string($tab_mef[$loop]['libelle_edition'])."',
+																	code_mefstat='".$tab_mef[$loop]['code_mefstat']."',
+																	mef_rattachement='".$tab_mef[$loop]['mef_rattachement']."'
+																	;";
+										$insert=mysql_query($sql);
+										if(!$insert) {
+											echo "<span style='color:red'>ERREUR&nbsp;:</span> Erreur lors de l'import suivant&nbsp;:<br />$sql<br />";
+										}
+									}
+								}
+							}
+						}
+
+
 						$sql="SELECT * FROM temp_gep_import2";
 						$res1=mysql_query($sql);
 
@@ -1210,7 +1349,7 @@
 								affiche_debug($sql."<br />\n");
 								$res2=mysql_query($sql);
 								if(!$res2){
-									echo "Erreur lors de la requête $sql<br />\n";
+									echo "<span style='color:red'><strong>Erreur lors de la requête</strong> $sql</span><br />\n";
 									flush();
 									$nb_err++;
 								}
@@ -1447,7 +1586,7 @@
 						$res=mysql_query($sql);
 
 						if(!$res){
-							echo "Erreur lors de la requête $sql<br />\n";
+							echo "<span style='color:red'><strong>Erreur lors de la requête</strong> $sql</span><br />\n";
 							flush();
 							$nb_err++;
 						}
@@ -1482,7 +1621,7 @@
 						$res=mysql_query($sql);
 
 						if(!$res){
-							echo "Erreur lors de la requête $sql<br />\n";
+							echo "<span style='color:red'><strong>Erreur lors de la requête</strong> $sql</span><br />\n";
 							flush();
 							$nb_err++;
 						}
@@ -1523,9 +1662,9 @@
 					}
 				}
 
-				if(file_exists("../temp/".$tempdir."/nomenclature.xml")) {
-					echo "<p>Suppression de nomenclature.xml... ";
-					if(unlink("../temp/".$tempdir."/nomenclature.xml")){
+				if(file_exists("../temp/".$tempdir."/fichier_nomenclature.xml")) {
+					echo "<p>Suppression de fichier_nomenclature.xml... ";
+					if(unlink("../temp/".$tempdir."/fichier_nomenclature.xml")){
 						echo "réussie.</p>\n";
 					}
 					else{

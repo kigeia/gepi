@@ -121,7 +121,7 @@ $matiere_nom = $current_group["matiere"]["nom_complet"];
 (!isset($_GET['imprime']) or (($_GET['imprime'] != 'y') and ($_GET['imprime']!= 'n')))?$current_imprime='n':$current_imprime=$_GET['imprime'];
 if ($current_imprime == 'n') {
 	$imprime='y';
-	$text_imprime="Version imprimmable";
+	$text_imprime="Version imprimable";
 	$largeur = "30%";
 } else {
 	$imprime='n';
@@ -238,6 +238,13 @@ if ($nb_test == 0) {
 		echo "Choisissez une classe et une matière.";
 	}
 	echo "\n</h2>\n";
+
+	echo "<hr />\n";
+	echo "<p style='text-align:center; font-style:italic;'>Cahiers de textes du ";
+	echo strftime("%d/%m/%Y", getSettingValue("begin_bookings"));
+	echo " au ";
+	echo strftime("%d/%m/%Y", getSettingValue("end_bookings"));
+	echo "</p>\n";
 	require("../lib/footer.inc.php");
 	die();
 }
@@ -248,11 +255,8 @@ $content = @mysql_result($appel_info_cahier_texte, 0, 'contenu');
 $id_ct = @mysql_result($appel_info_cahier_texte, 0, 'id_ct');
 $content .= affiche_docs_joints($id_ct,"c");
 if ($content != '') {
-	// echo "<div  style=\"border-bottom-style: solid; border-width:2px; border-color: ".$couleur_bord_tableau_notice."; \"><strong>INFORMATIONS GENERALES</strong></div>";
-	//echo "\n<div class='see_all_notice>\n";
 	echo "<h2 class='grande_ligne couleur_bord_tableau_notice'>\n<strong>INFORMATIONS GENERALES</strong>\n</h2>\n";
-	// echo "<table style=\"border-style:solid; border-width:0px; border-color: ".$couleur_bord_tableau_notice."; padding: 2px; margin: 2px;\" width = '100%' cellpadding='5'><tr><td>".$content."</td></tr></table>";
-echo "<div class='see_all_general couleur_bord_tableau_notice'>".$content."</div>";
+	echo "<div class='see_all_general couleur_bord_tableau_notice color_fond_notices_i' style='width:98%;'>".$content."</div>";
 }
 
 	// echo "<div  style=\"border-bottom-style: solid; border-width:2px; border-color: ".$couleur_bord_tableau_notice."; \"><strong>CAHIER DE TEXTES: comptes rendus de séance</strong></div><br />";
@@ -283,6 +287,16 @@ else {
 }
 $res_notices = mysql_query($req_notices);
 $notice = mysql_fetch_object($res_notices);
+
+// 20130727
+$CDTPeutPointerTravailFait=getSettingAOui('CDTPeutPointerTravailFait'.ucfirst($_SESSION['statut']));
+
+$class_notice_dev_fait="see_all_notice couleur_bord_tableau_notice color_fond_notices_t_fait";
+$class_notice_dev_non_fait="see_all_notice couleur_bord_tableau_notice color_fond_notices_t";
+if(($selected_eleve_login!='')&&($CDTPeutPointerTravailFait)) {
+	$tab_etat_travail_fait=get_tab_etat_travail_fait($selected_eleve_login);
+	echo js_cdt_modif_etat_travail();
+}
 
 $ts_limite_visibilite_devoirs_pour_eleves=time()+getSettingValue('delai_devoirs')*24*3600;
 
@@ -382,7 +396,42 @@ while (true) {
 			}
 		}
 		// echo("<table style=\"border-style:solid; border-width:1px; border-color: ".$couleur_bord_tableau_notice.";\" width=\"100%\" cellpadding=\"1\" bgcolor=\"".$color_fond_notices[$not_dev->type]."\">\n<tr>\n<td>\n$content</td>\n</tr>\n</table>\n<br/>\n");
-		echo "<div class='see_all_notice couleur_bord_tableau_notice color_fond_notices_".$not_dev->type."'>";
+		if($type_notice=='devoir') {
+			// 20130727
+			$class_color_fond_notice="color_fond_notices_t";
+			if($CDTPeutPointerTravailFait) {
+				get_etat_et_img_cdt_travail_fait($not_dev->id_ct);
+				/*
+				if(array_key_exists($not_dev->id_ct, $tab_etat_travail_fait)) {
+					if($tab_etat_travail_fait[$not_dev->id_ct]['etat']=='fait') {
+						$image_etat="../images/edit16b.png";
+						$texte_etat_travail="FAIT: Le travail est actuellement pointé comme fait.\n";
+						if($tab_etat_travail_fait[$not_dev->id_ct]['date_modif']!=$tab_etat_travail_fait[$not_dev->id_ct]['date_initiale']) {
+							$texte_etat_travail.="Le travail a été pointé comme fait la première fois le ".formate_date($tab_etat_travail_fait[$not_dev->id_ct]['date_initiale'], "y")."\net modifié pour la dernière fois par la suite le ".formate_date($tab_etat_travail_fait[$not_dev->id_ct]['date_modif'], "y")."\n";
+						}
+						else {
+							$texte_etat_travail.="Le travail a été pointé comme fait le ".formate_date($tab_etat_travail_fait[$not_dev->id_ct]['date_initiale'], "y")."\n";
+						}
+						$texte_etat_travail.="Cliquer pour corriger si le travail n'est pas encore fait.";
+						$class_color_fond_notice="color_fond_notices_t_fait";
+					}
+					else {
+						$image_etat="../images/edit16.png";
+						$texte_etat_travail="NON FAIT: Le travail n'est actuellement pas fait.\nCliquer pour pointer le travail comme fait.";
+					}
+				}
+				else {
+					$image_etat="../images/edit16.png";
+					$texte_etat_travail="NON FAIT: Le travail n'est actuellement pas fait.\nCliquer pour pointer le travail comme fait.";
+				}
+				*/
+			}
+
+			echo "<div id='div_travail_".$not_dev->id_ct."' class='see_all_notice couleur_bord_tableau_notice $class_color_fond_notice' style='min-height:2em;'>";
+		}
+		else {
+			echo "<div class='see_all_notice couleur_bord_tableau_notice color_fond_notices_".$not_dev->type."' style='min-height:2em;'>";
+		}
 		/* if ($not_dev->type == "t") {
 			echo "see_all_a_faire'>\n";
 		} else {
@@ -393,6 +442,10 @@ while (true) {
 			echo "<div style='float:right; width: 6em; border: 1px solid black; margin: 2px; font-size: xx-small; text-align: center;'>Donné le ".formate_date($not_dev->date_visibilite_eleve)."</div>\n";
 		}
 
+		if(($type_notice=='devoir')&&($CDTPeutPointerTravailFait)) {
+			echo "<div id='div_etat_travail_".$not_dev->id_ct."' style='float:right; width: 16px; margin: 2px; text-align: center;'><a href=\"javascript:cdt_modif_etat_travail('$selected_eleve_login', '".$not_dev->id_ct."')\" title=\"$texte_etat_travail\"><img src='$image_etat' class='icone16' /></a></div>\n";
+		}
+
 		echo "$content\n</div>\n";
 		if ($not_dev->type == "c") $date_ct_old = $not_dev->date_ct;
 	}
@@ -400,5 +453,13 @@ while (true) {
 
 //if ($current_imprime=='n') echo "</td></tr></table>";
 //echo "</td></tr></table>";
+
+echo "<hr />\n";
+echo "<p style='text-align:center; font-style:italic;'>Cahiers de textes du ";
+echo strftime("%d/%m/%Y", getSettingValue("begin_bookings"));
+echo " au ";
+echo strftime("%d/%m/%Y", getSettingValue("end_bookings"));
+echo "</p>\n";
+
 require("../lib/footer.inc.php");
 ?>

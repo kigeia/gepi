@@ -1,6 +1,6 @@
 <?php
 /**
- * Ajouter, modifier un devoir dans une évaluation cumule
+ * Ajouter, modifier un devoir dans une évaluation cumul
  * 
  *
  * @copyright Copyright 2001, 2011 Thomas Belliard, Laurent Delineau, Edouard Hue, Eric Lebrun
@@ -99,6 +99,7 @@ if ($id_dev)  {
 		$nom_complet = mysql_result($query, 0, 'nom_complet');
 		$description = nettoyage_retours_ligne_surnumeraires(mysql_result($query, 0, 'description'));
 	    $precision = mysql_result($query, 0, 'arrondir');
+        $famille=mysql_result($query, 0, 'vision_famille');
 	}
 	else {
 		header("Location: index.php?msg=".rawurlencode("Le numéro de devoir n est pas associé à ce groupe."));
@@ -110,7 +111,9 @@ else {
 	$nom_court = "CC";
 	$nom_complet = ucfirst($nom_cc)." n°";
 	$description = "";
-	$precision="s1";
+	//$precision="s1";
+	$precision=getPref($_SESSION['login'], 'eval_cumul_precision', 's1');
+    $famille = "";
 }
 
 $matiere_nom = $current_group["matiere"]["nom_complet"];
@@ -127,12 +130,15 @@ if (isset($_POST['is_posted'])) {
 	$nom_complet=traitement_magic_quotes($_POST['nom_complet']);
 	$description=traitement_magic_quotes($_POST['description']);
 	$precision=$_POST['precision'];
+	$famille=$_POST['famille'];
 	if(!my_ereg("^(s1|s5|se|p1|p5|pe)$", $precision)) {
 		$msg.="Précision '$precision' invalide; Elle a été remplacée par 's1'.";
 	}
 
+	savePref($_SESSION['login'], 'eval_cumul_precision', $precision);
+
 	if(!isset($id_dev)) {
-		$sql="INSERT INTO cc_dev SET id_groupe='$id_groupe', nom_court='$nom_court', nom_complet='$nom_complet', description='$description', arrondir='$precision';";
+		$sql="INSERT INTO cc_dev SET id_groupe='$id_groupe', nom_court='$nom_court', nom_complet='$nom_complet', description='$description', arrondir='$precision', vision_famille='$famille';";
 		$insert=mysql_query($sql);
 		if(!$insert) {
 			$msg.="Erreur lors de la création du $nom_cc.";
@@ -150,7 +156,7 @@ if (isset($_POST['is_posted'])) {
 
 		// Sinon, il faut mettre à jour le devoir associé
 		
-		$sql="UPDATE cc_dev SET nom_court='$nom_court', nom_complet='$nom_complet', description='$description', arrondir='$precision' WHERE id_groupe='$id_groupe' AND id='$id_dev';";
+		$sql="UPDATE cc_dev SET nom_court='$nom_court', nom_complet='$nom_complet', description='$description', arrondir='$precision', vision_famille='$famille' WHERE id_groupe='$id_groupe' AND id='$id_dev';";
 		$update=mysql_query($sql);
 		if(!$update) {
 			$msg.="Erreur lors de la mise à jour du $nom_cc.";
@@ -336,7 +342,29 @@ else {
 	echo "</td>\n";
 	echo "</tr>\n";
 }
+?>
+<tr>
+    <td style='background-color: #aae6aa; font-weight: bold;'>
+        <?php echo 'Visibilité&nbsp;:';?>
+    </td>
+    <td style="text-align: left;">
+        <input type="radio" id="famille_voit" 
+               name="famille" 
+               <?php if ("yes" == $famille) echo "checked='checked'"; ?>
+               value="yes" />
+        <label for="famille_voit">Les élèves et les parents voient cette évaluation</label>
+        <br />
+        <input type="radio" 
+               id="famille_voit_pas" 
+               name="famille" 
+               <?php if ("no" == $famille) echo "checked='checked'"; ?>
+               value="no" />
+        <label for="famille_voit_pas">Les élèves et les parents ne voient pas cette évaluation</label>
+        <br />
+    </td>
+</tr>
 
+<?php
 echo "</table>\n";
 
 if(isset($id_dev)) {

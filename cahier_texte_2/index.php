@@ -175,31 +175,52 @@ if ($groups->isEmpty()) {
     echo "<br /><br />";
 }
 
+$nom_ou_description_groupe_cdt=getPref($_SESSION['login'], "nom_ou_description_groupe_cdt", "name");
+//echo "\$nom_ou_description_groupe_cdt=$nom_ou_description_groupe_cdt<br />";
+
 $a = 1;
-	foreach($groups as $group) {
-	echo "<a href=\"#\" style=\"font-size: 11pt;\"  onclick=\"javascript:
-			id_groupe = '".$group->getId()."';
-			getWinDernieresNotices().hide();
-			getWinListeNotices();
-			new Ajax.Updater('affichage_liste_notice', './ajax_affichages_liste_notices.php?id_groupe=".$group->getId()."', {encoding: 'utf-8'});
-			getWinEditionNotice().setAjaxContent('./ajax_edition_compte_rendu.php?id_groupe=".$group->getId()."&today='+getCalendarUnixDate(), { 
-	            		encoding: 'utf-8',
-	            		onComplete : 
-	            		function() {
-	            			initWysiwyg();
+foreach($groups as $group) {
+	$sql="SELECT 1=1 FROM j_groupes_visibilite WHERE id_groupe='".$group->getId()."' AND domaine='cahier_texte' AND visible='n';";
+	$test_grp_visib=mysql_query($sql);
+	if(mysql_num_rows($test_grp_visib)==0) {
+		echo "<a href=\"#\" style=\"font-size: 11pt;\"  onclick=\"javascript:
+				id_groupe = '".$group->getId()."';
+				getWinDernieresNotices().hide();
+				getWinListeNotices();
+				new Ajax.Updater('affichage_liste_notice', './ajax_affichages_liste_notices.php?id_groupe=".$group->getId()."', {encoding: 'utf-8'});
+				getWinEditionNotice().setAjaxContent('./ajax_edition_compte_rendu.php?id_groupe=".$group->getId()."&today='+getCalendarUnixDate(), { 
+				    		encoding: 'utf-8',
+				    		onComplete : 
+				    		function() {
+				    			initWysiwyg();
+							}
 						}
-					}
-			);
-			return false;
-    	\">";
+				);
+				return false;
+			\">";
 
-	echo $group->getNameAvecClasses();
-	echo "</a>&nbsp;\n";
+			echo "<span title=\"".$group->getName()." - ".$group->getDescriptionAvecClasses()." (";
+			$cpt_prof=0;
+			foreach($group->getProfesseurs() as $prof) {
+				if($cpt_prof>0) {echo ", ";}
+				echo casse_mot($prof->getNom(),"maj")." ".casse_mot($prof->getPrenom(),"majf2");
+				$cpt_prof++;
+			}
+			echo ").\">";
+			if($nom_ou_description_groupe_cdt=='name') {
+				echo $group->getNameAvecClasses();
+			}
+			else {
+				echo $group->getDescriptionAvecClasses();
+			}
+			echo "</span>";
+		echo "</a>&nbsp;\n";
 
-    if ($a == 3) {
-    	$a = 1;
-    } else {
-		$a = $a + 1;
+		if ($a == 3) {
+			$a = 1;
+		} else {
+			$a = $a + 1;
+		}
 	}
 }
 echo "<a href='creer_sequence.php'>Pr&eacute;parer une s&eacute;quence enti&egrave;re</a></td>";

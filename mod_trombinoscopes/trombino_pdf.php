@@ -255,6 +255,8 @@ if ( $classe != 'toutes' and $groupe != 'toutes' and $discipline != 'toutes' and
 	$total = $cpt_photo;
 
 
+	//debug_var();
+	//die();
 	//==========================================================================
 
 	// Paramètres de dimensions
@@ -498,10 +500,25 @@ if ( $classe != 'toutes' and $groupe != 'toutes' and $discipline != 'toutes' and
 		}
 	}
 
+	$pref_output_mode_pdf=get_output_mode_pdf();
+
 	$date=date("Ymd_Hi");
-	$nom_fich='Trombino_'.$date.'.pdf';
+	$nom_fich='Trombino_';
+	if((isset($groupe))&&($groupe!=0)) {
+		$tab_champs=array('matieres', 'classes');
+		$tmp_group=get_group($groupe, $tab_champs);
+		$nom_fich.=$tmp_group['name']."_-_";
+		$nom_fich.=$tmp_group['description']."_-_";
+		$nom_fich.=$tmp_group['matiere']['matiere']."_-_";
+		$nom_fich.=$tmp_group['classlist_string']."_";
+	}
+	elseif(isset($classe)) {
+		$nom_fich.=get_class_from_id($classe);
+	}
+	$nom_fich=remplace_accents($nom_fich, "all");
+	$nom_fich.=$date.'.pdf';
 	header('Content-Type: application/pdf');
-	$pdf->Output($nom_fich,'I');
+	$pdf->Output($nom_fich, $pref_output_mode_pdf);
 	die();
 }
 else {

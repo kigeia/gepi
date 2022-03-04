@@ -2,12 +2,14 @@
 	/*
 	*/
 
+	$tab_param_classe=array();
 	echo "<table class='boireaus' border='1' summary='Tableau des items'>\n";
 	echo "<tr>\n";
 	//echo "<th width='30%'>Item</th>\n";
 	echo "<th>Item</th>\n";
 	for($i=0;$i<count($tab_id_classe);$i++) {
 		echo "<th>".get_class_from_id($tab_id_classe[$i])."</th>\n";
+		$tab_param_classe[$i]=getAllParamClasse($tab_id_classe[$i]);
 	}
 	echo "<th>\n";
 	echo "<a href=\"javascript:ToutCocher()\"><img src='../images/enabled.png' width='15' height='15' alt='Tout cocher' /></a> / <a href=\"javascript:ToutDeCocher()\"><img src='../images/disabled.png' width='15' height='15' alt='Tout décocher' /></a>";
@@ -15,6 +17,9 @@
 	echo "</tr>\n";
 
 	$gepiProfSuivi=getSettingValue("gepi_prof_suivi");
+
+	$tab_js_lignes_specifiques_releve_html="var tab_html=new Array('rn_col_moy', 'rn_sign_chefetab', 'rn_abs_2');";
+	$tab_js_lignes_specifiques_releve_pdf="var tab_pdf=new Array('rn_aff_classe_nom', 'rn_rapport_standard_min_font', 'rn_bloc_obs');";
 
 	$tab_item=array();
 	$tab_item[]='rn_nomdev';
@@ -27,15 +32,27 @@
 	//$tab_traduc['rn_app']="Avec l'appréciation (sous réserve d'autorisation par le professeur)";
 	$tab_item[]='rn_datedev';
 	$tab_traduc['rn_datedev']="Avec les dates";
+
+	// SELON LE STATUT: Accès ou pas
+	if((($_SESSION['statut']!='eleve')&&($_SESSION['statut']!='responsable'))||
+		(($_SESSION['statut']=='eleve')&&(getSettingAOui('GepiAccesColMoyReleveEleve')))||
+		(($_SESSION['statut']=='responsable')&&(getSettingAOui('GepiAccesColMoyReleveParent')))
+		) {
+		$tab_item[]='rn_col_moy';
+		$tab_traduc['rn_col_moy']="Avec la colonne moyenne (<em>relevé HTML</em>)<br />(<em style='font-size:small'>sur une période seulement, pas sur un intervalle de dates</em>)";
+	}
+
 	$tab_item[]='rn_sign_chefetab';
 	$tab_traduc['rn_sign_chefetab']="Avec case pour signature du chef d'établissement (<em>relevé HTML</em>)";
 	$tab_item[]='rn_sign_pp';
 	$tab_traduc['rn_sign_pp']="Avec case pour signature du $gepiProfSuivi";
 	$tab_item[]='rn_sign_resp';
 	$tab_traduc['rn_sign_resp']="Avec case pour signature des responsables";
-	
-	$tab_item[]='rn_abs_2';
-	$tab_traduc['rn_abs_2']="Afficher les absences (ABS2 et relevé HTML)";
+
+	if(getSettingValue("active_module_absence")=='2') {
+		$tab_item[]='rn_abs_2';
+		$tab_traduc['rn_abs_2']="Afficher les absences (<em>ABS2 et relevé HTML</em>)";
+	}
 
 	/*
 	$tab_item[]='rn_sign_nblig';
@@ -53,18 +70,30 @@
 	$alt=1;
 	// Affichage du nom de la classe Nom long  Nom court  Nom long (Nom court)
 	//$alt=$alt*(-1);
-	echo "<tr class='lig$alt white_hover'>\n";
+	echo "<tr id='tr_rn_aff_classe_nom' class='lig$alt white_hover'>\n";
 	echo "<td style='text-align:left;'>Affichage du nom de la classe (<em>relevé PDF</em>)<br />\n";
 	echo "Nom long (1) / Nom court (2) / Nom court (Nom long) (3)";
 	echo "</td>\n";
 	for($i=0;$i<count($tab_id_classe);$i++) {
 		echo "<td>\n";
 		echo "<label for='rn_aff_classe_nom_".$i."_1' class='invisible'>Nom long</label>
-		<input type='radio' name='rn_aff_classe_nom[$i]' id='rn_aff_classe_nom_".$i."_1' value='1' checked='checked' /><br />\n";
+		<input type='radio' name='rn_aff_classe_nom[$i]' id='rn_aff_classe_nom_".$i."_1' value='1' ";
+		if((!isset($tab_param_classe[$i]['rn_aff_classe_nom']))||($tab_param_classe[$i]['rn_aff_classe_nom']=='1')) {
+			echo "checked='checked' ";
+		}
+		echo "/><br />\n";
 		echo "<label for='rn_aff_classe_nom_".$i."_2' class='invisible'>Nom long</label>
-		<input type='radio' name='rn_aff_classe_nom[$i]' id='rn_aff_classe_nom_".$i."_2' value='2' /><br />\n";
+		<input type='radio' name='rn_aff_classe_nom[$i]' id='rn_aff_classe_nom_".$i."_2' value='2' ";
+		if((isset($tab_param_classe[$i]['rn_aff_classe_nom']))&&($tab_param_classe[$i]['rn_aff_classe_nom']=='2')) {
+			echo "checked='checked' ";
+		}
+		echo "/><br />\n";
 		echo "<label for='rn_aff_classe_nom_".$i."_3' class='invisible'>Nom long</label>
-		<input type='radio' name='rn_aff_classe_nom[$i]' id='rn_aff_classe_nom_".$i."_3' value='3' />\n";
+		<input type='radio' name='rn_aff_classe_nom[$i]' id='rn_aff_classe_nom_".$i."_3' value='3' ";
+		if((isset($tab_param_classe[$i]['rn_aff_classe_nom']))&&($tab_param_classe[$i]['rn_aff_classe_nom']=='3')) {
+			echo "checked='checked' ";
+		}
+		echo "/>\n";
 		echo "</td>\n";
 	}
 
@@ -76,16 +105,18 @@
 	echo "</td>\n";
 	echo "</tr>\n";
 
+	// A changer: il vaudrait mieux lister les paramètres correspondant à des champs de la table 'classes' (on ne devrait plus en ajouter)
+	$tab_param_table_classes_param=array('rn_aff_classe_nom','rn_app', 'rn_moy_classe', 'rn_moy_min_max_classe', 'rn_retour_ligne','rn_rapport_standard_min_font', 'rn_adr_resp', 'rn_bloc_obs', 'rn_col_moy');
 
 	for($k=0;$k<count($tab_item);$k++) {
 		$affiche_ligne="y";
-		if ((($_SESSION['statut']=='eleve')||($_SESSION['statut']=='responsable'))&&(my_ereg("^rn_sign",$tab_item[$k]))) {
+		if ((($_SESSION['statut']=='eleve')||($_SESSION['statut']=='responsable'))&&(preg_match("/^rn_sign/",$tab_item[$k]))) {
 			$affiche_ligne="n";
 		}
 
 		if($affiche_ligne=="y") {
 			$alt=$alt*(-1);
-			echo "<tr class='lig$alt white_hover'>\n";
+			echo "<tr id='tr_".$tab_item[$k]."' class='lig$alt white_hover'>\n";
 			echo "<td style='text-align:left;'>".$tab_traduc[$tab_item[$k]]."\n";
 			echo "</td>\n";
 
@@ -93,12 +124,20 @@
 				echo "<td>\n";
 				echo "<label for='".$tab_item[$k]."_".$i."' class='invisible'>".$tab_traduc[$tab_item[$k]]."</label>
 					<input type='checkbox' name='".$tab_item[$k]."[$i]' id='".$tab_item[$k]."_".$i."' value='y' ";
-				$sql="SELECT * FROM classes WHERE id='".$tab_id_classe[$i]."';";
-				$res_class_tmp=mysql_query($sql);
-				if(mysql_num_rows($res_class_tmp)>0){
-					$lig_class_tmp=mysql_fetch_object($res_class_tmp);
 
-					if($lig_class_tmp->$tab_item[$k]=="y") {echo "checked ='checked' ";}
+				if(!in_array($tab_item[$k], $tab_param_table_classes_param)) {
+					$sql="SELECT * FROM classes WHERE id='".$tab_id_classe[$i]."';";
+					$res_class_tmp=mysql_query($sql);
+					if(mysql_num_rows($res_class_tmp)>0){
+						$lig_class_tmp=mysql_fetch_object($res_class_tmp);
+
+						if($lig_class_tmp->$tab_item[$k]=="y") {echo "checked ='checked' ";}
+						//$tmp_champ=$tab_item[$k];
+						//if($lig_class_tmp->$tmp_champ=="y") {echo "checked ='checked' ";}
+					}
+				}
+				elseif(getParamClasse($tab_id_classe[$i],$tab_item[$k],'')=="y") {
+					echo "checked ='checked' ";
 				}
 				echo "/>\n";
 				echo "</td>\n";
@@ -120,7 +159,11 @@
 	for($i=0;$i<count($tab_id_classe);$i++) {
 		echo "<td>\n";
 		echo "<label for='rn_app_".$i."' class='invisible'>Avec l'appréciation</label>
-				<input type='checkbox' name='rn_app[$i]' id='rn_app_".$i."' size='2' value='y' />\n";
+				<input type='checkbox' name='rn_app[$i]' id='rn_app_".$i."' size='2' value='y' ";
+		if((isset($tab_param_classe[$i]['rn_app']))&&($tab_param_classe[$i]['rn_app']=='y')) {
+			echo "checked ";
+		}
+		echo "/>\n";
 		echo "</td>\n";
 	}
 
@@ -134,46 +177,63 @@
 	// 20100526
 	// Il ne faut peut-être pas l'autoriser pour tous les utilisateurs?
 	//if(($_SESSION['statut']!='eleve')&&($_SESSION['statut']!='responsable')) {
-		$alt=$alt*(-1);
-		echo "<tr class='lig$alt white_hover'>\n";
-		echo "<td style='text-align:left;'>Avec la moyenne de la classe pour chaque devoir\n";
-		echo "</td>\n";
-		for($i=0;$i<count($tab_id_classe);$i++) {
-			echo "<td>\n";
-			echo "<label for='rn_moy_classe_".$i."' class='invisible'>Avec la moyenne de la classe</label>
-				<input type='checkbox' name='rn_moy_classe[$i]' id='rn_moy_classe_".$i."' size='2' value='y' />\n";
+	if((($_SESSION['statut']!='eleve')&&($_SESSION['statut']!='responsable'))||
+		(($_SESSION['statut']=='eleve')&&(getSettingAOui('GepiAccesMoyClasseReleveEleve')))||
+		(($_SESSION['statut']=='responsable')&&(getSettingAOui('GepiAccesMoyClasseReleveParent')))
+		) {
+			$alt=$alt*(-1);
+			echo "<tr class='lig$alt white_hover'>\n";
+			echo "<td style='text-align:left;'>Avec la moyenne de la classe pour chaque devoir\n";
 			echo "</td>\n";
-		}
+			for($i=0;$i<count($tab_id_classe);$i++) {
+				echo "<td>\n";
+				echo "<label for='rn_moy_classe_".$i."' class='invisible'>Avec la moyenne de la classe</label>
+					<input type='checkbox' name='rn_moy_classe[$i]' id='rn_moy_classe_".$i."' size='2' value='y' ";
+				if((isset($tab_param_classe[$i]['rn_moy_classe']))&&($tab_param_classe[$i]['rn_moy_classe']=='y')) {
+					echo "checked ";
+				}
+				echo "/>\n";
+				echo "</td>\n";
+			}
 	
-		echo "<td>\n";
-		echo "<a href=\"javascript:CocheLigne('rn_moy_classe')\"><img src='../images/enabled.png' width='15' height='15' alt='Tout cocher' /></a> / <a href=\"javascript:DecocheLigne('rn_moy_classe')\"><img src='../images/disabled.png' width='15' height='15' alt='Tout décocher' /></a>";
-		echo "</td>\n";
-		echo "</tr>\n";
-	
-		$alt=$alt*(-1);
-		echo "<tr class='lig$alt white_hover'>\n";
-		echo "<td style='text-align:left;'>Avec les moyennes min/classe/max de chaque devoir\n";
-		echo "</td>\n";
-		for($i=0;$i<count($tab_id_classe);$i++) {
 			echo "<td>\n";
-			echo "<label for='rn_moy_min_max_classe_".$i."' class='invisible'>Avec les moyennes min/classe/max</label> 
-					<input type='checkbox' name='rn_moy_min_max_classe[$i]' id='rn_moy_min_max_classe_".$i."' size='2' value='y' />\n";
+			echo "<a href=\"javascript:CocheLigne('rn_moy_classe')\"><img src='../images/enabled.png' width='15' height='15' alt='Tout cocher' /></a> / <a href=\"javascript:DecocheLigne('rn_moy_classe')\"><img src='../images/disabled.png' width='15' height='15' alt='Tout décocher' /></a>";
 			echo "</td>\n";
-		}
-	
-		echo "<td>\n";
-		echo "<a href=\"javascript:CocheLigne('rn_moy_min_max_classe')\"><img src='../images/enabled.png' width='15' height='15' alt='Tout cocher' /></a> / <a href=\"javascript:DecocheLigne('rn_moy_min_max_classe')\"><img src='../images/disabled.png' width='15' height='15' alt='Tout décocher' /></a>";
-		echo "</td>\n";
-		echo "</tr>\n";
+			echo "</tr>\n";
+	}
 
-	//}
+	if((($_SESSION['statut']!='eleve')&&($_SESSION['statut']!='responsable'))||
+		(($_SESSION['statut']=='eleve')&&(getSettingAOui('GepiAccesMoyMinClasseMaxReleveEleve')))||
+		(($_SESSION['statut']=='responsable')&&(getSettingAOui('GepiAccesMoyMinClasseMaxReleveParent')))
+		) {
+
+			$alt=$alt*(-1);
+			echo "<tr class='lig$alt white_hover'>\n";
+			echo "<td style='text-align:left;'>Avec les moyennes min/classe/max de chaque devoir\n";
+			echo "</td>\n";
+			for($i=0;$i<count($tab_id_classe);$i++) {
+				echo "<td>\n";
+				echo "<label for='rn_moy_min_max_classe_".$i."' class='invisible'>Avec les moyennes min/classe/max</label> 
+						<input type='checkbox' name='rn_moy_min_max_classe[$i]' id='rn_moy_min_max_classe_".$i."' size='2' value='y' ";
+				if((isset($tab_param_classe[$i]['rn_moy_min_max_classe']))&&($tab_param_classe[$i]['rn_moy_min_max_classe']=='y')) {
+					echo "checked ";
+				}
+				echo "/>\n";
+				echo "</td>\n";
+			}
+	
+			echo "<td>\n";
+			echo "<a href=\"javascript:CocheLigne('rn_moy_min_max_classe')\"><img src='../images/enabled.png' width='15' height='15' alt='Tout cocher' /></a> / <a href=\"javascript:DecocheLigne('rn_moy_min_max_classe')\"><img src='../images/disabled.png' width='15' height='15' alt='Tout décocher' /></a>";
+			echo "</td>\n";
+			echo "</tr>\n";
+	}
 	//=================================
-
+	/*
 	$rn_retour_ligne_defaut="y";
 	if((isset($_SESSION['pref_rn_retour_ligne']))&&(($_SESSION['pref_rn_retour_ligne']=='y')||($_SESSION['pref_rn_retour_ligne']=='n'))) {
 		$rn_retour_ligne_defaut=$_SESSION['pref_rn_retour_ligne'];
 	}
-
+	*/
 	$alt=$alt*(-1);
 	echo "<tr class='lig$alt white_hover'>\n";
 	echo "<td style='text-align:left;'>Avec retour à la ligne après chaque devoir si on affiche le nom du devoir ou le commentaire\n";
@@ -182,7 +242,10 @@
 		echo "<td>\n";
 		echo "<label for='rn_retour_ligne_".$i."' class='invisible'>Avec retour à la ligne</label> 
 					<input type='checkbox' name='rn_retour_ligne[$i]' id='rn_retour_ligne_".$i."' size='2' value='y' ";
-		if($rn_retour_ligne_defaut=='y') {echo "checked='checked' ";}
+		//if($rn_retour_ligne_defaut=='y') {echo "checked='checked' ";}
+		if((isset($tab_param_classe[$i]['rn_retour_ligne']))&&($tab_param_classe[$i]['rn_retour_ligne']=='y')) {
+			echo "checked ";
+		}
 		echo "/>\n";
 		echo "</td>\n";
 	}
@@ -191,6 +254,7 @@
 	echo "</td>\n";
 	echo "</tr>\n";
 
+	/*
 	if(isset($_SESSION['pref_rn_rapport_standard_min_font'])) {
 		$rn_rapport_standard_min_font_defaut=$_SESSION['pref_rn_rapport_standard_min_font'];
 	}
@@ -198,12 +262,19 @@
 		$rn_rapport_standard_min_font_defaut=getSettingValue('rn_rapport_standard_min_font_defaut');
 		$rn_rapport_standard_min_font_defaut=(($rn_rapport_standard_min_font_defaut!='')&&(preg_match("/^[0-9.]*$/",$rn_rapport_standard_min_font_defaut))&&($rn_rapport_standard_min_font_defaut>0)) ? $rn_rapport_standard_min_font_defaut : 3;
 	}
+	*/
+
+	$rn_rapport_standard_min_font_defaut=getSettingValue('rn_rapport_standard_min_font_defaut');
+	$rn_rapport_standard_min_font_defaut=(($rn_rapport_standard_min_font_defaut!='')&&(preg_match("/^[0-9.]*$/",$rn_rapport_standard_min_font_defaut))&&($rn_rapport_standard_min_font_defaut>0)) ? $rn_rapport_standard_min_font_defaut : 3;
 
 	$alt=$alt*(-1);
-	echo "<tr class='lig$alt white_hover'>\n";
+	echo "<tr id='tr_rn_rapport_standard_min_font' class='lig$alt white_hover'>\n";
 	echo "<td style='text-align:left;'>Rapport taille_standard / taille_minimale_de_police (<em>relevé PDF avec cell_ajustee()</em>)<br />(<em>Si pour que les notes tiennent dans la cellule, il faut réduire davantage la police, on supprime les retours à la ligne.</em>)\n";
 	echo "</td>\n";
 	for($i=0;$i<count($tab_id_classe);$i++) {
+		if((isset($tab_param_classe[$i]['rn_rapport_standard_min_font']))&&(preg_match("/^[0-9.]*$/", $tab_param_classe[$i]['rn_rapport_standard_min_font']))&&($tab_param_classe[$i]['rn_rapport_standard_min_font']>0)) {
+			$rn_rapport_standard_min_font_defaut=$tab_param_classe[$i]['rn_rapport_standard_min_font'];
+		}
 		echo "<td>\n";
 		echo "<label for='rn_rapport_standard_min_font_".$i."' class='invisible'>Rapport taille</label> 
 					<input type='text' name='rn_rapport_standard_min_font[$i]' id='rn_rapport_standard_min_font_".$i."' size='2' value='".$rn_rapport_standard_min_font_defaut."' />\n";
@@ -223,10 +294,21 @@
 		echo "<tr class='lig$alt white_hover'>\n";
 		echo "<td style='text-align:left;'>Afficher le bloc adresse du responsable de l'élève\n";
 		echo "</td>\n";
+		/*
+		$chaine_coche_rn_adr_resp="";
+		if(getPref($_SESSION['login'], 'pref_rn_adr_resp', "")=="y") {
+			$chaine_coche_rn_adr_resp=" checked";
+		}
+		*/
 		for($i=0;$i<count($tab_id_classe);$i++) {
 			echo "<td>\n";
 			echo "<label for='rn_adr_resp_".$i."' class='invisible'>Afficher l'adresse</label> 
-					<input type='checkbox' name='rn_adr_resp[$i]' id='rn_adr_resp_".$i."' size='2' value='y' />\n";
+					<input type='checkbox' name='rn_adr_resp[$i]' id='rn_adr_resp_".$i."' size='2' value='y' ";
+					//$chaine_coche_rn_adr_resp." ";
+			if((isset($tab_param_classe[$i]['rn_adr_resp']))&&($tab_param_classe[$i]['rn_adr_resp']=='y')) {
+				echo "checked ";
+			}
+			echo "/>\n";
 			echo "</td>\n";
 		}
 		echo "<td>\n";
@@ -236,7 +318,7 @@
 
 
 		$alt=$alt*(-1);
-		echo "<tr class='lig$alt white_hover'>\n";
+		echo "<tr id='tr_rn_bloc_obs' class='lig$alt white_hover'>\n";
 		echo "<td style='text-align:left;'>Afficher le bloc observations (<em>relevé PDF</em>)\n";
 
 		$titre_infobulle="Bloc observations en PDF\n";
@@ -254,7 +336,11 @@
 		for($i=0;$i<count($tab_id_classe);$i++) {
 			echo "<td>\n";
 			echo "<label for='rn_bloc_obs_".$i."' class='invisible'>bloc observations</label> 
-					<input type='checkbox' name='rn_bloc_obs[$i]' id='rn_bloc_obs_".$i."' size='2' value='y' />\n";
+					<input type='checkbox' name='rn_bloc_obs[$i]' id='rn_bloc_obs_".$i."' size='2' value='y' ";
+			if((isset($tab_param_classe[$i]['rn_bloc_obs']))&&($tab_param_classe[$i]['rn_bloc_obs']=='y')) {
+				echo "checked ";
+			}
+			echo "/>\n";
 			echo "</td>\n";
 		}
 		echo "<td>\n";
@@ -300,6 +386,13 @@
 		echo "<input type='text' name='chaine_coef' id='chaine_coef' size='5' value='$chaine_coef' />\n";
 		echo "</p>\n";
 
+		echo "<p>\n";
+		echo "<input type='checkbox' name='rn_couleurs_alternees' id='rn_couleurs_alternees' size='5' value='y' ";
+		if(getPref($_SESSION['login'], "rn_couleurs_alternees", "n")=="y") {echo "checked ";}
+		echo "/> \n";
+		echo "<label for='rn_couleurs_alternees'>Afficher des couleurs alternées pour les lignes de matières</label>\n";
+		echo "</p>\n";
+
 		//echo "<p>Formule à afficher en bas de page (<em>relevé HTML</em>):</p>\n";
 		echo "<p>Formule à afficher en bas de page&nbsp;: \n";
 
@@ -332,6 +425,46 @@
 
 	}
 	echo "</table>\n";
+
+	echo "<script type='text/javascript'>
+	$tab_js_lignes_specifiques_releve_html;
+	$tab_js_lignes_specifiques_releve_pdf;
+
+	function reinit_lignes_specifiques_pdf_html() {
+		for(i=0;i<tab_html.length;i++) {
+			//alert(tab_html[i]);
+			if(document.getElementById('tr_'+tab_html[i])) {
+				document.getElementById('tr_'+tab_html[i]).style.backgroundColor='';
+			}
+		}
+
+		for(i=0;i<tab_pdf.length;i++) {
+			if(document.getElementById('tr_'+tab_pdf[i])) {
+				document.getElementById('tr_'+tab_pdf[i]).style.backgroundColor='';
+			}
+		}
+	}
+
+	function griser_lignes_specifiques_html() {
+		reinit_lignes_specifiques_pdf_html();
+		for(i=0;i<tab_html.length;i++) {
+			if(document.getElementById('tr_'+tab_html[i])) {
+				document.getElementById('tr_'+tab_html[i]).style.backgroundColor='grey';
+			}
+		}
+	}
+
+	function griser_lignes_specifiques_pdf() {
+		reinit_lignes_specifiques_pdf_html();
+		for(i=0;i<tab_pdf.length;i++) {
+			if(document.getElementById('tr_'+tab_pdf[i])) {
+				document.getElementById('tr_'+tab_pdf[i]).style.backgroundColor='grey';
+			}
+		}
+	}
+
+</script>
+";
 
 //echo "\$chaine_coef=$chaine_coef<br />";
 ?>

@@ -144,13 +144,32 @@ table.legende {
     border-collapse: collapse;
     border-spacing: 0px;
     margin:4px;
-    
-	
 }
 .legende  td{
     padding:4px;
     border-spacing: 0px;
     border: 1px solid black;
     font: 11px ;
-	
 }
+.tableau_tel_resp {
+    display:none;
+}
+.div_tab_tel_resp:hover .tableau_tel_resp {
+    display:block;
+}
+
+img.bord_rouge {
+	border: 3px solid red;
+}
+
+img.bord_jaune {
+	border: 3px solid yellow;
+}
+
+img.sans_bord {
+	border: 0px solid black;
+}
+
+tr.lignes_couleurs_alternees:nth-child(even) {background: #E8F1F4}
+tr.lignes_couleurs_alternees:nth-child(odd) {background: #C6DCE3}
+

@@ -213,6 +213,8 @@ $results = $eleves_col->getResults();
 require_once("../lib/header.inc.php");
 //**************** FIN EN-TETE *****************
 
+//debug_var();
+
 if(!$menu){
     include('menu_abs2.inc.php');
     include('menu_bilans.inc.php');
@@ -227,13 +229,13 @@ echo '<input type="hidden" name="menu" value="'.$menu.'"/>';
 if ($eleves_col->haveToPaginate()) {
     echo "Page ";
     echo '<input type="submit" name="page_deplacement" value="-"/>';
-    echo '<input type="text" name="page_number" size="1" value="'.$page_number.'"/>';
+    echo '<input type="text" name="page_number" id="page_number" size="1" value="'.$page_number.'"  onKeyDown="clavier_2(this.id, event, 1, '.$nb_pages.');" AutoComplete="off" />';
     echo '<input type="submit" name="page_deplacement" value="+"/> ';
     echo "sur ".$nb_pages." page(s) ";
     echo "| ";
 }
 echo "Voir ";
-echo '<input type="text" name="item_per_page" size="1" value="'.$item_per_page.'"/>';
+echo '<input type="text" name="item_per_page" id="item_per_page" size="1" value="'.$item_per_page.'" onKeyDown="clavier_2(this.id, event, 1, '.$eleves_col->count().');" AutoComplete="off" />';
 echo "par page|  Nombre d'élèves : ";
 echo $eleves_col->count();
 
@@ -350,7 +352,7 @@ echo '<br />';
 echo '<span style="white-space: nowrap;"> ';
 echo 'Entre : <input size="13" id="filter_date_debut_saisie_debut_plage" name="filter_date_debut_saisie_debut_plage" value="';
 if (isFiltreRechercheParam('filter_date_debut_saisie_debut_plage')) {echo getFiltreRechercheParam('filter_date_debut_saisie_debut_plage');}
-echo '" />&nbsp;';
+echo '" onKeyDown="clavier_date2(this.id,event);" AutoComplete="off" />&nbsp;';
 echo '<img id="trigger_filter_date_debut_saisie_debut_plage" src="../images/icons/calendrier.gif" alt="" />';
 //echo '</nobr>';
 echo '</span>';
@@ -370,7 +372,7 @@ echo '<br />';
 echo '<span style="white-space: nowrap;"> ';
 echo 'Et : <input size="13" id="filter_date_debut_saisie_fin_plage" name="filter_date_debut_saisie_fin_plage" value="';
 if (isFiltreRechercheParam('filter_date_debut_saisie_fin_plage')) {echo getFiltreRechercheParam('filter_date_debut_saisie_fin_plage');}
-echo '" />&nbsp;';
+echo '" onKeyDown="clavier_date2(this.id,event);" AutoComplete="off" />&nbsp;';
 echo '<img id="trigger_filter_date_debut_saisie_fin_plage" src="../images/icons/calendrier.gif" alt="" />';
 //echo '</nobr>';
 echo '</span>';
@@ -398,7 +400,7 @@ echo '<br />';
 echo '<span style="white-space: nowrap;"> ';
 echo 'Entre : <input size="13" id="filter_date_fin_saisie_debut_plage" name="filter_date_fin_saisie_debut_plage" value="';
 if (isFiltreRechercheParam('filter_date_fin_saisie_debut_plage')) {echo getFiltreRechercheParam('filter_date_fin_saisie_debut_plage');}
-echo '" />&nbsp;';
+echo '" onKeyDown="clavier_date2(this.id,event);" AutoComplete="off" />&nbsp;';
 echo '<img id="trigger_filter_date_fin_saisie_debut_plage" src="../images/icons/calendrier.gif" alt="" />';
 //echo '</nobr>';
 echo '</span>';
@@ -418,7 +420,7 @@ echo '<br />';
 echo '<span style="white-space: nowrap;"> ';
 echo 'Et : <input size="13" id="filter_date_fin_saisie_fin_plage" name="filter_date_fin_saisie_fin_plage" value="';
 if (isFiltreRechercheParam('filter_date_fin_saisie_fin_plage')) {echo getFiltreRechercheParam('filter_date_fin_saisie_fin_plage');}
-echo '" />&nbsp;';
+echo '" onKeyDown="clavier_date2(this.id,event);" AutoComplete="off" />&nbsp;';
 echo '<img id="trigger_filter_date_fin_saisie_fin_plage" src="../images/icons/calendrier.gif" alt="" />';
 //echo '</nobr>';
 echo '</span>';
@@ -459,7 +461,7 @@ echo '</th>';
 //en tete filtre manqement_obligation
 echo '<th>';
 echo ("<select name=\"filter_manqement_obligation\" onchange='submit()'>");
-echo "<option value=''";
+echo "<option value='' ";
 if (!isFiltreRechercheParam('filter_manqement_obligation')) {echo "selected='selected'";}
 echo "></option>\n";
 echo "<option value='y' ";
@@ -527,7 +529,7 @@ foreach ($results as $eleve) {
     echo "<tr style='background-color :$background_couleur'>\n";
 
     //donnees id
-    echo '<td>';
+    echo '<td title="Identifiant id_eleve">';
     echo $eleve->getId();
     echo '</td>';
 
@@ -537,7 +539,8 @@ foreach ($results as $eleve) {
     echo ($eleve->getCivilite().' '.$eleve->getNom().' '.$eleve->getPrenom());
     echo "</a>";
     if ($utilisateur->getAccesFicheEleve($eleve)) {
-        echo "<a href='../eleves/visu_eleve.php?ele_login=".$eleve->getLogin()."&amp;onglet=responsables&amp;quitter_la_page=y' target='_blank'>";
+        //echo "<a href='../eleves/visu_eleve.php?ele_login=".$eleve->getLogin()."&amp;onglet=responsables&amp;quitter_la_page=y' target='_blank'>";
+        echo "<a href='../eleves/visu_eleve.php?ele_login=".$eleve->getLogin()."&amp;onglet=absences&amp;quitter_la_page=y' target='_blank'>";
         //echo "<a href='../eleves/visu_eleve.php?ele_login=".$eleve->getLogin()."' >";
         echo ' (voir fiche)';
         echo "</a>";
@@ -562,10 +565,44 @@ foreach ($results as $eleve) {
     $query_eleve_hydration->joinWith('Eleve.AbsenceEleveSaisie', 'LEFT JOIN')->joinWith('AbsenceEleveSaisie.JTraitementSaisieEleve', 'LEFT JOIN')->joinWith('JTraitementSaisieEleve.AbsenceEleveTraitement', 'LEFT JOIN');
     $query_eleve_hydration->useAbsenceEleveSaisieQuery()->filterByDeletedAt(null)->endUse();
     $eleve_saisie_hydrated = $query_eleve_hydration->find()->getFirst();
-    echo $eleve_saisie_hydrated->getAbsenceEleveSaisies()->count();
-    echo " saisie";
-    if ($eleve_saisie_hydrated->getAbsenceEleveSaisies()->count() > 1) {
-        echo "s";
+    // Ajout d'un test: Il y avait plantage sur la recherche:
+    //    Manquement obligation présence : <vide>
+    //    Justification : SANS JUSTIFICATION
+    if($eleve_saisie_hydrated) {
+
+        echo "<a href='bilan_individuel.php?id_eleve=".$eleve->getId()."&amp;affichage=html";
+
+        if(isFiltreRechercheParam('filter_manqement_obligation')) {
+            echo "&amp;type_extrait=1";
+        }
+        else {
+            echo "&amp;type_extrait=2";
+        }
+
+        if (isFiltreRechercheParam('filter_date_debut_saisie_debut_plage')) {
+            $tmp_tab=explode(" ",getFiltreRechercheParam('filter_date_debut_saisie_debut_plage'));
+            echo "&amp;date_absence_eleve_debut=".$tmp_tab[0];
+        }
+        elseif (isFiltreRechercheParam('filter_date_debut_saisie_fin_plage')) {
+            $tmp_tab=explode(" ",getFiltreRechercheParam('filter_date_debut_saisie_fin_plage'));
+            echo "&amp;date_absence_eleve_debut=".$tmp_tab[0];
+        }
+
+        if (isFiltreRechercheParam('filter_date_fin_saisie_fin_plage')) {
+            $tmp_tab=explode(" ",getFiltreRechercheParam('filter_date_fin_saisie_fin_plage'));
+            echo "&amp;date_absence_eleve_fin=".$tmp_tab[0];
+        }
+        if (isFiltreRechercheParam('filter_date_fin_saisie_debut_plage')) {
+            $tmp_tab=explode(" ",getFiltreRechercheParam('filter_date_fin_saisie_debut_plage'));
+            echo "&amp;date_absence_eleve_fin=".$tmp_tab[0];
+        }
+        echo "'>";
+        echo $eleve_saisie_hydrated->getAbsenceEleveSaisies()->count();
+        echo " saisie";
+        if ($eleve_saisie_hydrated->getAbsenceEleveSaisies()->count() > 1) {
+            echo "s";
+        }
+        echo "</a>";
     }
     echo '</td>';
 
@@ -573,13 +610,18 @@ foreach ($results as $eleve) {
     $justif_col = new PropelObjectCollection();
     $motif_col = new PropelObjectCollection();
     $manque = false;
-    foreach ($eleve_saisie_hydrated->getAbsenceEleveSaisies() as $saisie) {
-        foreach ($saisie->getAbsenceEleveTraitements() as $traitement) {
-            $type_col->add($traitement->getAbsenceEleveType());
-            $justif_col->add($traitement->getAbsenceEleveJustification());
-            $motif_col->add($traitement->getAbsenceEleveMotif());
+    // Ajout d'un test: Il y avait plantage sur la recherche:
+    //    Manquement obligation présence : <vide>
+    //    Justification : SANS JUSTIFICATION
+    if($eleve_saisie_hydrated) {
+        foreach ($eleve_saisie_hydrated->getAbsenceEleveSaisies() as $saisie) {
+            foreach ($saisie->getAbsenceEleveTraitements() as $traitement) {
+                $type_col->add($traitement->getAbsenceEleveType());
+                $justif_col->add($traitement->getAbsenceEleveJustification());
+                $motif_col->add($traitement->getAbsenceEleveMotif());
+            }
+            $manque = $manque || $saisie->getManquementObligationPresence();
         }
-        $manque = $manque || $saisie->getManquementObligationPresence();
     }
 
     //donnees type
@@ -610,7 +652,7 @@ foreach ($results as $eleve) {
             echo ', ';
         }
     }
-    echo "</a>";
+    echo "</td>";
     
     //donnees motif
     echo '<td>';
@@ -621,9 +663,9 @@ foreach ($results as $eleve) {
             echo ', ';
         }
     }
-    echo "</a>";
+    echo "</td>";
     
-    echo '</tr>';
+    echo '</tr>'."\n";
 }
 
 echo '</tbody>';

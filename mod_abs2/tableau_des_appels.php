@@ -152,6 +152,7 @@ foreach ($creneau_col as $creneau) {
 	echo '&nbsp;-&nbsp;';
     }
 }
+echo add_token_field(true);
 ?>
 </form>
 <br />
@@ -164,6 +165,10 @@ if ($choix_creneau_obj != null) {
 <!-- Affichage des réponses-->
 <table class="tab_edt" summary="Liste des absents r&eacute;partie par classe">
 <?php
+// 20130416
+$tab_dest_message=array();
+$cpt_user=0;
+
 // On affiche la liste des classes
 $classe_col = ClasseQuery::create()->orderByNom()->orderByNomComplet()->distinct()
 					    ->leftJoinWith('Classe.JGroupesClasses')
@@ -188,7 +193,12 @@ foreach($classe_col as $classe){
 //			<div id="'.$num_id.'" style="display: none; position: absolute; background-color: white; -moz-border-radius: 10px; padding: 10px;">
 //			</div>
 //		</td>';
-	echo '	<td><h4>'.$classe->getNom().'</h4></td>';
+	echo '	<td>';
+	if((getSettingAOui('active_mod_alerte'))&&(getSettingAOui('PeutPosterMessage'.ucfirst($_SESSION['statut'])))) {
+		echo "<div style='float:right; width:16px;'><a href='../mod_alerte/form_message.php?mode=rediger_message&sujet=".$choix_creneau_obj->getHeuredebutDefiniePeriode('H:i')."-".$choix_creneau_obj->getHeurefinDefiniePeriode('H:i')." : Appel en ".$classe->getNom()."&message=L appel en ".$classe->getNom()." sur le créneau ".$choix_creneau_obj->getHeuredebutDefiniePeriode('H:i')."-".$choix_creneau_obj->getHeurefinDefiniePeriode('H:i')." n a pas été effectué.' target='_blank'><img src='../images/icons/mail.png' width='16' height='16' title=\"Rédiger un message à propos de la classe de ".$classe->getNom().".\" /></a></div>";
+	}
+	echo '<h4>'.$classe->getNom().'</h4>';
+	echo '</td>';
 
 	//la classe a-t-elle des cours actuellement ? On récupère la liste des cours pour cette période.
 	//on regarde au debut du creneau et a la fin car il peut y avoir des demi creneau
@@ -199,38 +209,113 @@ foreach($classe_col as $classe){
 	$dt_presque_fin_creneau = clone $dt_fin_creneau;
 	$dt_presque_fin_creneau->setTime($choix_creneau_obj->getHeurefinDefiniePeriode('H'), $choix_creneau_obj->getHeurefinDefiniePeriode('i') - 1);
 	$cours_col->addCollection( EdtEmplacementCoursHelper::getColEdtEmplacementCoursActuel($edtCoursCol, $dt_presque_fin_creneau));
-	
-
+/*
+echo "<td>";
+echo "\$dt_presque_fin_creneau=";
+echo "<pre>";
+echo print_r($dt_presque_fin_creneau);
+echo "</pre>";
+echo "<br />";
+echo "\$dt_debut_creneau=";
+echo "<pre>";
+echo print_r($dt_debut_creneau);
+echo "</pre>";
+echo "<br />";
+echo "\$dt_fin_creneau=";
+echo "<pre>";
+echo print_r($dt_fin_creneau);
+echo "</pre>";
+echo "<br />";
+echo "</td>";
+*/
 	//on teste si l'appel a été fait
 	$appel_manquant = false;
 	$echo_str = '';
 	$classe_deja_sorties = Array();//liste des appels deja affiché sous la form [id_classe, id_utilisateur]
 	$groupe_deja_sortis = Array();//liste des appels deja affiché sous la form [id_groupe, id_utilisateur]
 	foreach ($cours_col as $edtCours) {//on regarde tous les cours enregistrés dans l'edt
-	    //$edtCours = new EdtEmplacementCours();
-	    $abs_col = AbsenceEleveSaisieQuery::create()->filterByPlageTemps($dt_debut_creneau, $dt_fin_creneau)
-		      ->filterByEdtEmplacementCours($edtCours)->find();
-	    if ($abs_col->isEmpty()) {
-		$appel_manquant = true;
-		$echo_str .= '<span style="color: red;">Non fait</span> - ';
-	    } else {
-		$echo_str .= $abs_col->getFirst()->getCreatedAt('H:i').' ';
-	    }
-	    if ($edtCours->getGroupe() != null) {
-		$echo_str .= $edtCours->getGroupe()->getName().' ';
-		if ($abs_col->getFirst() !== null) {
-		    $groupe_deja_sortis[] = Array($edtCours->getIdGroupe(),  $abs_col->getFirst()->getUtilisateurId());
+		// 20130416
+		$current_cours_appel_manquant=false;
+
+		$echo_str .= "<span title=\"Cours dans l'emploi du temps";
+		if ($edtCours->getGroupe() != null) {
+			$echo_str .= " (id_groupe:".$edtCours->getIdGroupe().")";
 		}
-	    }
-	    if ($edtCours->getUtilisateurProfessionnel() != null) {
-		$echo_str .= $edtCours->getUtilisateurProfessionnel()->getCivilite().' '
-			.$edtCours->getUtilisateurProfessionnel()->getNom().' '
-			.strtoupper(mb_substr($edtCours->getUtilisateurProfessionnel()->getPrenom(), 0 ,1)).'. ';
-	    }
-	    if ($edtCours->getEdtSalle() != null) {
-		$echo_str .= '- <span style="font-style: italic;">('.$edtCours->getEdtSalle()->getNumeroSalle().')</span>';
-	    }
-	    $echo_str .= '<br/>';
+		$echo_str .= "\">";
+
+//$echo_str .= "edt.id_groupe=".$edtCours->getIdGroupe()." - ";
+
+		//$edtCours = new EdtEmplacementCours();
+		$abs_col = AbsenceEleveSaisieQuery::create()->filterByPlageTemps($dt_debut_creneau, $dt_fin_creneau)
+													->filterByEdtEmplacementCours($edtCours)->find();
+		if ($abs_col->isEmpty()) {
+			//====================================================
+			// Vérifier si le prof a fait l'appel sans passer par le choix "Cours", par exemple par le choix "Groupe"
+			$temoin_appel_non_fait_sur_le_groupe_courant=true;
+			if ($edtCours->getIdGroupe() != null) {
+				$tmp_abs_col = AbsenceEleveSaisieQuery::create()->filterByPlageTemps($dt_debut_creneau, $dt_fin_creneau)
+						->filterByGroupe($classe->getGroupes())
+						->find();
+				if (!$tmp_abs_col->isEmpty()) {
+					foreach ($tmp_abs_col as $abs) {//$abs = new AbsenceEleveSaisie();
+/*
+if ($abs->getIdGroupe()!=null) {
+$echo_str .= "abs.id_groupe=".$abs->getIdGroupe()." - ";
+}
+*/
+						if (($abs->getIdGroupe()!=null)&&($abs->getIdGroupe()==$edtCours->getIdGroupe())) {
+							$temoin_appel_non_fait_sur_le_groupe_courant=false;
+							break;
+						}
+					}
+				}
+			}
+
+			if($temoin_appel_non_fait_sur_le_groupe_courant) {
+				$appel_manquant = true;
+				$echo_str .= '<span style="color: red;">Non fait</span> - ';
+				// 20130416
+				$current_cours_appel_manquant=true;
+			}
+			//====================================================
+		} else {
+			$echo_str .= $abs_col->getFirst()->getCreatedAt('H:i').' ';
+		}
+
+		if ($edtCours->getGroupe() != null) {
+			$echo_str .= $edtCours->getGroupe()->getName().' ';
+			if ($abs_col->getFirst() !== null) {
+				$groupe_deja_sortis[] = Array($edtCours->getIdGroupe(),  $abs_col->getFirst()->getUtilisateurId());
+			}
+		}
+		if ($edtCours->getUtilisateurProfessionnel() != null) {
+			$echo_str .= $edtCours->getUtilisateurProfessionnel()->getCivilite().' '
+						.$edtCours->getUtilisateurProfessionnel()->getNom().' '
+						.strtoupper(mb_substr($edtCours->getUtilisateurProfessionnel()->getPrenom(), 0 ,1)).'. ';
+		}
+		if ($edtCours->getEdtSalle() != null) {
+			$echo_str .= '- <span style="font-style: italic;">('.$edtCours->getEdtSalle()->getNumeroSalle().')</span>';
+		}
+
+		// 20130416
+		if ($edtCours->getUtilisateurProfessionnel() != null) {
+			if($current_cours_appel_manquant) {
+				$tab_dest_message[]=$choix_creneau_obj->getHeuredebutDefiniePeriode('H:i')."-".$choix_creneau_obj->getHeurefinDefiniePeriode('H:i')."|".$classe->getNom()."|".$edtCours->getUtilisateurProfessionnel()->getLogin();
+
+				if((getSettingAOui('active_mod_alerte'))&&(getSettingAOui('PeutPosterMessage'.ucfirst($_SESSION['statut'])))) {
+					$echo_str.=" <span id='span_envoi_message_$cpt_user'><a href='../mod_alerte/form_message.php?message_envoye=y&login_dest=".$edtCours->getUtilisateurProfessionnel()->getLogin()."&sujet=".$choix_creneau_obj->getHeuredebutDefiniePeriode('H:i')."-".$choix_creneau_obj->getHeurefinDefiniePeriode('H:i')." : Appel en ".$classe->getNom()."&message=Sauf erreur, vous avez oublié de faire l appel en ".$classe->getNom()." sur le créneau ".$choix_creneau_obj->getHeuredebutDefiniePeriode('H:i')."-".$choix_creneau_obj->getHeurefinDefiniePeriode('H:i').add_token_in_url()."'
+					target='_blank'
+					onclick=\"envoi_rappel_appel($cpt_user,
+												'".$edtCours->getUtilisateurProfessionnel()->getLogin()."', 
+												'".$choix_creneau_obj->getHeuredebutDefiniePeriode('H:i')."-".$choix_creneau_obj->getHeurefinDefiniePeriode('H:i')." : Appel en ".$classe->getNom()."', 
+												'Sauf erreur, vous avez oublié de faire l appel en ".$classe->getNom()." sur le créneau ".$choix_creneau_obj->getHeuredebutDefiniePeriode('H:i')."-".$choix_creneau_obj->getHeurefinDefiniePeriode('H:i')."');return false;\"><img src='../images/icons/mail.png' width='16' height='16' title='Envoyer un rappel.' /></a></span>";
+				}
+			}
+			$cpt_user++;
+		}
+
+		$echo_str .= "</span>";
+		$echo_str .= '<br/>';
 	}
 
 	//$classe = new Classe();
@@ -247,45 +332,53 @@ foreach($classe_col as $classe){
             break;
         }
     }
+
 	if ($abs_col->isEmpty()||$test_saisies_sorti) {
-	    if ($cours_col->isEmpty()) {
-		$appel_manquant = true;
-		$echo_str .= 'Appel non fait<br/>';
-	    }
+		if ($cours_col->isEmpty()) {
+			$appel_manquant = true;
+			$echo_str .= 'Appel non fait<br/>';
+		}
 	} else {
-	    if ($cours_col->isEmpty()) {
-		$appel_manquant = false;
-	    }
-	    foreach ($abs_col as $abs) {//$abs = new AbsenceEleveSaisie();
-        if($abs->getEleve()!=null && $abs->getEleve()->isEleveSorti($dt_debut_creneau)){
-                continue;
-        }
-		$affiche = false;
-		if ($abs->getIdClasse()!=null && !in_array(Array($abs->getIdClasse(), $abs->getUtilisateurId()), $classe_deja_sorties)) {
-		    $echo_str .= $abs->getCreatedAt('H:i').' ';
-		    $echo_str .= ' '.$abs->getClasse()->getNom().' ';
-		    $classe_deja_sorties[] = Array($abs->getClasse()->getId(), $abs->getUtilisateurId());
-		    $affiche = true;
+		if ($cours_col->isEmpty()) {
+			$appel_manquant = false;
 		}
-		if ($abs->getIdGroupe()!=null && !in_array(Array($abs->getIdGroupe(), $abs->getUtilisateurId()), $groupe_deja_sortis)) {
-		    $echo_str .= $abs->getCreatedAt('H:i').' ';
-		    $echo_str .= ' '.$abs->getGroupe()->getName().' ';
-		    $groupe_deja_sortis[] = Array($abs->getIdGroupe(), $abs->getUtilisateurId());
-		    $affiche = true;
+
+		foreach ($abs_col as $abs) {//$abs = new AbsenceEleveSaisie();
+			if($abs->getEleve()!=null && $abs->getEleve()->isEleveSorti($dt_debut_creneau)){
+				continue;
+			}
+			$affiche = false;
+			if ($abs->getIdClasse()!=null && !in_array(Array($abs->getIdClasse(), $abs->getUtilisateurId()), $classe_deja_sorties)) {
+				$echo_str .= $abs->getCreatedAt('H:i').' ';
+				$echo_str .= ' '.$abs->getClasse()->getNom().' ';
+				$classe_deja_sorties[] = Array($abs->getClasse()->getId(), $abs->getUtilisateurId());
+				$affiche = true;
+			}
+			//if ($abs->getIdGroupe()!=null && !in_array(Array($abs->getIdGroupe(), $abs->getUtilisateurId()), $groupe_deja_sortis) && (!$abs->getEleve())) {
+			if ($abs->getIdGroupe()!=null && !in_array(Array($abs->getIdGroupe(), $abs->getUtilisateurId()), $groupe_deja_sortis) && ($abs->getEleve()==null)) {
+				$echo_str .= "<span title=\"Saisie/appel pour le groupe n°".$abs->getIdGroupe()."\">";
+				//$echo_str .= $abs->getPrimaryKey().' ';
+				//$echo_str .= "abs.id_groupe=".$abs->getIdGroupe().' ';
+				//if($abs->getEleve()) {$echo_str .= "- ".$abs->getEleve()->getId()." - ";}
+				$echo_str .= $abs->getCreatedAt('H:i').' ';
+				$echo_str .= ' '.$abs->getGroupe()->getName().' ';
+				$echo_str .= "</span>";
+				$groupe_deja_sortis[] = Array($abs->getIdGroupe(), $abs->getUtilisateurId());
+				$affiche = true;
+			}
+			if ($affiche) {//on affiche un appel donc on va afficher les infos du prof
+				$echo_str .= ' '.$abs->getUtilisateurProfessionnel()->getCivilite().' '
+					.$abs->getUtilisateurProfessionnel()->getNom().' '
+					.strtoupper(mb_substr($abs->getUtilisateurProfessionnel()->getPrenom(), 0 ,1)).'. ';
+				$prof_deja_sortis[] = $abs->getUtilisateurProfessionnel()->getPrimaryKey();
+				$echo_str .= '<br/>';
+			}
 		}
-		if ($affiche) {//on affiche un appel donc on va afficher les infos du prof
-		    $echo_str .= ' '.$abs->getUtilisateurProfessionnel()->getCivilite().' '
-			    .$abs->getUtilisateurProfessionnel()->getNom().' '
-			    .strtoupper(mb_substr($abs->getUtilisateurProfessionnel()->getPrenom(), 0 ,1)).'. ';
-		    $prof_deja_sortis[] = $abs->getUtilisateurProfessionnel()->getPrimaryKey();
-		    $echo_str .= '<br/>';
-		}
-	    }
 	}
 	if ($appel_manquant) {
-	    echo '<td style="min-width: 350px;">';
+		echo '<td style="min-width: 350px;">';
 	} else {
-	    echo '<td style="min-width: 350px; background-color:#9f9">';
+		echo '<td style="min-width: 350px; background-color:#9f9">';
 	}
 	echo $echo_str;
 
@@ -407,6 +500,19 @@ foreach($classe_col as $classe){
 </table>
 
 <?php
+	// 20130416
+	if((getSettingAOui('active_mod_alerte'))&&(getSettingAOui('PeutPosterMessage'.ucfirst($_SESSION['statut'])))&&(count($tab_dest_message)>0)) {
+		echo "<script type='text/javascript'>
+	function envoi_rappel_appel(id, login_dest, sujet, message) {
+		csrf_alea=document.getElementById('csrf_alea').value;
+
+		new Ajax.Updater($('span_envoi_message_'+id),'$gepiPath/mod_alerte/form_message.php?envoi_js=y&message_envoye=y&login_dest='+login_dest+'&sujet='+sujet+'&message='+message+'&csrf_alea='+csrf_alea,{method: 'get'});
+	}
+</script>";
+
+		// A FAIRE: Boucle sur le $tab_dest_message pour envoyer des messages à tous ceux qui ont oublié de faire l'appel.
+	}
+
 }
 echo '</div>';
 

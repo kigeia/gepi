@@ -26,9 +26,19 @@ class AbsenceEleveSaisie extends BaseAbsenceEleveSaisie {
 	protected $manquementObligationPresence;
 
 	/**
+	 * @var        bool to store aggregation of manquementObligationPresence value
+	 */
+	protected $manquementObligationPresenceEnglobante;
+
+	/**
 	 * @var        bool to store the manquementObligationPresenceSpecifie_NON_PRECISE state
 	 */
 	protected $manquementObligationPresenceSpecifie_NON_PRECISE;
+
+	/**
+	 * @var        bool to store the justifie state
+	 */
+	protected $justifieeEnglobante;
 
 	/**
 	 * @var        bool to store the justifie state
@@ -41,6 +51,10 @@ class AbsenceEleveSaisie extends BaseAbsenceEleveSaisie {
 	protected $retard;
 
 	/**
+	 * @var        bool to store the retardEnglobante state
+	 */
+	protected $retardEnglobante;
+	/**
 	 * @var        collection to store aggregation of saisie contradictoires
 	 */
 	protected $collectionSaisiesContradictoiresManquementObligation;
@@ -52,6 +66,11 @@ class AbsenceEleveSaisie extends BaseAbsenceEleveSaisie {
 	
 	protected $oldVersion;
 
+	/**
+	 * @var        bool to store aggregation of sousResponsabiliteEtablissement value
+	 */
+	protected $saisiesEnglobantes;
+        
 	/**
 	 *
 	 * Renvoi une description intelligible du traitement
@@ -544,6 +563,158 @@ class AbsenceEleveSaisie extends BaseAbsenceEleveSaisie {
 	    return $this->justifiee;
 	}
 
+        /**
+	 *
+	 * Renvoi true ou false en fonction des justifications apporte ou des saisies y compris les saisies englobantes
+	 *
+	 * @return     boolean
+	 *
+	 */
+	public function getJustifieeEnglobante() {
+	    if (!isset($this->justifieeEnglobante) || $this->justifieeEnglobante === null) {
+                if ($this->getAbsenceEleveSaisiesEnglobantes()->isEmpty()) {
+                    $this->justifieeEnglobante = $this->getJustifiee();
+                } else {
+                    $justifiee_sans = false;
+                    $justifiee_avec = false;
+                    foreach ($this->getAbsenceEleveSaisiesEnglobantes() as $saisie) {
+                        $justif_boolean;
+                        if ($saisie->getDebutAbs(null) != $this->getDebutAbs(null) || $saisie->getFinAbs(null) != $this->getFinAbs(null)) {
+                            //si la saisie est strictement englobante, on va regarder la justification de la saisie englobante
+                            $justif_boolean = $saisie->getJustifieeEnglobante();
+                        } else {
+                            //si la saisie est égale en terme de borne, on ne fait pas de récursion sinon elle ne va pas se terminer
+                            //on va regarder ce qu'il en est des justifications des deux saisies identiques
+                            if (getSettingValue("abs2_saisie_multi_type_non_justifiee")!='y') {
+                                $justif_boolean = $saisie->getJustifiee() || $this->getJustifiee();
+                            } else {
+                                $justif_boolean = $saisie->getJustifiee() && $this->getJustifiee();
+                            }
+                        }
+                        if ($justif_boolean) {
+                            $justifiee_avec = true;
+                        } else {
+                            $justifiee_sans = true;
+                        }
+                        if ($justifiee_avec && $justifiee_sans) {
+                            break;
+                        }
+                    }
+
+                    if ($justifiee_avec && $justifiee_sans ) {
+                        //on a plusieurs informations contradictoires, on renvoit le reglage adequat
+                        $this->justifieeEnglobante = (getSettingValue("abs2_saisie_multi_type_non_justifiee")!='y');
+                    } else if ($justifiee_avec) {
+                        $this->justifieeEnglobante =  true;
+                    } else {
+                        $this->justifieeEnglobante =  false;
+                    }
+                }
+	    }
+	    return $this->justifieeEnglobante;
+	}
+
+        /**
+	 *
+	 * Renvoi true ou false en fonction du manquement à l'obligation de présence en prenant en compte les saisises englobantes
+	 *
+	 * @return     boolean
+	 *
+	 */
+	public function getManquementObligationPresenceEnglobante() {
+	    if (!isset($this->manquementObligationPresenceEnglobante) || $this->manquementObligationPresenceEnglobante === null) {
+                if ($this->getAbsenceEleveSaisiesEnglobantes()->isEmpty()) {
+                    $this->manquementObligationPresenceEnglobante = $this->getManquementObligationPresence();
+               } else {
+                    // on regarde les saisies englobantes
+                    $manquement_sans = false;
+                    $manquement_avec = false;
+                    $saisies_egales = new PropelCollection();
+                    foreach ($this->getAbsenceEleveSaisiesEnglobantes() as $saisie) {
+                        if ($saisie->getManquementObligationPresenceSpecifie_NON_PRECISE()) continue;
+                        if ($saisie->getDebutAbs(null) != $this->getDebutAbs(null) || $saisie->getFinAbs(null) != $this->getFinAbs(null)) {
+                            $manquement_avec = $manquement_avec || $saisie->getManquementObligationPresenceEnglobante();
+                            $manquement_sans = $manquement_sans || !$saisie->getManquementObligationPresenceEnglobante();
+                        } else {
+                            //on ne regarde pas immédiatement les saisies strictements égales en terme de borne
+                            $saisies_egales->add($saisie);
+                        }
+                        if ($manquement_avec && $manquement_sans) {
+                            break;
+                        }
+                    }
+
+                    if ($manquement_avec && $manquement_sans ) {
+                        //on a plusieurs informations contradictoires, on renvoit le reglage adequat
+                        $this->manquementObligationPresenceEnglobante = (getSettingValue("abs2_saisie_multi_type_sans_manquement")!='y');
+                    } else if ($manquement_avec) {
+                        $this->manquementObligationPresenceEnglobante =  true;
+                    } else if ($manquement_sans) {
+                        $this->manquementObligationPresenceEnglobante =  false;
+                    } else {
+                        //on a pas de réponse pour les saisies englobantes, on regarde les saisies strictement identiques
+                        $manquement_sans = false;
+                        $manquement_avec = false;
+                        $saisies_egales->add($this);
+                        foreach ($saisies_egales as $saisie) {
+                            if ($saisie->getManquementObligationPresenceSpecifie_NON_PRECISE()) continue;
+                            $manquement_avec = $manquement_avec || $saisie->getManquementObligationPresence();
+                            $manquement_sans = $manquement_sans || !$saisie->getManquementObligationPresence();
+
+                            if ($manquement_avec && $manquement_sans) {
+                                break;
+                            }
+                        }
+                        if ($manquement_avec && $manquement_sans ) {
+                            //on a plusieurs informations contradictoires, on renvoit le reglage adequat
+                            $this->manquementObligationPresenceEnglobante = (getSettingValue("abs2_saisie_multi_type_sans_manquement")!='y');
+                        } else if ($manquement_avec) {
+                            $this->manquementObligationPresenceEnglobante =  true;
+                        } else if ($manquement_sans) {
+                            $this->manquementObligationPresenceEnglobante =  false;
+                        } else {
+                            $this->manquementObligationPresenceEnglobante =  (getSettingValue("abs2_saisie_par_defaut_sans_manquement")!='y');
+                        }
+                    }
+                }
+	    }
+	    return $this->manquementObligationPresenceEnglobante;
+	}
+
+    /**
+	 *
+	 * Renvoi true ou false en fonction de la saisie. Ceci concerne le décompte des bulletins
+	 * Les retards sont toujours décompté en maximisant leurs apparitions : 
+	 * si une saisie plus large ou égale est un retard on comptabilisera ce retard
+	 *
+	 * @return     boolean
+	 *
+	 */
+	public function getRetardEnglobante() {
+	    if (!isset($this->retardEnglobante) || $this->retardEnglobante === null) {
+	        if ($this->getAbsenceEleveSaisiesEnglobantes()->isEmpty()) {
+	            $this->retardEnglobante = $this->getRetard();
+	        } else {
+	            $this->retardEnglobante = false;
+	            foreach ($this->getAbsenceEleveSaisiesEnglobantes() as $saisie) {
+	                if ($saisie->getDebutAbs(null) != $this->getDebutAbs(null) || $saisie->getFinAbs(null) != $this->getFinAbs(null)) {
+	                    //si la saisie est strictement englobante, on va regarder la saisie englobante
+	                    $this->retardEnglobante = $saisie->getRetardEnglobante();
+	                    if ($this->retardEnglobante) {
+        	                //on arrete dès qu'on trouve une saisie englobante qui est elle même retard
+        	                break;
+        	            }
+    	            } else {
+    	                //si la saisie est égale en terme de borne, on fait un ou logique, et on continue de chercher au cas ou il y aurait une saisie plus grosse
+    	                $this->retardEnglobante = $this->getRetard() || $saisie->getRetard();
+    	            }
+    	        }
+    	    }
+	    }
+	    return $this->retardEnglobante;
+	}
+
+
 	/**
 	 *
 	 * Renvoi le nom du groupe (avec les classe) ou une chaine vide
@@ -601,7 +772,32 @@ class AbsenceEleveSaisie extends BaseAbsenceEleveSaisie {
 	    }
 	    return false;
 	}
-    /**
+	
+	
+	/**
+	 *
+	 * Renvoi true si une notification a ete recue avec succès par la famille pour cette saisies ou une saisie plus large
+	 *
+	 * @return     boolean
+	 *
+	 */
+	public function getNotifieeEnglobante() {
+	    //on commence par vérifié cette saisie
+	    if ($this->getNotifiee()) {
+	        return true;
+	    }
+	    
+	    //on vérifie les saisies englobantes
+	    foreach ($this->getAbsenceEleveSaisiesEnglobantes() as $saisie) {
+	        if ($saisie->getNotifiee()) {
+    	        return true;
+    	    }      
+	    }
+	    return false;
+	}
+	
+	
+	/**
 	 *
 	 * Renvoi true si une notification est prête à envoyée ou envoyée à la famille
 	 *
@@ -620,6 +816,28 @@ class AbsenceEleveSaisie extends BaseAbsenceEleveSaisie {
     }
 
 	/**
+	 *
+	 * Renvoi true si une notification est prête à envoyée ou envoyée à la famille
+	 *
+	 * @return     boolean
+	 *
+	 */
+	public function getNotificationEnCoursEnglobante() {
+	    //on commence par vérifié cette saisie
+	    if ($this->getNotificationEnCours()) {
+	        return true;
+	    }
+	    
+	    //on vérifie les saisies englobantes
+	    foreach ($this->getAbsenceEleveSaisiesEnglobantes() as $saisie) {
+	        if ($saisie->getNotificationEnCours()) {
+    	        return true;
+    	    }      
+	    }
+	    return false;
+    }
+
+    /**
 	 * Gets a collection of AbsenceEleveTraitement objects related by a many-to-many relationship
 	 * to the current object by way of the j_traitements_saisies cross-reference table.
 	 *
@@ -770,16 +988,6 @@ class AbsenceEleveSaisie extends BaseAbsenceEleveSaisie {
 			if (($retval = AbsenceEleveSaisiePeer::doValidate($this, $columns)) !== true) {
 				$failureMap = array_merge($failureMap, $retval);
 			}
-
-
-				if ($this->collJTraitementSaisieEleves !== null) {
-					foreach ($this->collJTraitementSaisieEleves as $referrerFK) {
-						if (!$referrerFK->validate($columns)) {
-							$failureMap = array_merge($failureMap, $referrerFK->getValidationFailures());
-						}
-					}
-				}
-
 
 			$this->alreadyInValidation = false;
 		}
@@ -1172,15 +1380,19 @@ class AbsenceEleveSaisie extends BaseAbsenceEleveSaisie {
 	public function reload($deep = false, PropelPDO $con = null) {
 	    parent::reload($deep, $con);
 	    if ($deep) {
-    	    $this->sousResponsabiliteEtablissement = null;
-    	    $this->manquementObligationPresence = null;
-    	    $this->manquementObligationPresenceSpecifie_NON_PRECISE = null;
-    	    $this->justifiee = null;
-    	    $this->boolSaisiesContradictoiresManquementObligation = null;
-    	    $this->retard = null;
-    	    $this->collectionSaisiesContradictoiresManquementObligation = null;
-    	    $this->collAbsenceEleveTraitements = null;
-    	    $this->oldVersion = null;
+            $this->sousResponsabiliteEtablissement = null;
+            $this->manquementObligationPresence = null;
+            $this->manquementObligationPresenceEnglobante = null;
+            $this->manquementObligationPresenceSpecifie_NON_PRECISE = null;
+            $this->justifiee = null;
+            $this->justifieeEnglobante = null;
+            $this->saisiesEnglobantes = null;
+            $this->boolSaisiesContradictoiresManquementObligation = null;
+            $this->retard = null;
+            $this->retardEnglobante = null;
+            $this->collectionSaisiesContradictoiresManquementObligation = null;
+            $this->collAbsenceEleveTraitements = null;
+            $this->oldVersion = null;
 	    }
 	}
 	
@@ -1195,19 +1407,72 @@ class AbsenceEleveSaisie extends BaseAbsenceEleveSaisie {
 	 */
 	public function clearAllReferences($deep = false)
 	{
-	    parent::clearAllReferences($deep);
-	    $this->sousResponsabiliteEtablissement = null;
-	    $this->manquementObligationPresence = null;
-	    $this->manquementObligationPresenceSpecifie_NON_PRECISE = null;
-	    $this->justifiee = null;
-	    $this->boolSaisiesContradictoiresManquementObligation = null;
-	    $this->retard = null;
-	    $this->collectionSaisiesContradictoiresManquementObligation = null;
-	    $this->oldVersion = null;
+        parent::clearAllReferences($deep);
+        $this->sousResponsabiliteEtablissement = null;
+        $this->manquementObligationPresence = null;
+        $this->manquementObligationPresenceEnglobante = null;
+        $this->manquementObligationPresenceSpecifie_NON_PRECISE = null;
+        $this->justifiee = null;
+        $this->justifieeEnglobante = null;
+        $this->saisiesEnglobantes = null;
+        $this->boolSaisiesContradictoiresManquementObligation = null;
+        $this->retard = null;
+        $this->retardEnglobante = null;
+        $this->collectionSaisiesContradictoiresManquementObligation = null;
+        $this->oldVersion = null;
 	}
 	
 	public function getAlreadyInSave() {
 		return $this->alreadyInSave;
 	}
-	
+
+	/**
+	 *
+	 * Renvoi une collection de saisies englobant celle ci au sens large (on renvoi aussi les saisies de bornes identiques)
+	 *
+	 * @return     AbsenceEleveLieu
+	 *
+	 */
+	public function  getAbsenceEleveSaisiesEnglobantes() {
+            if (!isset($this->saisiesEnglobantes) || $this->saisiesEnglobantes === null) {
+                if ($this->getEleveId() == null) {
+                    $this->saisiesEnglobantes = new PropelCollection();
+                    return $this->saisiesEnglobantes;
+                }
+
+                $query = AbsenceEleveSaisieQuery::create();
+                $query->filterById($this->getId(), Criteria::NOT_EQUAL);
+                $query->filterByEleveId($this->getEleveId());
+                $query->filterByDebutAbs($this->getDebutAbs(), Criteria::LESS_EQUAL);
+                $query->filterByFinAbs($this->getFinAbs(), Criteria::GREATER_EQUAL);
+                $this->saisiesEnglobantes = $query->find();
+            }
+            return $this->saisiesEnglobantes;
+        }
+        
+	public function  setAbsenceEleveSaisiesEnglobantes(PropelCollection $col) {
+            $this->saisiesEnglobantes = $col;
+        }
+
+	/**
+	 *
+	 * filtre une collection de saisie pour ne retenir que les saisies englobante
+	 *
+	 * @return     AbsenceEleveLieu
+	 *
+	 */
+	public function filterAbsenceEleveSaisiesEnglobantes(PropelCollection $col) {
+            $result = new PropelCollection();
+            foreach ($col as $saisie) {
+                if ($saisie->getEleveId() == $this->getEleveId() &&
+                    $saisie->getDebutAbs(null) <= $this->getDebutAbs(null) &&
+                    $saisie->getFinAbs(null) >= $this->getFinAbs(null)) {
+                    $result->add($saisie);
+                }
+            }
+            return $result;
+        }
+
+
+        
 } // AbsenceEleveSaisie

@@ -4,7 +4,7 @@
  *
  * $Id$
  *
- * @copyright Copyright 2001, 2012 Thomas Belliard, Laurent Delineau, Edouard Hue, Eric Lebrun, Stéphane Boireau, Christian Chapel
+ * @copyright Copyright 2001, 2013 Thomas Belliard, Laurent Delineau, Edouard Hue, Eric Lebrun, Stéphane Boireau, Christian Chapel
  * @todo Les bulletins HTML utilisent les infos display_rang, display_coef,... de la table 'classes'.
  *Les bulletins PDF utilisent plutôt les infos de la table 'modele_bulletin' il me semble.
  *Il faudrait peut-être revoir le dispositif pour adopter la même stratégie.
@@ -55,6 +55,11 @@ if (mysql_num_rows($res_test)==0) {
 }
 if (!checkAccess()) {
 	header("Location: ../logout.php?auto=1");
+	die();
+}
+
+if(!getSettingAOui('active_bulletins')) {
+	header("Location: ../accueil.php?msg=Module_inactif");
 	die();
 }
 
@@ -398,6 +403,8 @@ elseif((!isset($choix_periode_num))||(!isset($tab_periode_num))) {
 		}
 		else {
 			echo "<td style='background-color:red; text-align:center;'>Période non close<br />pour une classe au moins";
+			// 20120713
+			echo "<br /><input type='checkbox' name='tab_periode_num[]' value='$i' title=\"ATTENTION: Les notes et appréciations des bulletins peuvent encore évoluer\" />\n";
 			if($_SESSION['statut']=='scolarite') {
 				echo " <a href='verrouillage.php' target='_blank'><img src='../images/icons/configure.png' width='16' height='16' title='Verrouillage/déverrouillage'/></a>\n";
 			}
@@ -444,8 +451,19 @@ elseif(!isset($_POST['valide_select_eleves'])) {
 	// FORMULAIRE POUR LE RETOUR AU CHOIX DES PERIODES
 	echo "\n<!-- Formulaire de retour au choix des périodes -->\n";
 	echo "<form enctype='multipart/form-data' action='".$_SERVER['PHP_SELF']."' method='post' name='form_retour'>\n";
+	$temoin_periode_non_close="n";
+	$tab_per_non_close=array();
 	for($i=0;$i<count($tab_id_classe);$i++) {
 		echo "<input type='hidden' name='tab_id_classe[$i]' value='".$tab_id_classe[$i]."' />\n";
+		//if($temoin_periode_non_close=="n") {
+		for($j=0;$j<count($tab_periode_num);$j++) {
+			$sql="SELECT 1=1 FROM periodes WHERE id_classe='".$tab_id_classe[$i]."' AND verouiller='N' AND num_periode='".$tab_periode_num[$j]."';";
+			$test_per=mysql_query($sql);
+			if(mysql_num_rows($test_per)>0) {
+				$tab_per_non_close[$tab_id_classe[$i]][]=$tab_periode_num[$j];
+				$temoin_periode_non_close="y";
+			}
+		}
 	}
 	for($j=0;$j<count($tab_periode_num);$j++) {
 		echo "<input type='hidden' name='tab_periode_num[$j]' value='".$tab_periode_num[$j]."' />\n";
@@ -453,6 +471,9 @@ elseif(!isset($_POST['valide_select_eleves'])) {
 	echo "</form>\n";
 	//===========================
 
+	if($temoin_periode_non_close=="y") {
+		echo "<br /><p style='text-indent:-7em; margin-left:7em;'><strong style='color:red; text-decoration:blink;'>ATTENTION&nbsp;:</strong> Les saisies ne sont pas closes (<em>période encore ouverte en saisie</em>).<br />Cela signifie que les notes et appréciations peuvent encore changer.<br />Les bulletins vont être marqués d'une indication comme quoi la période n'est pas close.<br />Vous ne devriez pas imprimer ces bulletins.<br />Vous pouvez tester l'affichage pour ajuster les paramètres d'impression, mais vous devriez verrouiller la période avec un compte 'scolarité' avant d'imprimer les bulletins.</p><br />\n";
+	}
 
 	//echo "<p class='bold'>Sélection des élèves:</p>\n";
 	echo "<p class='bold'>Sélection des élèves et paramètres:</p>\n";
@@ -473,7 +494,7 @@ elseif(!isset($_POST['valide_select_eleves'])) {
 	echo "<table border='0' summary='Choix du type de bulletin'>\n";
 	echo "<tr>\n";
 	echo "<td valign='top'>\n";
-	echo "<input type='radio' name='mode_bulletin' id='mode_bulletin_html' value='html' onchange='display_div_modele_bulletin_pdf();display_param_b_adr_pg();checkbox_change(this.id);checkbox_change(\"mode_bulletin_pdf\");change_lien_param_bull(\"html\");' ";
+	echo "<input type='radio' name='mode_bulletin' id='mode_bulletin_html' value='html' onchange='display_div_modele_bulletin_pdf();display_param_b_adr_pg();checkbox_change(this.id);checkbox_change(\"mode_bulletin_pdf\");change_lien_param_bull(\"html\");griser_lignes_specifiques_pdf();' ";
 	if($type_bulletin_par_defaut=='html') {echo "checked ";}
 	echo "/> ";
 	echo "</td>\n";
@@ -512,7 +533,7 @@ elseif(!isset($_POST['valide_select_eleves'])) {
 			}
 		}
 		else {
-			echo "<input type='radio' name='mode_bulletin' id='mode_bulletin_pdf' value='pdf' onchange='display_div_modele_bulletin_pdf();display_param_b_adr_pg();checkbox_change(this.id);checkbox_change(\"mode_bulletin_html\");change_lien_param_bull(\"pdf\");' ";
+			echo "<input type='radio' name='mode_bulletin' id='mode_bulletin_pdf' value='pdf' onchange='display_div_modele_bulletin_pdf();display_param_b_adr_pg();checkbox_change(this.id);checkbox_change(\"mode_bulletin_html\");change_lien_param_bull(\"pdf\");griser_lignes_specifiques_html();' ";
 			if($type_bulletin_par_defaut=='pdf') {echo "checked ";}
 			echo "/> ";
 			echo "</td>\n";
@@ -746,7 +767,16 @@ elseif(!isset($_POST['valide_select_eleves'])) {
 		include("../cahier_notes/tableau_choix_parametres_releves_notes.php");
 		echo "</div>\n";
 
-		echo "<script type='text/javascript'>
+		echo "<script type='text/javascript'>";
+
+		if($type_bulletin_par_defaut=='html') {
+			echo "griser_lignes_specifiques_pdf();";
+		}
+		else {
+			echo "griser_lignes_specifiques_html();";
+		}
+
+		echo "
 function CocheLigne(item) {
 	for (var i=0;i<".count($tab_id_classe).";i++) {
 		if(document.getElementById(item+'_'+i)){
@@ -783,6 +813,33 @@ function ToutDeCocher() {
 
 </script>\n";
 
+	}
+
+	$tab_signature=get_tab_signature_bull();
+	if(count($tab_signature)>0) {
+		echo "<p class='bold'>Signature des bulletins&nbsp;: <a href='#'><img src='../images/edit16.png' class='icone16' title=\"Éditer/Modifier les signatures.
+Le dépot de fichiers de signature pour les différents utilisateurs et classes n'est pour le moment possible qu'en tant qu'administrateur dans Gestion des modules/Bulletins\" /></a></p>\n";
+		echo "<table class='boireaus boireaus_alt' summary='Tableau des signatures possibles'>\n";
+		echo "<tr><th>Classe</th><th>Signer</th></tr>\n";
+		for($i=0;$i<count($tab_id_classe);$i++) {
+			echo "<tr><td>".get_nom_classe($tab_id_classe[$i])."</td><td>";
+			if((isset($tab_signature['classe']))&&(array_key_exists($tab_id_classe[$i] ,$tab_signature['classe']))) {
+				if((isset($tab_signature['fichier']))&&(array_key_exists($tab_signature['classe'][$tab_id_classe[$i]]['id_fichier'] ,$tab_signature['fichier']))) {
+					echo "<input type='checkbox' name='signer[]' id='signer_".$tab_id_classe[$i]."' value= '".$tab_id_classe[$i]."' onchange=\"checkbox_change(this.id)\" /><label for='signer_".$tab_id_classe[$i]."' id='texte_signer_".$tab_id_classe[$i]."'> Signer avec l'image ci-contre ";
+					echo "<img src='".$tab_signature['fichier'][$tab_signature['classe'][$tab_id_classe[$i]]['id_fichier']]['chemin']."' width='100' style='vertical-align:middle;' />";
+					echo "</label>";
+				}
+				else {
+					echo "Le droit de signer est présent,<br />mais aucun fichier de signature n'est associé à la classe.";
+				}
+			}
+			else {
+				echo "<img src='../images/disabled.png' class='icone20' title=\"Vous n'avez pas le droit de signer d'un fichier les bulletins de cette classe.\" />";
+			}
+			echo "</td></tr>\n";
+			//$sql="SELECT ";
+		}
+		echo "</table>\n";
 	}
 
 
@@ -868,7 +925,82 @@ function ToutDeCocher() {
 
 		echo "<input type='hidden' name='tab_id_classe[$i]' value='".$tab_id_classe[$i]."' />\n";
 
-		echo "<p class='bold'>Classe de ".get_class_from_id($tab_id_classe[$i])."</p>\n";
+		$classe_courante=get_class_from_id($tab_id_classe[$i]);
+		echo "<p class='bold'>Classe de ".$classe_courante."</p>\n";
+
+		echo "<div style='float:right'>\n";
+		echo "<div align='left' style='margin-left:11em; font-size: xx-small;'>\n";
+
+		if (getSettingValue("active_module_absence")=='2' && getSettingValue("abs2_import_manuel_bulletin")!='y') {
+			echo "<p>Voici les dates prises en compte<br />pour les extractions d'absences&nbsp;:</p>\n";
+			echo "<table class='boireaus'>\n";
+			echo "<tr>\n";
+			echo "<th>Période</th>\n";
+			echo "<th>Date de fin</th>\n";
+			echo "</tr>\n";
+			$sql="SELECT nom_periode, num_periode, date_fin FROM periodes WHERE id_classe='".$tab_id_classe[$i]."' ORDER BY num_periode;";
+			$res_tmp_per=mysql_query($sql);
+			$alt=1;
+			while($lig_tmp_per=mysql_fetch_object($res_tmp_per)) {
+				$alt=$alt*(-1);
+				echo "<tr class='lig$alt white_hover'>\n";
+				echo "<td>".$lig_tmp_per->nom_periode."</td>\n";
+				echo "<td>".formate_date($lig_tmp_per->date_fin)."</td>\n";
+				echo "</tr>\n";
+			}
+			echo "</table>\n";
+		}
+
+		echo "<table class='boireaus' summary='Coefficients des enseignements de ".$classe_courante."'>\n";
+		echo "<tr>\n";
+		echo "<th>Enseignement</th>\n";
+		echo "<th>Enseignant(s)</th>\n";
+		echo "<th>Classes</th>\n";
+		echo "<th>Coefficient</th>\n";
+		echo "</tr>\n";
+		$alt=1;
+		$tmp_groups = get_groups_for_class($tab_id_classe[$i],"","n");
+		foreach($tmp_groups as $tmp_current_group) {
+			$sql="SELECT * FROM j_groupes_visibilite WHERE id_groupe='".$tmp_current_group['id']."' AND domaine='bulletins' AND visible='n';";
+			$test_visu=mysql_query($sql);
+			if(mysql_num_rows($test_visu)==0) {
+				$alt=$alt*(-1);
+				echo "<tr class='lig$alt white_hover'>\n";
+				echo "<td>\n";
+				echo $tmp_current_group['name']."\n";
+				echo "</td>\n";
+
+				echo "<td>\n";
+				$tab_champs=array('profs');
+				$tmp_current_group_complement=get_group($tmp_current_group['id'] ,$tab_champs);
+				echo $tmp_current_group_complement['profs']['proflist_string']."\n";
+				echo "</td>\n";
+
+				echo "<td>\n";
+				echo $tmp_current_group['classlist_string']."\n";
+				echo "</td>\n";
+
+				echo "<td>\n";
+				$sql="SELECT coef FROM j_groupes_classes WHERE id_classe='".$tab_id_classe[$i]."' AND id_groupe='".$tmp_current_group['id']."';";
+				$res_coef=mysql_query($sql);
+				if(mysql_num_rows($res_coef)>0) {
+					$tmp_coef=mysql_result($res_coef, 0, 'coef');
+					if($_SESSION['statut']=='administrateur') {
+						echo "<a href='../groupes/edit_class.php?id_classe=".$tab_id_classe[$i]."' target='_blank'>".$tmp_coef."</a>";
+					}
+					else {
+						echo $tmp_coef;
+					}
+				}
+				echo "</td>\n";
+				echo "</tr>\n";
+			}
+		}
+		unset($tmp_groups);
+		echo "</table>\n";
+
+		echo "</div>\n";
+		echo "</div>\n";
 
 		echo "<table class='boireaus' summary='Choix des élèves'>\n";
 		echo "<tr>\n";
@@ -884,7 +1016,11 @@ function ToutDeCocher() {
 			//echo "<th>Période $j</th>\n";
 			$sql="SELECT nom_periode FROM periodes WHERE id_classe='".$tab_id_classe[$i]."' AND num_periode='".$tab_periode_num[$j]."';";
 			$res_per=mysql_query($sql);
-			echo "<th>\n";
+			echo "<th";
+			if((isset($tab_per_non_close[$tab_id_classe[$i]]))&&(in_array($tab_periode_num[$j], $tab_per_non_close[$tab_id_classe[$i]]))) {
+				echo " style='background-color:red' title='Période non close. Vous ne devriez pas imprimer ces bulletins.'";
+			}
+			echo ">\n";
 			$lig_per=mysql_fetch_object($res_per);
 
 			echo "<input type='hidden' name='tab_periode_num[$j]' value='".$tab_periode_num[$j]."' />\n";
@@ -894,7 +1030,7 @@ function ToutDeCocher() {
 				echo $lig_per->nom_periode;
 			}
 			else {
-				echo "<span style='color:red'>X</span>";
+				echo "<span style='color:orange' title='Nom de période inconnu???'>X</span>";
 			}
 
 			echo "<br />\n";
@@ -1054,6 +1190,8 @@ else {
 
 	$tri_par_etab_orig=isset($_POST['tri_par_etab_orig']) ? $_POST['tri_par_etab_orig'] : "n";
 
+	$signer=isset($_POST['signer']) ? $_POST['signer'] : array();
+
 	//$avec_coches_mentions=isset($_POST['avec_coches_mentions']) ? $_POST['avec_coches_mentions'] : "n";
 
 
@@ -1194,6 +1332,16 @@ else {
 
 	// Absences
 	$bull_affiche_absences=getSettingValue("bull_affiche_absences");
+	$bull_affiche_abs_tot=getSettingValue("bull_affiche_abs_tot");
+	$bull_affiche_abs_nj=getSettingValue("bull_affiche_abs_nj");
+	$bull_affiche_abs_ret=getSettingValue("bull_affiche_abs_ret");
+	if(($bull_affiche_abs_tot=='')&&($bull_affiche_abs_nj=='')&&($bull_affiche_abs_ret=='')) {
+		if($bull_affiche_absences=='y') {
+			$bull_affiche_abs_tot="y";
+			$bull_affiche_abs_nj="y";
+			$bull_affiche_abs_ret="y";
+		}
+	}
 
 	// Prof principal
 	$gepi_prof_suivi=getSettingValue("gepi_prof_suivi");
@@ -1279,6 +1427,24 @@ else {
 		}
 	}
 
+
+	$signature_bull=array();
+	if(count($signer)>0) {
+		$tab_signature=get_tab_signature_bull();
+		if((count($tab_signature)>0)&&(isset($tab_signature['classe']))) {
+			for($loop_classe=0;$loop_classe<count($tab_id_classe);$loop_classe++) {
+
+				if(array_key_exists($tab_id_classe[$loop_classe], $tab_signature['classe'])) {
+					if(array_key_exists($tab_signature['classe'][$tab_id_classe[$loop_classe]]['id_fichier'], $tab_signature['fichier'])) {
+						$signature_bull[$tab_id_classe[$loop_classe]]=$tab_signature['fichier'][$tab_signature['classe'][$tab_id_classe[$loop_classe]]['id_fichier']]['chemin'];
+					}
+				}
+
+			}
+		}
+	}
+
+
 	$nb_bulletins_edites=0;
 	// Boucle sur les classes
 	for($loop_classe=0;$loop_classe<count($tab_id_classe);$loop_classe++) {
@@ -1314,163 +1480,20 @@ else {
 		}
 		//==============================
 
-		$moyennes_periodes_precedentes="n";
+		// Les deux choix ci-dessous sont maintenant dans les Paramètres des bulletins HTML
+		//$moyennes_annee="n";
+		//$moyennes_periodes_precedentes="n";
+
 		$evolution_moyenne_periode_precedente="n";
 		// Remplissage des paramètres du modèle de bulletin PDF:
 		if($mode_bulletin=="pdf") {
+			$moyennes_annee="n";
+			$moyennes_periodes_precedentes="n";
+
 			require_once("bulletin_pdf.inc.php");
 			foreach($val_defaut_champ_bull_pdf as $key => $value) {
 				$tab_modele_pdf[$key][$tab_id_classe[$loop_classe]]=$value;
 			}
-/*
-			// information d'activation des différentes parties du bulletin
-			$tab_modele_pdf["affiche_filigrame"][$tab_id_classe[$loop_classe]]='1'; // affiche un filigramme
-			$tab_modele_pdf["texte_filigrame"][$tab_id_classe[$loop_classe]]='DUPLICATA INTERNET'; // texte du filigrame
-			$tab_modele_pdf["affiche_logo_etab"][$tab_id_classe[$loop_classe]]='1';
-			$tab_modele_pdf["nom_etab_gras"][$tab_id_classe[$loop_classe]]='0';
-			$tab_modele_pdf["entente_mel"][$tab_id_classe[$loop_classe]]='1'; // afficher l'adresse mel dans l'entête
-			$tab_modele_pdf["entente_tel"][$tab_id_classe[$loop_classe]]='1'; // afficher le numéro de téléphone dans l'entête
-			$tab_modele_pdf["entente_fax"][$tab_id_classe[$loop_classe]]='1'; // afficher le numéro de fax dans l'entête
-			$tab_modele_pdf["L_max_logo"][$tab_id_classe[$loop_classe]]=75; $tab_modele_pdf["H_max_logo"][$tab_id_classe[$loop_classe]]=75; //dimension du logo
-			$tab_modele_pdf["active_bloc_datation"][$tab_id_classe[$loop_classe]] = '1'; // fait - afficher les informations de datation du bulletin
-			$tab_modele_pdf["taille_texte_date_edition"][$tab_id_classe[$loop_classe]] = '8'; // définit la taille de la date d'édition du bulletin
-			$tab_modele_pdf["active_bloc_eleve"][$tab_id_classe[$loop_classe]] = '1'; // fait - afficher les informations sur l'élève
-			$tab_modele_pdf["active_bloc_adresse_parent"][$tab_id_classe[$loop_classe]] = '1'; // fait - afficher l'adresse des parents
-			$tab_modele_pdf["active_bloc_absence"][$tab_id_classe[$loop_classe]] = '1'; // fait - afficher les absences de l'élève
-			$tab_modele_pdf["active_bloc_note_appreciation"][$tab_id_classe[$loop_classe]] = '1'; // fait - afficher les notes et appréciations
-			$tab_modele_pdf["active_bloc_avis_conseil"][$tab_id_classe[$loop_classe]] = '1'; // fait - afficher les avis du conseil de classe
-			$tab_modele_pdf["active_bloc_chef"][$tab_id_classe[$loop_classe]] = '1'; // fait - afficher la signature du chef
-			$tab_modele_pdf["active_photo"][$tab_id_classe[$loop_classe]] = '0'; // fait - afficher la photo de l'élève
-			$tab_modele_pdf["active_coef_moyenne"][$tab_id_classe[$loop_classe]] = '1'; // fait - afficher le coéficient des moyenne par matière
-			$active_coef_sousmoyene = '1'; // fait - afficher le coéficient des moyenne par matière
-			$tab_modele_pdf["active_nombre_note"][$tab_id_classe[$loop_classe]] = '1'; // fait - afficher le nombre de note par matière sous la moyenne de l'élève
-			$tab_modele_pdf["active_nombre_note_case"][$tab_id_classe[$loop_classe]] = '1'; // fait - afficher le nombre de note par matière
-			$tab_modele_pdf["active_moyenne"][$tab_id_classe[$loop_classe]] = '1'; // fait - afficher les moyennes
-			$tab_modele_pdf["active_moyenne_eleve"][$tab_id_classe[$loop_classe]] = '1'; // fait - afficher la moyenne de l'élève
-			$tab_modele_pdf["active_moyenne_classe"][$tab_id_classe[$loop_classe]] = '1'; // fait - afficher les moyennes de la classe
-			$tab_modele_pdf["active_moyenne_min"][$tab_id_classe[$loop_classe]] = '1'; // fait - afficher les moyennes minimum
-			$tab_modele_pdf["active_moyenne_max"][$tab_id_classe[$loop_classe]] = '1'; // fait - afficher les moyennes maximum
-			$tab_modele_pdf["active_regroupement_cote"][$tab_id_classe[$loop_classe]] = '1'; // fait - afficher le nom des regroupement sur le coté
-			$tab_modele_pdf["active_entete_regroupement"][$tab_id_classe[$loop_classe]] = '1'; // fait - afficher les entête des regroupement
-			$tab_modele_pdf["active_moyenne_regroupement"][$tab_id_classe[$loop_classe]] = '1'; // fait - afficher les moyennes des regroupement
-			$tab_modele_pdf["active_moyenne_general"][$tab_id_classe[$loop_classe]] = '1'; // fait - afficher la moyenne général sur le bulletin
-			$tab_modele_pdf["active_rang"][$tab_id_classe[$loop_classe]] = '1'; // fait - afficher le rang de l'élève
-			$tab_modele_pdf["active_graphique_niveau"][$tab_id_classe[$loop_classe]] = '1'; // fait - afficher le graphique des niveaux
-			$tab_modele_pdf["active_appreciation"][$tab_id_classe[$loop_classe]] = '1'; // fait - afficher les appréciations des professeurs
-			$tab_modele_pdf["affiche_doublement"][$tab_id_classe[$loop_classe]] = '1'; // affiche si l'élève à doubler
-			$tab_modele_pdf["affiche_date_naissance"][$tab_id_classe[$loop_classe]] = '1'; // affiche la date de naissance de l'élève
-			$tab_modele_pdf["affiche_lieu_naissance"][$tab_id_classe[$loop_classe]] = '0'; // affiche le lieu de naissance de l'élève
-			$tab_modele_pdf["affiche_dp"][$tab_id_classe[$loop_classe]] = '1'; // affiche l'état de demi pension ou extern
-			$tab_modele_pdf["affiche_nom_court"][$tab_id_classe[$loop_classe]] = '1'; // affiche le nom court de la classe
-			$tab_modele_pdf["affiche_effectif_classe"][$tab_id_classe[$loop_classe]] = '1'; // affiche l'effectif de la classe
-			$tab_modele_pdf["affiche_numero_impression"][$tab_id_classe[$loop_classe]] = '1'; // affiche le numéro d'impression des bulletins
-			$tab_modele_pdf["affiche_etab_origine"][$tab_id_classe[$loop_classe]] = '0'; // affiche l'établissement d'origine
-			$tab_modele_pdf["toute_moyenne_meme_col"][$tab_id_classe[$loop_classe]]='0'; // afficher les information moyenne classe/min/max sous la moyenne général de l'élève
-			$active_coef_sousmoyene = '1'; //afficher le coeficent en dessous de la moyenne de l'élève
-
-			$tab_modele_pdf["entete_model_bulletin"][$tab_id_classe[$loop_classe]] = '1'; //choix du type d'entete des moyennes
-			$tab_modele_pdf["ordre_entete_model_bulletin"][$tab_id_classe[$loop_classe]] = '1'; // ordre des entêtes tableau du bulletin
-
-			// information paramétrage
-			$tab_modele_pdf["caractere_utilse"][$tab_id_classe[$loop_classe]] = 'DejaVu';
-			// cadre identitée parents
-			$tab_modele_pdf["X_parent"][$tab_id_classe[$loop_classe]]=110; $tab_modele_pdf["Y_parent"][$tab_id_classe[$loop_classe]]=40;
-			$tab_modele_pdf["imprime_pour"][$tab_id_classe[$loop_classe]] = 1;
-			// cadre identitée eleve
-			$tab_modele_pdf["X_eleve"][$tab_id_classe[$loop_classe]]=5; $tab_modele_pdf["Y_eleve"][$tab_id_classe[$loop_classe]]=40;
-			$tab_modele_pdf["cadre_eleve"][$tab_id_classe[$loop_classe]]=1;
-			// cadre de datation du bulletin
-			$tab_modele_pdf["X_datation_bul"][$tab_id_classe[$loop_classe]]=110; $tab_modele_pdf["Y_datation_bul"][$tab_id_classe[$loop_classe]]=5;
-			$tab_modele_pdf["cadre_datation_bul"][$tab_id_classe[$loop_classe]]=1;
-			// si les catégorie son affiché avec moyenne
-			$tab_modele_pdf["hauteur_info_categorie"][$tab_id_classe[$loop_classe]]=5;
-			// cadre des notes et app
-			$tab_modele_pdf["X_note_app"][$tab_id_classe[$loop_classe]]=5;
-			$tab_modele_pdf["Y_note_app"][$tab_id_classe[$loop_classe]]=72;
-			$tab_modele_pdf["longeur_note_app"][$tab_id_classe[$loop_classe]]=200;
-			$tab_modele_pdf["hauteur_note_app"][$tab_id_classe[$loop_classe]]=175;
-
-			//coef des matiere
-			$tab_modele_pdf["largeur_coef_moyenne"][$tab_id_classe[$loop_classe]] = 8;
-			//nombre de note par matière
-			$tab_modele_pdf["largeur_nombre_note"][$tab_id_classe[$loop_classe]] = 8;
-			//champ des moyennes
-			$tab_modele_pdf["largeur_d_une_moyenne"][$tab_id_classe[$loop_classe]] = 10;
-			//graphique de niveau
-			$tab_modele_pdf["largeur_niveau"][$tab_id_classe[$loop_classe]] = 18;
-			//rang de l'élève
-			$tab_modele_pdf["largeur_rang"][$tab_id_classe[$loop_classe]] = 8;
-			//autres infos
-			$tab_modele_pdf["active_reperage_eleve"][$tab_id_classe[$loop_classe]] = '1';
-			$tab_modele_pdf["couleur_reperage_eleve1"][$tab_id_classe[$loop_classe]] = '255';
-			$tab_modele_pdf["couleur_reperage_eleve2"][$tab_id_classe[$loop_classe]] = '255';
-			$tab_modele_pdf["couleur_reperage_eleve3"][$tab_id_classe[$loop_classe]] = '207';
-			$tab_modele_pdf["couleur_categorie_cote"][$tab_id_classe[$loop_classe]] = '1';
-			$tab_modele_pdf["couleur_categorie_cote1"][$tab_id_classe[$loop_classe]]='239';
-			$tab_modele_pdf["couleur_categorie_cote2"][$tab_id_classe[$loop_classe]]='239';
-			$tab_modele_pdf["couleur_categorie_cote3"][$tab_id_classe[$loop_classe]]='239';
-			$tab_modele_pdf["couleur_categorie_entete"][$tab_id_classe[$loop_classe]] = '1';
-			$tab_modele_pdf["couleur_categorie_entete1"][$tab_id_classe[$loop_classe]]='239';
-			$tab_modele_pdf["couleur_categorie_entete2"][$tab_id_classe[$loop_classe]]='239';
-			$tab_modele_pdf["couleur_categorie_entete3"][$tab_id_classe[$loop_classe]]='239';
-			$tab_modele_pdf["couleur_moy_general"][$tab_id_classe[$loop_classe]] = '1';
-			$tab_modele_pdf["couleur_moy_general1"][$tab_id_classe[$loop_classe]]='239';
-			$tab_modele_pdf["couleur_moy_general2"][$tab_id_classe[$loop_classe]]='239';
-			$tab_modele_pdf["couleur_moy_general3"][$tab_id_classe[$loop_classe]]='239';
-			$tab_modele_pdf["titre_entete_matiere"][$tab_id_classe[$loop_classe]]='Matière';
-			$active_coef_sousmoyene = '1'; $tab_modele_pdf["titre_entete_coef"][$tab_id_classe[$loop_classe]]='coef.';
-			$tab_modele_pdf["titre_entete_nbnote"][$tab_id_classe[$loop_classe]]='nb. n.';
-			$tab_modele_pdf["titre_entete_rang"][$tab_id_classe[$loop_classe]]='rang';
-			$titre_entete_appreciation='Appréciation/Conseils';
-			// cadre absence
-			$tab_modele_pdf["X_absence"][$tab_id_classe[$loop_classe]]=5; $tab_modele_pdf["Y_absence"][$tab_id_classe[$loop_classe]]=246.3;
-			// entete du bas contient les moyennes gérnéral
-			$tab_modele_pdf["hauteur_entete_moyenne_general"][$tab_id_classe[$loop_classe]] = 5;
-			// cadre des Avis du conseil de classe
-			$tab_modele_pdf["X_avis_cons"][$tab_id_classe[$loop_classe]]=5; $tab_modele_pdf["Y_avis_cons"][$tab_id_classe[$loop_classe]]=250; $tab_modele_pdf["longeur_avis_cons"][$tab_id_classe[$loop_classe]]=130; $tab_modele_pdf["hauteur_avis_cons"][$tab_id_classe[$loop_classe]]=37;
-			$tab_modele_pdf["cadre_avis_cons"][$tab_id_classe[$loop_classe]]=1;
-			// cadre signature du chef
-			$tab_modele_pdf["X_sign_chef"][$tab_id_classe[$loop_classe]]=138; $tab_modele_pdf["Y_sign_chef"][$tab_id_classe[$loop_classe]]=250; $tab_modele_pdf["longeur_sign_chef"][$tab_id_classe[$loop_classe]]=67; $tab_modele_pdf["hauteur_sign_chef"][$tab_id_classe[$loop_classe]]=37;
-			$tab_modele_pdf["cadre_sign_chef"][$tab_id_classe[$loop_classe]]=0;
-			//les moyennes
-			$tab_modele_pdf["arrondie_choix"][$tab_id_classe[$loop_classe]]='0.01'; //arrondie de la moyenne
-			$tab_modele_pdf["nb_chiffre_virgule"][$tab_id_classe[$loop_classe]]='1'; //nombre de chiffre après la virgule
-			$tab_modele_pdf["chiffre_avec_zero"][$tab_id_classe[$loop_classe]]='1'; // si une moyenne se termine par ,00 alors on supprimer les zero
-
-			$tab_modele_pdf["autorise_sous_matiere"][$tab_id_classe[$loop_classe]] = '1'; //autorise l'affichage des sous matière
-			$tab_modele_pdf["affichage_haut_responsable"][$tab_id_classe[$loop_classe]] = '1'; //affiche le nom du haut responsable de la classe
-
-			$tab_modele_pdf["largeur_matiere"][$tab_id_classe[$loop_classe]] = '40'; // largeur de la colonne matiere
-
-			$tab_modele_pdf["taille_texte_matiere"][$tab_id_classe[$loop_classe]] = '10'; //taille du texte des matières
-
-			$tab_modele_pdf["titre_bloc_avis_conseil"][$tab_id_classe[$loop_classe]] = 'Avis du Conseil de classe:'; // titre du bloc avis du conseil de classe
-			$tab_modele_pdf["taille_titre_bloc_avis_conseil"][$tab_id_classe[$loop_classe]] = '10'; // taille du titre du bloc avis du conseil
-			$tab_modele_pdf["taille_profprincipal_bloc_avis_conseil"][$tab_id_classe[$loop_classe]] = '10'; // taille du texte prof principal du bloc avis conseil de classe
-			$tab_modele_pdf["affiche_fonction_chef"][$tab_id_classe[$loop_classe]] = '1'; // affiche la fonction du chef
-			$tab_modele_pdf["taille_texte_fonction_chef"][$tab_id_classe[$loop_classe]] = '10'; // taille du texte de la fonction du chef
-			$tab_modele_pdf["taille_texte_identitee_chef"][$tab_id_classe[$loop_classe]] = '10'; // taille du texte du nom du chef
-
-			$tab_modele_pdf["cadre_adresse"][$tab_id_classe[$loop_classe]] = ''; // cadre sur l'adresse
-
-			$tab_modele_pdf["centrage_logo"][$tab_id_classe[$loop_classe]] = '0'; // centrer le logo de l'établissement
-			$tab_modele_pdf["Y_centre_logo"][$tab_id_classe[$loop_classe]] = '18'; // centre du logo sur la page
-			$tab_modele_pdf["ajout_cadre_blanc_photo"][$tab_id_classe[$loop_classe]] = '0'; // ajouter un cadre blanc pour la photo de l'élève.
-
-			$tab_modele_pdf["affiche_moyenne_mini_general"][$tab_id_classe[$loop_classe]] = '1'; // permet l'affichage de la moyenne général mini
-			$tab_modele_pdf["affiche_moyenne_maxi_general"][$tab_id_classe[$loop_classe]] = '1'; // permet l'affichage de la moyenne général maxi
-
-			$tab_modele_pdf["affiche_date_edition"][$tab_id_classe[$loop_classe]] = '1'; // affiche la date d'édition
-			$tab_modele_pdf["affiche_ine"][$tab_id_classe[$loop_classe]] = '0'; // affiche l'INE de l'élève
-
-			$tab_modele_pdf["affiche_moyenne_general_coef_1"][$tab_id_classe[$loop_classe]] = '0'; // affichage des moyennes générales avec coef 1 en plus des autres coeff saisis dans Gestion des classes/<Classe> Enseignements
-	
-			$tab_modele_pdf["affiche_numero_responsable"][$tab_id_classe[$loop_classe]] = '0'; // affichage du numéro du responsable legal de l'élève dont le bulletin est imprimé. 1 ==> affiche 0 ==> n'affiche pas
-			*/
-
-			//================================
-			//================================
-			//================================
 
 			// Modèle de bulletin PDF
 			$type_bulletin=isset($_POST['type_bulletin']) ? $_POST['type_bulletin'] : 1;
@@ -1523,6 +1546,11 @@ else {
 						// Pour que l'on extraie les moyennes pour les différentes périodes si nécessaire
 						$evolution_moyenne_periode_precedente="y";
 					}
+
+					if(($lig_model->nom=='moyennes_annee')&&($lig_model->valeur=='y')) {
+						// Moyennes des moyennes de périodes pour les différents enseignements
+						$moyennes_annee="y";
+					}
 				}
 			}
 
@@ -1542,6 +1570,7 @@ else {
 			//================================
 		}
 
+		//echo "\$moyennes_annee=$moyennes_annee<br />";
 
 		//$id_classe=2;
 		$id_classe=$tab_id_classe[$loop_classe];
@@ -1658,7 +1687,6 @@ else {
 
 		// Boucle sur les périodes
 		for($loop_periode_num=0;$loop_periode_num<count($tab_periode_num);$loop_periode_num++) {
-
 
 			if((isset($_POST['forcer_recalcul_moy_conteneurs']))&&($_POST['forcer_recalcul_moy_conteneurs']=='y')) {
 					$sql="SELECT DISTINCT ccn.id_cahier_notes,ccn.id_groupe FROM cn_cahier_notes ccn,groupes g,j_groupes_classes jgc,classes c WHERE
@@ -1948,6 +1976,54 @@ else {
 						}
 					}
 				}
+				
+				// Tester si au moins une matière est dans une catégorie autre que AUCUNE...
+				$sql="SELECT DISTINCT categorie_id FROM j_groupes_classes jgc, matieres_categories mc WHERE mc.id=jgc.categorie_id AND jgc.id_classe='$id_classe' AND jgc.id_groupe NOT IN (SELECT id_groupe FROM j_groupes_visibilite WHERE domaine='bulletins' AND visible='n');";
+				$test_cat_auc=mysql_query($sql);
+				if(mysql_num_rows($test_cat_auc)==0) {
+					if($mode_bulletin!="pdf") {
+						echo "<h1 align='center'>Erreur</h1>";
+						echo "<p>Vous avez demandé à afficher les catégories de matières, mais aucun enseignement n'est dans une catégorie pour la classe n°$id_classe.<br />Contrôlez, en compte administrateur, Gestion des classes/&lt;Classe&gt; Enseignements.</p>\n";
+						require("../lib/footer.inc.php");
+						die();
+					}
+					else {
+
+						$pdf=new bul_PDF('p', 'mm', 'A4');
+						$pdf->SetCreator($gepiSchoolName);
+						$pdf->SetAuthor($gepiSchoolName);
+						$pdf->SetKeywords('');
+						$pdf->SetSubject('Bulletin');
+						$pdf->SetTitle('Bulletin');
+						$pdf->SetDisplayMode('fullwidth', 'single');
+						$pdf->SetCompression(TRUE);
+						$pdf->SetAutoPageBreak(TRUE, 5);
+
+						$pdf->AddPage(); //ajout d'une page au document
+						$pdf->SetFont('DejaVu');
+						$pdf->SetXY(20,20);
+						$pdf->SetFontSize(14);
+						$pdf->Cell(90,7, "ERREUR",0,2,'');
+
+						$pdf->SetXY(20,40);
+						$pdf->SetFontSize(10);
+						$pdf->Cell(150,7, "Vous avez demandé à afficher les catégories de matières,",0,2,'');
+						$pdf->SetXY(20,45);
+						$pdf->Cell(150,7, "mais aucun enseignement n'est dans une catégorie pour la classe ".get_nom_classe($id_classe).".",0,2,'');
+						$pdf->SetXY(20,50);
+						$pdf->Cell(150,7, "Contrôlez, en compte administrateur:",0,2,'');
+						$pdf->SetXY(20,55);
+						$pdf->Cell(150,7, "    Gestion des classes/<Classe> Enseignements",0,2,'');
+						$pdf->SetXY(20,60);
+						$pdf->Cell(150,7, "Ou bien, modifiez les Paramètres d'impression des bulletins",0,2,'');
+						$pdf->SetXY(20,65);
+						$pdf->Cell(150,7, "pour ne pas utiliser les catégories de matières.",0,2,'');
+
+						$nom_bulletin = 'Erreur_bulletin.pdf';
+						$pdf->Output($nom_bulletin,'I');
+						die();
+					}
+				}
 			}
 
 			//========================================
@@ -2186,6 +2262,7 @@ else {
 					}
 				}
 				*/
+
 				if(isset($current_eleve_rang)) {$tab_bulletin[$id_classe][$periode_num]['rang']=$current_eleve_rang;}
 				$tab_bulletin[$id_classe][$periode_num]['coef_eleve']=$current_coef_eleve;
 
@@ -2499,6 +2576,24 @@ else {
 								$tab_ele['pp'][$cpt_pp]['nom']=$lig_pp->nom;
 								$tab_ele['pp'][$cpt_pp]['prenom']=$lig_pp->prenom;
 								$tab_ele['pp'][$cpt_pp]['civilite']=$lig_pp->civilite;
+								$cpt_pp++;
+							}
+						}
+
+						// Récup infos des profs principaux (éventuellement multiples) associés à la classe:
+						$sql="SELECT DISTINCT u.login, u.nom, u.prenom, u.civilite FROM j_eleves_professeurs jep, utilisateurs u WHERE jep.id_classe='$id_classe' AND jep.professeur=u.login;";
+						$res_pp=mysql_query($sql);
+						//echo "$sql<br />";
+						if(mysql_num_rows($res_pp)>0) {
+							$tab_ele['pp_classe']=array();
+
+							$cpt_pp=0;
+							while($lig_pp=mysql_fetch_object($res_pp)) {
+								$tab_ele['pp_classe'][$cpt_pp]=array();
+								$tab_ele['pp_classe'][$cpt_pp]['login']=$lig_pp->login;
+								$tab_ele['pp_classe'][$cpt_pp]['nom']=$lig_pp->nom;
+								$tab_ele['pp_classe'][$cpt_pp]['prenom']=$lig_pp->prenom;
+								$tab_ele['pp_classe'][$cpt_pp]['civilite']=$lig_pp->civilite;
 								$cpt_pp++;
 							}
 						}
@@ -2948,11 +3043,13 @@ else {
 							require_once("../lib/initialisationsPropel.inc.php");
 							$eleve = EleveQuery::create()->findOneByLogin($current_eleve_login[$i]);
 							if ($eleve != null) {
-							$current_eleve_absences = strval($eleve->getDemiJourneesAbsenceParPeriode($periode_num)->count());
-							$current_eleve_nj = strval($eleve->getDemiJourneesNonJustifieesAbsenceParPeriode($periode_num)->count());
-							$current_eleve_retards = strval($eleve->getRetardsParPeriode($periode_num)->count());
-							$current_eleve_absences_query = mysql_query("SELECT * FROM absences WHERE (login='$current_eleve_login' AND periode='$periode_num')");
-							$current_eleve_appreciation_absences = @mysql_result($current_eleve_absences_query, 0, "appreciation");
+								$current_eleve_absences = strval($eleve->getDemiJourneesAbsenceParPeriode($periode_num)->count());
+								$current_eleve_nj = strval($eleve->getDemiJourneesNonJustifieesAbsenceParPeriode($periode_num)->count());
+								$current_eleve_retards = strval($eleve->getRetardsParPeriode($periode_num)->count());
+								$sql="SELECT * FROM absences WHERE (login='".$current_eleve_login[$i]."' AND periode='$periode_num');";
+								//echo "$sql< br />";
+								$current_eleve_absences_query = mysql_query($sql);
+								$current_eleve_appreciation_absences = @mysql_result($current_eleve_absences_query, 0, "appreciation");
 							}
 						}
 						if ($current_eleve_absences === '') { $current_eleve_absences = "?"; }
@@ -2964,14 +3061,22 @@ else {
 						$tab_ele['eleve_retards']=$current_eleve_retards;
 						$tab_ele['appreciation_absences']=$current_eleve_appreciation_absences;
 
+						// Indice non encore exploité dans les paramètres d'impression des bulletins, ni dans bull_func.lib.php
+						if((is_numeric($current_eleve_absences))&&(is_numeric($current_eleve_nj))) {
+							$tab_ele['eleve_justif']=$current_eleve_absences-$current_eleve_nj;
+						}
+						else {
+							$tab_ele['eleve_justif']="?";
+						} 
+
 						$sql="SELECT u.login login,u.civilite FROM utilisateurs u,
 													j_eleves_cpe j
 												WHERE (u.login=j.cpe_login AND
 													j.e_login='".$current_eleve_login[$i]."');";
 						$query = mysql_query($sql);
-						$current_eleve_cperesp_login = @mysql_result($query, "0", "login");
+						$current_eleve_cperesp_login = @mysql_result($query, 0, "login");
 						$tab_ele['cperesp_login']=$current_eleve_cperesp_login;
-						$current_eleve_cperesp_civilite = @mysql_result($query, "0", "civilite");
+						$current_eleve_cperesp_civilite = @mysql_result($query, 0, "civilite");
 						$tab_ele['cperesp_civilite']=$current_eleve_cperesp_civilite;
 						//==========================================
 
@@ -3065,6 +3170,36 @@ else {
 									$tab_bulletin[$id_classe][$periode_num]['groupe'][$j][$i]['cn_id']=$cn_id;
 									$tab_bulletin[$id_classe][$periode_num]['groupe'][$j][$i]['cn_nom']=$cn_nom;
 								}
+
+								//================================
+								// 20130520 : Faire le calcul de moyenne annuelle là?
+								if((isset($moyennes_annee))&&($moyennes_annee=='y')) {
+									$sql="SELECT round(avg(note),1) as moy_annee from matieres_notes where login='".$current_eleve_login[$i]."' and statut='' and id_groupe='".$current_group[$j]['id']."';";
+									//echo "$sql<br />";
+									$res_annee=mysql_query($sql);
+									if(mysql_num_rows($res_annee)>0) {
+										$tab_bulletin[$id_classe][$periode_num]['moy_annee'][$j][$i]=mysql_result($res_annee, 0, "moy_annee");
+									}
+								}
+								/*
+								// Ou recherche d'indices?
+								if(isset($tab_bull['login_prec'])) {
+
+									//for($loop_p=1;$loop_p<count($tab_bull['login_prec']);$loop_p++) {
+									foreach($tab_bull['login_prec'] as $key => $value) {
+										// Il faut récupérer l'id_groupe et l'indice de l'élève... dans les tableaux récupérés de calcul_moy_gen.inc.php
+										// Tableaux d'indices [$j][$i] (groupe, élève)
+										//		$tab_bull['note_prec'][$loop_p]=$current_eleve_note;
+										//		$tab_bull['statut_prec'][$loop_p]=$current_eleve_statut;
+										$indice_eleve=-1;
+										//for($loop_l=0;$loop_l<count($tab_bull['login_prec'][$loop_p]);$loop_l++) {
+										for($loop_l=0;$loop_l<count($tab_bull['login_prec'][$key]);$loop_l++) {
+											//echo "\$tab_bull['login_prec'][$key][$loop_l]=".$tab_bull['login_prec'][$key][$loop_l]." et \$tab_bull['eleve'][$i]['login']=".$tab_bull['eleve'][$i]['login']."<br />\n";
+											if($tab_bull['login_prec'][$key][$loop_l]==$tab_bull['eleve'][$i]['login']) {$indice_eleve=$loop_l;break;}
+										}
+
+								*/
+								//================================
 
 								//================================
 								// Récup appréciation
@@ -3250,6 +3385,9 @@ else {
 				$id_classe=$tab_id_classe[$loop_classe];
 				$classe=get_class_from_id($id_classe);
 
+				$sql="INSERT INTO tempo4 SET col1='$id_classe', col2='".$tableau_eleve['login'][$j]."', col3='$nom_fichier_bulletin', col4='".mysql_real_escape_string($tableau_eleve['nom_prenom'][$j])."';";
+				$res_t4=mysql_query($sql);
+
 				for($loop_periode_num=0;$loop_periode_num<count($tab_periode_num);$loop_periode_num++) {
 					$periode_num=$tab_periode_num[$loop_periode_num];
 
@@ -3266,6 +3404,7 @@ else {
 
 			echo $pdf->Output($dirname."/".$nom_fichier_bulletin,'F');
 			echo "<p><a href='$dirname/$nom_fichier_bulletin'>$nom_fichier_bulletin</a></p>\n";
+
 			flush();
 		}
 
@@ -3309,6 +3448,31 @@ else {
 		require("../lib/footer.inc.php");
 		die();
 	}
+
+	/*
+	if($mode_bulletin=="html") {
+		// 20120716
+		// Si une image de signature doit être insérée...
+		$bull_affiche_img_signature=getSettingValue('bull_affiche_img_signature');
+		$url_fich_sign="";
+
+		if($bull_affiche_img_signature=='y') {
+			$tmp_fich=getSettingValue('fichier_signature');
+			$fich_sign = '../backup/'.getSettingValue('backup_directory').'/'.$tmp_fich;
+			//echo "\$fich_sign=$fich_sign<br />\n";
+			if(($tmp_fich!='') and (file_exists($fich_sign))) {
+				$sql="SELECT 1=1 FROM droits_acces_fichiers WHERE fichier='signature_img' AND ((identite='".$_SESSION['statut']."' AND type='statut') OR (identite='".$_SESSION['login']."' AND type='individu'))";
+				$test=mysql_query($sql);
+				if(mysql_num_rows($test)>0) {
+					// Si un .htaccess est en place dans backup, on n'atteind pas l'image sans fournir compte/mdp
+					$url_fich_sign="../temp/".get_user_temp_directory()."/".$tmp_fich;
+					copy($fich_sign, $url_fich_sign);
+					// La copie sera supprimée à la déconnexion
+				}
+			}
+		}
+	}
+	*/
 
 	if($mode_bulletin=="pdf") {
 		// définition d'une variable
@@ -3466,6 +3630,17 @@ else {
 								bulletin_pdf($tab_bulletin[$id_classe][$periode_num],$rg[$i],$tab_releve[$id_classe][$periode_num]);
 							}
 
+/*
+echo "Tableau de la classe $id_classe en période $periode_num<br />
+<pre>";
+print_r($tab_bulletin[$id_classe][$periode_num]);
+echo "</pre>";
+
+echo "Tableau du modèle PDF<br />
+<pre>";
+print_r($tab_modele_pdf);
+echo "</pre>";
+*/
 
 							//==============================================================================================
 							// PAR LA SUITE, ON POURRA INSERER ICI, SI L'OPTION EST COCHEE, LE RELEVE DE NOTES DE LA PERIODE
@@ -3545,7 +3720,7 @@ if($mode_bulletin=="html") {
 //==============================
 
 if((!isset($mode_bulletin))||($mode_bulletin!="pdf")) {
-	echo "<div id='remarques_bas_de_page'>
+	echo "<div id='remarques_bas_de_page' style='display:none;'>
 <p><br /></p>
 <p>A REVOIR:</p>
 <ul>
@@ -3602,7 +3777,8 @@ elseif((isset($mode_bulletin))&&($mode_bulletin=="pdf")) {
 		die();
 	}
 	else {
-		$pdf->Output($nom_bulletin,'I');
+		$pref_output_mode_pdf=get_output_mode_pdf();
+		$pdf->Output($nom_bulletin,$pref_output_mode_pdf);
 	}
 }
 

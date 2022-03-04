@@ -251,6 +251,16 @@ $fb_dezip_ooo=getSettingValue("fb_dezip_ooo");
 	echo "</td>";
 	echo "<td>";
 
+	echo "<input type='radio' name='fb_dezip_ooo' id='fb_dezip_ooo_3' value='3' ";
+	if($fb_dezip_ooo=="3"){
+	  echo "checked='checked' />";
+	}
+	else{
+	  echo "/>";
+	}
+	echo "<label for='fb_dezip_ooo_3'> Zlib + openTBS : le meilleur choix mais nécessite que php ait été compilé avec l'extension zlib (voir la configuration du serveur)</label><br />\n";
+	
+
 	echo "<input type='radio' name='fb_dezip_ooo' id='fb_dezip_ooo_0' value='0' ";
 	if($fb_dezip_ooo=="0"){
 	  echo "checked='checked' />";
@@ -258,7 +268,7 @@ $fb_dezip_ooo=getSettingValue("fb_dezip_ooo");
 	else{
 	  echo "/>";
 	}
-	echo "<label for='fb_dezip_ooo_0'> ZIPARCHIVE et TinyDoc : le choix par défaut mais peut créer des fichiers corrompus si votre version de PHP est inférieure à 5.2.8 (utiliser OOo 3.2 pour réparer les fichiers) </label><br />\n";
+	echo "<label for='fb_dezip_ooo_0'> ZIPARCHIVE et TinyDoc : peut créer des fichiers corrompus si votre version de PHP est inférieure à 5.2.8 (utiliser OOo 3.2 pour réparer les fichiers) </label><br />\n";
 	
 	echo "<input type='radio' name='fb_dezip_ooo' id='fb_dezip_ooo_1' value='1' ";
 	if($fb_dezip_ooo=="1"){
@@ -320,7 +330,7 @@ if(mysql_num_rows($res)==0) {
 	die();
 }
 
-$sql="SELECT DISTINCT type_brevet FROM notanet_corresp ORDER BY type_brevet;";
+$sql="SELECT DISTINCT type_brevet FROM notanet_corresp WHERE $sql_indices_types_brevets ORDER BY type_brevet;";
 $res=mysql_query($sql);
 $nb_type_brevet=mysql_num_rows($res);
 
@@ -597,6 +607,7 @@ for($i=0;$i<count($id_classe);$i++){
 			if(mysql_num_rows($res)>0){
 				$lig=mysql_fetch_object($res);
 				$tabmatieres[$j][-4]=$lig->statut;
+				// On ne récupère qu'une seule des matières Gepi associées, là.
 				$tabmatieres[$j][-5]=$lig->matiere;
 			}
 			else{
@@ -668,7 +679,16 @@ for($i=0;$i<count($id_classe);$i++){
 					if ((isset($tab_champs_OOo[$j][0]))&&($tab_champs_OOo[$j][0]!='')) {
 
 						$tab_eleves_OOo[$nb_eleve][$j]=array();
-						for($l=0;$l<=4;$l++){
+						for($l=0;$l<=10;$l++){
+							/*
+								0: Moyenne de l'élève
+								1: Moyenne ou points Notanet de l'élève
+								2: Identifiant de matière gepi
+								3: Moyenne de la classe
+								4: Appréciation
+								5: Nom de la langue vivante ou option
+								6: Nom de la langue vivante ou option
+							*/
 							$tab_eleves_OOo[$nb_eleve][$j][$l]=""; 						// on initialise les champs pour ne pas avoir d'erreurs
 						}
 						if($tab_champs_OOo[$j][3]>-2) {$tab_eleves_OOo[$nb_eleve][$j][3] = $moy_classe[$j];}
@@ -714,6 +734,15 @@ for($i=0;$i<count($id_classe);$i++){
 									if(mysql_num_rows($res_mat_fac)>0){
 										$lig_mat_fac=mysql_fetch_object($res_mat_fac);
 										$tab_eleves_OOo[$nb_eleve][$j][2]=ucfirst(accent_min(mb_strtolower($lig_mat_fac->matiere)));
+
+										$sql_opt="SELECT m.nom_complet FROM matieres m
+										WHERE m.matiere='$lig_mat_fac->matiere'";
+										$res_opt=mysql_query($sql_opt);
+										if(mysql_num_rows($res_opt)>0){
+											$lig_matiere=mysql_fetch_object($res_opt);
+											$tab_eleves_OOo[$nb_eleve][$j][5]=$lig_matiere->nom_complet;
+										}
+
 									}
 									// on calcule la moyenne de la matière
 									include("fb_moyenne.inc.php");
@@ -736,6 +765,32 @@ for($i=0;$i<count($id_classe);$i++){
 									if(mysql_num_rows($res_mat_fac)>0){
 										$lig_mat_fac=mysql_fetch_object($res_mat_fac);
 										$tab_eleves_OOo[$nb_eleve][$j][2]=ucfirst(accent_min(mb_strtolower($lig_mat_fac->matiere)));
+
+										//if(preg_match("/|/", $lig_mat_fac->matiere)) {
+										if(strstr($lig_mat_fac->matiere, '|')) {
+											unset($tab_tmp_mat);
+											$tab_tmp_mat=explode('|', $lig_mat_fac->matiere);
+											for($loop=0;$loop<count($tab_tmp_mat);$loop++) {
+												if($tab_tmp_mat[$loop]!="") {
+													$sql_opt="SELECT m.nom_complet FROM matieres m
+													WHERE m.matiere='".$tab_tmp_mat[$loop]."'";
+													$res_opt=mysql_query($sql_opt);
+													if(mysql_num_rows($res_opt)>0){
+														$lig_matiere=mysql_fetch_object($res_opt);
+														$tab_eleves_OOo[$nb_eleve][$j][5+$loop]=$lig_matiere->nom_complet;
+													}
+												}
+											}
+										}
+										else {
+											$sql_opt="SELECT m.nom_complet FROM matieres m
+											WHERE m.matiere='$lig_mat_fac->matiere'";
+											$res_opt=mysql_query($sql_opt);
+											if(mysql_num_rows($res_opt)>0){
+												$lig_matiere=mysql_fetch_object($res_opt);
+												$tab_eleves_OOo[$nb_eleve][$j][5]=$lig_matiere->nom_complet;
+											}
+										}
 									}
 
 									// On calcule la note coefficientée
@@ -766,6 +821,9 @@ for($i=0;$i<count($id_classe);$i++){
 							// on va chercher les appréciations si besoin
 							include("fb_appreciation.inc.php");
 						}
+
+						//echo "\$TOTAL_POINTS=$TOTAL_POINTS<br />";
+						//echo "\$TOTAL_COEF=$TOTAL_COEF<br /><br />";
 					}
 				}
                 // Langue régionale
@@ -806,7 +864,7 @@ for($i=0;$i<count($id_classe);$i++){
 			if(mysql_num_rows($res_avis)>0) {
 				$lig_avis=mysql_fetch_object($res_avis);
 				if($lig_avis->favorable=="O") {$tab_eleves_OOo[$nb_eleve]['decision']="Avis favorable";}
-				elseif($lig_avis->favorable=="N") {$tab_eleves_OOo[$nb_eleve]['decision']="Avis défavorable";}
+				elseif($lig_avis->favorable=="N") {$tab_eleves_OOo[$nb_eleve]['decision']="Doit faire ses preuves";}
 				//$tab_eleves_OOo[$nb_eleve]['appreciation']= htmlspecialchars($lig_avis->avis);
 				$tab_eleves_OOo[$nb_eleve]['appreciation']= $lig_avis->avis;
 				$tab_eleves_OOo[$nb_eleve]['avis']=$lig_avis->favorable;
@@ -835,13 +893,16 @@ for($i=0;$i<count($id_classe);$i++){
 
 
 			//===== Ajout mai 2011 ======
+			/*
+			// Ce qui suit n'est plus d'actualité en 2013
 			// Afficher soit LV1 soit Sciences physiques
 			if ($tab_eleves_OOo[$nb_eleve][103][0] > $tab_eleves_OOo[$nb_eleve][104][0]) {
 				$tab_eleves_OOo[$nb_eleve]['LV1_ou_ScPhy']=$tab_eleves_OOo[$nb_eleve][103];
 			}else{
 				$tab_eleves_OOo[$nb_eleve]['LV1_ou_ScPhy']=$tab_eleves_OOo[$nb_eleve][104];
 			}
-			
+			*/
+
 			/*
 				// 20120508: L'Histoire des Arts n'est plus saisie dans Notanet
 				// Total des points sans Histoire des arts
@@ -857,6 +918,8 @@ for($i=0;$i<count($id_classe);$i++){
 
 			//===== Fin ajout mai 2011 ======
 
+			/*
+			// Ce qui suit n'est plus d'actualité en 2013
 			// Pour les brevets PRO, on a soit LV1 soit ScPhy
 			if(($type_brevet==2)||($type_brevet==3)) {
 				$max_indice=5;
@@ -864,13 +927,11 @@ for($i=0;$i<count($id_classe);$i++){
 					$tab_eleves_OOo[$nb_eleve]['LV_SC'][$loop]="";
 				}
 
-				/*
-				echo "<p>$lig1->login<br />\n";
-				echo "\$tab_eleves_OOo[$nb_eleve][103][0]=".$tab_eleves_OOo[$nb_eleve][103][0]."<br />\n";
-				echo "\$tab_eleves_OOo[$nb_eleve][103][1]=".$tab_eleves_OOo[$nb_eleve][103][1]."<br />\n";
-				echo "\$tab_eleves_OOo[$nb_eleve][104][0]=".$tab_eleves_OOo[$nb_eleve][104][0]."<br />\n";
-				echo "\$tab_eleves_OOo[$nb_eleve][104][1]=".$tab_eleves_OOo[$nb_eleve][104][1]."<br />\n";
-				*/
+				//echo "<p>$lig1->login<br />\n";
+				//echo "\$tab_eleves_OOo[$nb_eleve][103][0]=".$tab_eleves_OOo[$nb_eleve][103][0]."<br />\n";
+				//echo "\$tab_eleves_OOo[$nb_eleve][103][1]=".$tab_eleves_OOo[$nb_eleve][103][1]."<br />\n";
+				//echo "\$tab_eleves_OOo[$nb_eleve][104][0]=".$tab_eleves_OOo[$nb_eleve][104][0]."<br />\n";
+				//echo "\$tab_eleves_OOo[$nb_eleve][104][1]=".$tab_eleves_OOo[$nb_eleve][104][1]."<br />\n";
 
 				if((isset($tab_eleves_OOo[$nb_eleve][103][0]))&&(preg_match("/^[0-9\.]*$/",$tab_eleves_OOo[$nb_eleve][103][0]))) {
 
@@ -925,6 +986,7 @@ for($i=0;$i<count($id_classe);$i++){
 				//echo "</p>\n";
 
 			}
+			*/
 
 			// Socle commun
 			// Initialisation

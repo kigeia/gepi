@@ -1,7 +1,7 @@
 <?php
 /*
  *
- * Copyright 2001, 2005 Thomas Belliard, Laurent Delineau, Edouard Hue, Eric Lebrun
+ * Copyright 2001, 2013 Thomas Belliard, Laurent Delineau, Edouard Hue, Eric Lebrun
  *
  * This file is part of GEPI.
  *
@@ -314,15 +314,27 @@ if (!suivi_ariane($_SERVER['PHP_SELF'],"Administration des modules"))
 		$menuPage[]=$nouveauItem;
 	}
 	unset($nouveauItem);
-	
+
+// Bulletins
+	$nouveauItem = new itemGeneral();
+	$nouveauItem->chemin='/bulletin/index_admin.php';	
+	if ($nouveauItem->acces($nouveauItem->chemin,$_SESSION['statut']))
+	{
+		$nouveauItem->choix_icone('active_bulletins') ;	
+		$nouveauItem->titre="Bulletins" ;
+		$nouveauItem->expli="Pour gérer le module bulletins" ;
+		$menuPage[]=$nouveauItem;
+	}
+	unset($nouveauItem);
+
 // Absences
 	$nouveauItem = new itemGeneral();
 	$nouveauItem->chemin='/mod_absences/admin/index.php';	
 	if ($nouveauItem->acces($nouveauItem->chemin,$_SESSION['statut']))
 	{
-		$nouveauItem->choix_icone('active_module_absence%') ;	
+		$nouveauItem->choix_icone('active_module_absence%',"mod_absences") ;	
 		$nouveauItem->titre="Absences" ;
-		$nouveauItem->expli="Pour gérer le module absences" ;
+		$nouveauItem->expli="Pour gérer le module absences<br /><span style='color:red'>Ce module n'est plus maintenu.</span><br />Vous ne pourrez pas obtenir d'aide des développeurs sur ce module.<br />Utilisez plutôt le module absences2 ci-dessous." ;
 		$menuPage[]=$nouveauItem;
 	}
 	unset($nouveauItem);
@@ -332,9 +344,9 @@ if (!suivi_ariane($_SERVER['PHP_SELF'],"Administration des modules"))
 	$nouveauItem->chemin='/mod_abs2/admin/index.php';	
 	if ($nouveauItem->acces($nouveauItem->chemin,$_SESSION['statut']))
 	{
-		$nouveauItem->choix_icone('active_module_absence%') ;	
+		$nouveauItem->choix_icone('active_module_absence',"mod_abs2") ;	
 		$nouveauItem->titre="Absences 2" ;
-		$nouveauItem->expli="Pour gérer le module absences 2 (en cours de developpement)" ;
+		$nouveauItem->expli="Pour gérer le module absences 2" ;
 		$menuPage[]=$nouveauItem;
 	}
 	unset($nouveauItem);
@@ -556,6 +568,18 @@ if (!suivi_ariane($_SERVER['PHP_SELF'],"Administration des modules"))
 		$nouveauItem->choix_icone('active_mod_gest_aid') ;	
 		$nouveauItem->titre="Gestionnaires d'AID" ;
 		$nouveauItem->expli="Pour ouvrir la possibilité de définir des gestionnaires pour chaque AID." ;
+		$menuPage[]=$nouveauItem;
+	}
+	unset($nouveauItem);
+
+// Messagerie
+	$nouveauItem = new itemGeneral();
+	$nouveauItem->chemin='/mod_alerte/admin.php';
+	if ($nouveauItem->acces($nouveauItem->chemin,$_SESSION['statut']))
+	{
+		$nouveauItem->choix_icone('active_mod_alerte') ;
+		$nouveauItem->titre="Alertes" ;
+		$nouveauItem->expli="Pour gérer le dispositif d'alerte." ;
 		$menuPage[]=$nouveauItem;
 	}
 	unset($nouveauItem);

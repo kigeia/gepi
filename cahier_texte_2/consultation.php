@@ -97,12 +97,26 @@ if ($_SESSION['statut'] == 'eleve') {
 	}
 	$selected_eleve = mysql_fetch_object(mysql_query("SELECT e.login, e.nom, e.prenom FROM eleves e WHERE login = '".$_SESSION['login'] . "'"));
 } elseif ($_SESSION['statut'] == "responsable") {
-	$get_eleves = mysql_query("SELECT e.login, e.nom, e.prenom " .
+	$sql="(SELECT e.login, e.nom, e.prenom " .
 			"FROM eleves e, resp_pers r, responsables2 re " .
 			"WHERE (" .
 			"e.ele_id = re.ele_id AND " .
 			"re.pers_id = r.pers_id AND " .
-			"r.login = '".$_SESSION['login']."' AND (re.resp_legal='1' OR re.resp_legal='2'));");
+			"r.login = '".$_SESSION['login']."' AND (re.resp_legal='1' OR re.resp_legal='2')))";
+
+	if(getSettingAOui('GepiMemesDroitsRespNonLegaux')) {
+		$sql.=" UNION (SELECT e.login, e.nom, e.prenom " .
+							"FROM eleves e, resp_pers r, responsables2 re " .
+							"WHERE (" .
+							"e.ele_id = re.ele_id AND " .
+							"re.pers_id = r.pers_id AND " .
+							"r.login = '".$_SESSION['login']."' AND 
+							re.resp_legal='0' AND 
+							re.acces_sp='y'))";
+	}
+	$sql.=";";
+	//echo "$sql<br />";
+	$get_eleves = mysql_query($sql);
 
 	if (mysql_num_rows($get_eleves) == 1) {
 			// Un seul élève associé : on initialise tout de suite la variable $selected_eleve
@@ -128,9 +142,18 @@ if ($_SESSION['statut'] == 'eleve') {
 		}
 	}
 
-
 	if((isset($login_eleve))&&($login_eleve!="")) {
-		$sql="SELECT 1=1 FROM resp_pers r, responsables2 re, eleves e WHERE r.pers_id=re.pers_id AND re.ele_id=e.ele_id AND r.login='".$_SESSION['login']."' AND (re.resp_legal='1' OR re.resp_legal='2') AND e.login='".$login_eleve."';";
+		$sql="(SELECT 1=1 FROM resp_pers r, responsables2 re, eleves e WHERE r.pers_id=re.pers_id AND re.ele_id=e.ele_id AND r.login='".$_SESSION['login']."' AND (re.resp_legal='1' OR re.resp_legal='2') AND e.login='".$login_eleve."')";
+		if(getSettingAOui('GepiMemesDroitsRespNonLegaux')) {
+			$sql.=" UNION (SELECT 1=1 FROM eleves e, resp_pers r, responsables2 re 
+							WHERE (e.login = '" . $login_eleve . "' AND
+								e.ele_id = re.ele_id AND 
+								re.pers_id = r.pers_id AND 
+								r.login = '".$_SESSION['login']."' AND 
+								re.resp_legal='0' AND 
+								re.acces_sp='y'))";
+		}
+		$sql.=";";
 		//echo "$sql<br />";
 		$verif_ele=mysql_query($sql);
 		if(mysql_num_rows($verif_ele)==0) {
@@ -189,6 +212,16 @@ $titre_page = "Cahier de textes";
 require_once("../lib/header.inc.php");
 //**************** FIN EN-TETE *************
 
+// 20130727
+$CDTPeutPointerTravailFait=getSettingAOui('CDTPeutPointerTravailFait'.ucfirst($_SESSION['statut']));
+
+$class_notice_dev_fait="cdt_fond_not_dev color_fond_notices_t_fait";
+$class_notice_dev_non_fait="cdt_fond_not_dev couleur_cellule_gen";
+if(($selected_eleve_login!='')&&($CDTPeutPointerTravailFait)) {
+	$tab_etat_travail_fait=get_tab_etat_travail_fait($selected_eleve_login);
+	echo js_cdt_modif_etat_travail();
+}
+
 //debug_var();
 
 //echo "<p>\$selected_eleve_login=$selected_eleve_login</p>";
@@ -224,7 +257,9 @@ echo "<div class=\"centre_table\">\n";
 					echo "Retour à l'accueil\n";
 				echo "</a>\n";
 				echo " | ";
-				echo "<a href=\"consultation2.php\">\n";
+				echo "<a href=\"consultation2.php";
+				if(($_SESSION['statut']=='responsable')&&(isset($login_eleve))) {echo "?login_eleve=$login_eleve";}
+				echo "\">\n";
 					echo "Affichage semaine\n";
 				echo "</a>\n";
 			echo "</p>\n";
@@ -341,6 +376,7 @@ if (($nb_test == 0) and ($id_classe != null OR $selected_eleve) and ($delai != 0
         //$aujourhui = $aujourdhui = mktime(0,0,0,date("m"),date("d"),date("Y"));
         $aujourdhui = mktime(0,0,0,date("m"),date("d"),date("Y"));
         $jour = mktime(0, 0, 0, date('m',$aujourdhui), (date('d',$aujourdhui) + $i), date('Y',$aujourdhui) );
+        $jour_suivant=$jour+24*3600;
         if (is_numeric($id_classe) AND $id_classe > 0) {
 	        $sql="SELECT ct.id_sequence, ct.contenu, g.id, g.description, ct.date_ct, ct.id_ct " .
 	            "FROM ct_devoirs_entry ct, groupes g, j_groupes_classes jc WHERE (" .
@@ -348,7 +384,9 @@ if (($nb_test == 0) and ($id_classe != null OR $selected_eleve) and ($delai != 0
 	            "g.id = jc.id_groupe and " .
 	            "jc.id_classe = '" . $id_classe . "' and " .
 	            "ct.contenu != '' and " .
-	            "ct.date_ct = '$jour');";
+	            "ct.date_ct >= '$jour' and
+	             ct.date_ct < '$jour_suivant'
+	            );";
 
         } elseif ($selected_eleve) {
 			// Le DISTINCT est quand même utile parce que si plusieurs périodes sont ouvertes en saisie, on a une multiplication des retours par le nombre de périodes ouvertes en saisie
@@ -386,7 +424,9 @@ if (($nb_test == 0) and ($id_classe != null OR $selected_eleve) and ($delai != 0
                 "jeg.periode = '".$periode_courante."' and " .
                 "jec.login = '" . $selected_eleve->login ."' and " .
                 "ct.contenu != '' and " .
-                "ct.date_ct = '$jour')";
+                "ct.date_ct >= '$jour' and
+	             ct.date_ct < '$jour_suivant'
+	            )";
 
         }
 		//echo strftime("%a %d/%m/%y",$jour)."<br />";
@@ -415,6 +455,10 @@ if (($nb_test == 0) and ($id_classe != null OR $selected_eleve) and ($delai != 0
           //echo "\n".'<div style="position relative;'.$margin_left.'width: 15%;">';
           echo "<h3 class=\"titre_a_faire couleur_bord_tableau_notice color_fond_notices_f color_police_travaux\">\n
                   Travaux personnels pour le ".strftime("%a %d %b", $jour)."</h3>\n";
+
+			// 20130727
+			$class_notice_dev_fait="matiere_a_faire couleur_bord_tableau_notice color_police_matieres color_fond_notices_t_fait";
+			$class_notice_dev_non_fait="matiere_a_faire couleur_bord_tableau_notice couleur_cellule_f color_police_matieres";
 
           // Affichage des devoirs dans chaque matière
           while ($ind < $nb_devoirs_cahier_texte) {
@@ -450,8 +494,26 @@ if (($nb_test == 0) and ($id_classe != null OR $selected_eleve) and ($delai != 0
               $aff_titre_seq  = '<p class="bold"> - <em>' . $rep_seq["titre"] . '</em> - </p>';
             }
 
+			/*
             $content = "<div class=\"matiere_a_faire couleur_bord_tableau_notice couleur_cellule_f color_police_matieres\">\n
                       <h4 class=\"souligne\">".$matiere_devoirs." (".$chaine."):</h4>\n".$aff_titre_seq."".$content;
+			*/
+			// 20130727
+			$class_color_fond_notice="couleur_cellule_f";
+			if($CDTPeutPointerTravailFait) {
+				get_etat_et_img_cdt_travail_fait($id_devoirs);
+			}
+
+            $content_ini=$content;
+
+            $content = "<div id='div_travail_".$id_devoirs."' class=\"matiere_a_faire couleur_bord_tableau_notice $class_color_fond_notice color_police_matieres\">\n<h4 class=\"souligne\">".$matiere_devoirs." (".$chaine."):</h4>\n";
+
+			if($CDTPeutPointerTravailFait) {
+                 $content.="<div id='div_etat_travail_".$id_devoirs."' style='float:right; width: 16px; margin: 2px; text-align: center;'><a href=\"javascript:cdt_modif_etat_travail('".$selected_eleve->login."', '".$id_devoirs."')\" title=\"$texte_etat_travail\"><img src='$image_etat' class='icone16' /></a></div>\n";
+			}
+
+            $content .= $aff_titre_seq.$content_ini;
+
             // fichier joint
             $content .= affiche_docs_joints($id_devoirs,"t");
             $content .="</div>";
@@ -463,7 +525,15 @@ if (($nb_test == 0) and ($id_classe != null OR $selected_eleve) and ($delai != 0
         }
     }
 
-    if ($nb_dev != 0) echo "</div>";
+    if ($nb_dev != 0) {echo "</div>";}
+
+	echo "<hr />\n";
+	echo "<p style='text-align:center; font-style:italic;'>Cahiers de textes du ";
+	echo strftime("%d/%m/%Y", getSettingValue("begin_bookings"));
+	echo " au ";
+	echo strftime("%d/%m/%Y", getSettingValue("end_bookings"));
+	echo "</p>\n";
+
 	require("../lib/footer.inc.php");
     die();
     //Affichage page de garde
@@ -477,6 +547,14 @@ if (($nb_test == 0) and ($id_classe != null OR $selected_eleve) and ($delai != 0
 		echo "<p class='gepi_garde'>Choisissez une classe et une matière.</p>\n";
 	}
 	//echo "</center>";
+
+	echo "<hr />\n";
+	echo "<p style='text-align:center; font-style:italic;'>Cahiers de textes du ";
+	echo strftime("%d/%m/%Y", getSettingValue("begin_bookings"));
+	echo " au ";
+	echo strftime("%d/%m/%Y", getSettingValue("end_bookings"));
+	echo "</p>\n";
+
 	require("../lib/footer.inc.php");
 	die();
 }
@@ -515,6 +593,7 @@ echo "<div class=\"centre_cont_texte\">\n";
         $nb_dev = 0;
         for ($i = 0; $i <= $delai; $i++) {
           $jour = mktime(0, 0, 0, date('m',$today), (date('d',$today) + $i), date('Y',$today) );
+          $jour_suivant=$jour+24*3600;
         // On regarde pour chaque jour, s'il y a des devoirs dans à faire
           if ($selected_eleve) {
 			// On détermine la période active, pour ne pas avoir de duplication des entrées
@@ -530,7 +609,9 @@ echo "<div class=\"centre_cont_texte\">\n";
                 "p.id_classe = jec.id_classe and " .
                 "jec.login = '" . $selected_eleve->login ."' and " .
                 "ct.contenu != '' and " .
-                "ct.date_ct = '$jour');";
+                "ct.date_ct >= '$jour' and
+	             ct.date_ct < '$jour_suivant'
+	            );";
           } else {
 	         $sql="SELECT ct.id_sequence, ct.contenu, g.id, g.description, ct.date_ct, ct.id_ct " .
 	             "FROM ct_devoirs_entry ct, groupes g, j_groupes_classes jgc WHERE (" .
@@ -538,7 +619,9 @@ echo "<div class=\"centre_cont_texte\">\n";
 	             "g.id = jgc.id_groupe and " .
 	             "jgc.id_classe = '" . $id_classe . "' and " .
 	             "ct.contenu != '' and " .
-	             "ct.date_ct = '$jour');";
+	             "ct.date_ct >= '$jour' and
+	             ct.date_ct < '$jour_suivant'
+	            );";
           }
 		//echo strftime("%a %d/%m/%y",$jour)."<br />";
 		//echo "$sql<br /><br />";
@@ -809,7 +892,25 @@ $td = date("d",$i);
 //            echo "<tr>\n";
 // ---------------------------- Titre notices (div div div div div div) --
 // choisir le fond en fonction de $devoir ou $notice
-              	 echo "<div class='cdt_titre_not_dev couleur_bord_tableau_notice color_fond_notices_".$not_dev->type."'>";
+
+             if ($not_dev->type == "c") {
+                echo "<div class='cdt_titre_not_dev couleur_bord_tableau_notice color_fond_notices_".$not_dev->type."'>";
+             }
+             else {
+				// 20130727
+				//$class_color_fond_notice="color_fond_notices_t";
+				$class_color_fond_notice="couleur_cellule_gen";
+				if($CDTPeutPointerTravailFait) {
+					get_etat_et_img_cdt_travail_fait($not_dev->id_ct);
+				}
+
+				echo "<div class='cdt_titre_not_dev couleur_bord_tableau_notice color_fond_notices_t' style='min-height:2em;'>";
+
+				if($CDTPeutPointerTravailFait) {
+					echo "<div id='div_etat_travail_".$not_dev->id_ct."' style='float:right; width: 16px; margin: 2px; text-align: center;'><a href=\"javascript:cdt_modif_etat_travail('$selected_eleve_login', '".$not_dev->id_ct."')\" title=\"$texte_etat_travail\"><img src='$image_etat' class='icone16' /></a></div>\n";
+				}
+             }
+
              /* if ($not_dev->type == "c") {
                 echo "c'>";
               } else {
@@ -820,7 +921,12 @@ $td = date("d",$i);
 //            echo "</tr>\n";
 // ---------------------------- contenu notices (div div div div div div) --
 //            echo "<tr>\n";
-              echo "<div class='cdt_fond_not_dev couleur_cellule_gen'>".$content."</div>\n";
+             if ($not_dev->type == "c") {
+                 echo "<div class='cdt_fond_not_dev couleur_cellule_gen'>".$content."</div>\n";
+              }
+              else {
+                 echo "<div id='div_travail_".$not_dev->id_ct."' class='cdt_fond_not_dev $class_color_fond_notice'>".$content."</div>\n";
+              }
 // ---------------------------- Fin contenu notices (div div div div div /div) --
 //            echo "</tr>\n";
            echo "</div>\n";
@@ -838,6 +944,13 @@ $td = date("d",$i);
 //   echo "</tr>\n";
 echo "</div>\n";
 // ---------------------------- Fin du conteneur 2 colonnes (/div) --
+
+	echo "<hr />\n";
+	echo "<p style='text-align:center; font-style:italic;'>Cahiers de textes du ";
+	echo strftime("%d/%m/%Y", getSettingValue("begin_bookings"));
+	echo " au ";
+	echo strftime("%d/%m/%Y", getSettingValue("end_bookings"));
+	echo "</p>\n";
 
 	require("../lib/footer.inc.php");
 ?>

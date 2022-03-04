@@ -363,12 +363,110 @@ if ($res_test==0){
 $sql="SELECT 1=1 FROM ref_wiki WHERE ref='enseignement_invisible';";
 $test=mysql_query($sql);
 if(mysql_num_rows($test)==0) {
-	$sql="INSERT INTO ref_wiki VALUES ('','enseignement_invisible', 'http://www.sylogix.org/gepi/wiki/Enseignement_invisible');";
+	$sql="INSERT INTO ref_wiki VALUES ('','enseignement_invisible', 'http://www.sylogix.org/projects/gepi/wiki/Enseignement_invisible');";
 	$update=mysql_query($sql);
 }
 else {
-	$sql="UPDATE ref_wiki SET url='http://www.sylogix.org/gepi/wiki/Enseignement_invisible' WHERE ref='enseignement_invisible'";
+	$sql="UPDATE ref_wiki SET url='http://www.sylogix.org/projects/gepi/wiki/Enseignement_invisible' WHERE ref='enseignement_invisible'";
 	$update=mysql_query($sql);
+}
+
+$result.="<br />";
+$result.="Contrôle des index de la table absences&nbsp;: ";
+$sql="show index from absences where sub_part!='NULL';";
+$test=mysql_query($sql);
+if(mysql_num_rows($test)!=0) {
+  $result.="Correction des index de la table absences&nbsp;: ";
+  $result_inter = traite_requete("ALTER TABLE absences DROP PRIMARY KEY , ADD PRIMARY KEY ( login , periode );");
+  if ($result_inter == '') {
+    $result.=msj_ok("Ok !");
+  } else {
+    $result.=msj_erreur("Erreur !");
+  }
+}
+else {
+  $result .= msj_present("Déjà correct");
+}
+
+$result .= "<br />";
+$result .= "<strong>Ajout d'une table 't_plan_de_classe' :</strong><br />";
+$test = sql_query1("SHOW TABLES LIKE 't_plan_de_classe'");
+if ($test == -1) {
+	$sql="CREATE TABLE IF NOT EXISTS t_plan_de_classe (
+	id INT( 11 ) NOT NULL AUTO_INCREMENT PRIMARY KEY ,
+	id_groupe INT(11) NOT NULL ,
+	login_prof VARCHAR(50) NOT NULL ,
+	dim_photo INT(11) NOT NULL) ENGINE=MyISAM CHARACTER SET utf8 COLLATE utf8_general_ci;";
+	$result_inter = traite_requete($sql);
+	if ($result_inter == '') {
+		$result .= msj_ok("SUCCES !");
+	}
+	else {
+		$result .= msj_erreur("ECHEC !");
+	}
+} else {
+	$result .= msj_present("La table existe déjà");
+}
+
+$result .= "<br />";
+$result .= "<strong>Ajout d'une table 't_plan_de_classe_ele' :</strong><br />";
+$test = sql_query1("SHOW TABLES LIKE 't_plan_de_classe_ele'");
+if ($test == -1) {
+	$sql="CREATE TABLE IF NOT EXISTS t_plan_de_classe_ele (
+	id INT( 11 ) NOT NULL AUTO_INCREMENT PRIMARY KEY ,
+	id_plan INT( 11 ) NOT NULL,
+	login_ele VARCHAR(50) NOT NULL ,
+	x INT(11) NOT NULL ,
+	y INT(11) NOT NULL);";
+	$result_inter = traite_requete($sql);
+	if ($result_inter == '') {
+		$result .= msj_ok("SUCCES !");
+	}
+	else {
+		$result .= msj_erreur("ECHEC !");
+	}
+} else {
+	$result .= msj_present("La table existe déjà");
+}
+
+$result .= "<br />";
+$result .= "<strong>Ajout d'une table 'rss_users' :</strong><br />";
+$test = sql_query1("SHOW TABLES LIKE 'rss_users'");
+if ($test == -1) {
+	$sql="CREATE TABLE rss_users (id int(11) NOT NULL auto_increment, user_login varchar(30) NOT NULL, user_uri varchar(30) NOT NULL, PRIMARY KEY  (id)) ENGINE=MyISAM CHARACTER SET utf8 COLLATE utf8_general_ci;";
+	$result_inter = traite_requete($sql);
+	if ($result_inter == '') {
+		$result .= msj_ok("SUCCES !");
+	}
+	else {
+		$result .= msj_erreur("ECHEC !");
+	}
+} else {
+	$result .= msj_present("La table existe déjà");
+}
+
+$result .= "<br />";
+$result .= "<strong>Ajout d'une table 'ldap_bx' :</strong><br />";
+$test = sql_query1("SHOW TABLES LIKE 'ldap_bx'");
+if ($test == -1) {
+	$sql="CREATE TABLE ldap_bx (
+			id INT( 11 ) NOT NULL AUTO_INCREMENT ,
+			login_u VARCHAR( 200 ) NOT NULL ,
+			nom_u VARCHAR( 200 ) NOT NULL ,
+			prenom_u VARCHAR( 200 ) NOT NULL ,
+			statut_u VARCHAR( 50 ) NOT NULL ,
+			identite_u VARCHAR( 50 ) NOT NULL ,
+			PRIMARY KEY ( id )
+			) ENGINE=MyISAM CHARACTER SET utf8 COLLATE utf8_general_ci;";
+	$result_inter = traite_requete($sql);
+	if ($result_inter == '') {
+		$result .= msj_ok("SUCCES !");
+	}
+	else {
+		$result .= msj_erreur("ECHEC !");
+	}
+} else {
+	$result .= msj_present("La table existe déjà");
 }
 
 $result.="<br />Fin mise à jour<br/>";

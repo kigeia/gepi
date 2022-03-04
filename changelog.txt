@@ -3,9 +3,260 @@
 |= CHANGELOG GEPI =|
 |==================|
 
-Gepi-1.6.2 (Version de développement)
+Gepi-master (Version de développement)
 ===========================
-- ...
+Bulletins:
+- Bulletins HTML: Possibilité de définir la taille des textes des cellules Avis du conseil de classe et Signature.
+- Possibilité de gérer plusieurs fichiers de signature des bulletins.
+- Affichage de l'appréciation concernant le groupe classe dans la page Mes moyennes et appréciations.
+- Possibilité de modifier l'accès parent/élève aux appréciations depuis les pages 
+  de saisie de l'avis du conseil de classe dans le cas où l'accès est basculé manuellement.
+- Possibilité de désactiver la recherche de lapsus lors des saisies d'appréciations et avis du conseil de classe.
+
+Graphes:
+- Possibilité de définir la taille du texte sous le graphique.
+
+Carnets de notes:
+- Visualiser toutes les notes de l'année: Affichage de la moyenne annuelle.
+- Visualiser toutes les notes de l'année: Possibilité d'afficher les moyennes de bulletins en plus des moyennes de carnets de notes.
+- Possibilité d'interdire la création/paramétrage de boites/conteneurs par les professeurs.
+- Possibilité, en tant qu'administrateur, de créer des boites/conteneurs par lots dans les carnets de notes d'une sélection d'enseignements.
+- Accès des professeurs principaux à la page Moyennes des carnets de notes si ils ont accès à la Visualisation des carnets de notes.
+
+Cahier de textes:
+- Possibilité d'afficher la liste des documents joints à un CDT.
+- Possibilité pour les parents et élèves de pointer leurs travaux faits ou non.
+- Possibilité de redimensionner les infobulles dans l'affichage semaine.
+- Possibilité d'envoyer par mail une portion du cahier de textes.
+
+Absences2:
+- Possibilité de modifier les dates/heure de début et fin d'une saisie depuis la page de saisie d'un traitement.
+- Accès à l'onglet 'Saisir un groupe' pour les statuts 'autre' avec le droit 'Saisir les absences de tous les élèves'.
+- Possibilité de créer des traitements et notifications par lots.
+
+Discipline:
+- Affichage par tranches des incidents à traiter (pour limiter le temps de chargement de la page).
+- Possibilité d'imprimer des fichiers OOo pour les sanctions  de type travail et autre.
+- Possibilité de modifier les termes 'incident' et 'sanction'.
+- Possibilité de saisir certaines sanctions en tant que professeur (liste à préciser dans Définir les sanctions).
+- Possibilité de restreindre dans Mon compte ce qui a été défini dans Définir les destinataires d'alertes,
+  les catégories d'incidents pour lesquelles on souhaite être averti.
+- Saisie d'incident: Recherche des élèves et personnels dans le même formulaire.
+
+Modèles Ooo:
+- Possibilité de gérer des modèles OOo en compte scolarité ou cpe.
+
+Gestion:
+- Ajout de la date d'entrée d'un élève dans l'établissement.
+- Possibilité de choisir l'adresse mail destinataire de l'information comme quoi un changement d'adresse mail responsable ou élèev a eu lieu.
+- Possibilité d'ajouter un préfixe au sujet des mails envoyés par Gepi.
+- Possibilité de donner l'accès à l'impression de leur Fiche Bienvenue pour les différents statuts depuis la page Gérer mon compte.
+- Possibilité de définir des messages d'information à faire apparaître dans 'Gérer mon compte' (messages éventuellement différents pour chaque statut).
+- Possibilité d'accéder à la date de dernière connexion d'élèves/responsables.
+- Possibilité de donner l'accès aux statistiques, voire aux détails de connexion pour les comptes scolarité, cpe, professeurs principaux et/ou professeurs.
+- Possibilité de choisir le professeur principal depuis la page d'index Élèves.
+
+Divers:
+- Ajout d'une page pour que les parents puissent contrôler les informations élève/resp.
+
+Gepi-1.6.3 (17/06/2013)
+===========================
+Bulletins:
+- Possibilité de choisir ce que l'on souhaite faire apparaitre sur les bulletins
+  en ce qui concerne les absences (total, absences non-justifiées et/ou retards).
+- Possibilité de corriger des notes de bulletins en période partiellement close.
+- PDF: Ajout d'un ordre d'affichage des colonnes avec appréciation en premier.
+- Possibilité d'afficher la moyenne annuelle des enseignements sur les bulletins PDF.
+- Possibilité d'afficher les moyennes de l'élève pour les périodes précédentes et annuelle sur les bulletins HTML.
+- Possibilité de valider en tant qu'admin les corrections de bulletins proposées.
+
+Carnets de notes
+- Possibilité de corriger des notes de CN en période partiellement close.
+- Possibilité de copier un devoir et ses notes.
+- Ajout d'un lien vers toutes les évaluations de l'année.
+- Grisage par défaut des paramètres spécifiques HTML/PDF pour l'impression des relevés de notes.
+
+Graphes:
+- Possibilité de choisir la taille de la police pour le champ de saisie de l'avis du conseil de classe.
+
+Cahiers de textes
+- Abandon du mode Wiki pour la saisie des notices du CdT
+- Possibilité de n'afficher que le travail à faire ou que les compte-rendus en mode Toutes_matieres.
+
+RSS:
+- Accès au flux RSS CDT pour les responsables
+- Possibilité de créer des flux RSS pour les élèves arrivés en cours d'année.
+- Possibilité de signaler et visionner un flux RSS CDT élève en compte scolarité/cpe/pp.
+
+Alertes/informations:
+- Ajout d'un module permettant de déposer des alertes à la façon d'une messagerie mail à l'attention de personnels choisis.
+- Possibilité de déposer une alerte depuis la liste des personnes connectées et depuis le tableau des appels dans mod_abs2.
+
+Abs2:
+- Absences du jour: Possibilité de ne pas afficher les lignes déjà traitées.
+- Absences du jour: Possibilité de signaler ou masquer les saisies englobées.
+- Tableau des appels: Possibilité de déposer une alerte aux professeurs si le module Alertes est actif
+- Saisie des absences sur Plan de classe: Ajout de drapeaux concernant les absences précédentes.
+- Ajout d'une page d'exports statistiques (encore inachevée).
+- Possibilité de calculer un score d'absences.
+
+Epreuves blanches:
+- Ajout de l'effectif sur l'émargement PDF.
+
+Gestion:
+- Elèves: Possibilité de rechercher des élèves par elenoet, ele_id, no_gep
+-         Possibilité d'inscrire les élèves dans des classes depuis la liste des non inscrits.
+- Responsables: Mise à jour d'après Sconet: Ajout de précision sur les nouveaux responsables.
+- Classe/Enseignements: Possibilité de modifier les noms des groupes par lots pour une classe.
+- Possibilité de générer le CSV liste des élèves depuis la page liste des élèves suivant l'enseignement.
+- Paramétrage par lots: Possibilité d'associer le(s) professeur(s) principal(aux) à l'enseignement créé.
+- Import de l'emploi du temps depuis le CSV UnDeuxTemps: Amélioration de la recherche de groupes
+- Possibilité de filtrer les noms/prénoms pour ne retenir que les caractères alphabétiques dans la génération de login.
+- Possibilité de générer une fiche bienvenue pour un élève/responsable, sans changer le mot de passe.
+
+Panneau d'affichage:
+- Possibilité d'afficher une annonce aux profs d'une matière.
+
+Divers:
+- Ajout en page d'accueil administrateur d'une rubrique: A lire
+- Maintien de la session à la valeur définie dans Configuration générale,
+  en contrant si nécessaire la valeur (session.gc_maxlifetime) définie dans 
+  le php.ini
+- Ajout pour l'administrateur d'une colonne Date/heure de fin de session pour la liste des personnes connectées.
+- Ajouts de liens divers de passage/navigation vers des pages associées.
+- Ajout de messages explicatifs en balise title.
+- Possibilité de choisir la façon dont s'ouvre un PDF (dans un autre onglet ou en téléchargement):
+  Globalement dans Configuration générale, et utilisateur par utilisateur dans Mon compte.
+- Possibilité d'alterner l'affichage/masquage de certains cadres infobulles d'un clic.
+
+Gepi-1.6.2
+===========================
+Librairies :
+- HTMLPurifier : màj en 4.4.0
+
+Bulletins :
+- Affichage (à des fins de contrôle) des coef et profs associés 
+  aux enseignements avant génération des bulletins.
+- Possibilité d'afficher tous les PP d'une classe et non seulement 
+  celui associé à l'élève sur les bulletins PDF.
+- Possibilité d'imprimer les bulletins en période non close 
+  (mais avec filigrane (PDF) ou alerte en rouge (HTML) imposée
+  pour signaler que les moyennes et appréciations peuvent encore 
+  évoluer).
+  Cela permet de faire des vérifications et réglages avant la
+  fermeture de période.
+- Possibilité d'insérer un fichier de signature
+  (bulletins PDF et HTML).
+- Possibilité de donner, aux parents et aux élèves, l'accès au bulletin
+  simplifié des appreciations sur le groupe-classe.
+- Possibilité de masquer aux parents et aux élèves la moyenne de classe sur les
+  bulletins simplifiés et graphes.
+- Possibilité d'afficher ou non sur le bulletin simplifié de classe les
+  moyennes min/max.
+- Affichage de l'indication comme quoi les appréciations sont visibles
+  ou non des parents à une date donnée.
+- Envoi des mails de proposition de correction aux comptes scolarité
+  en plus des comptes secours.
+
+Carnets de notes:
+- Possibilité de définir un mode par défaut pour le calcul de la moyenne dans le
+  cas où des boites/conteneurs/sous-matières sont créés.
+
+Relevés de notes:
+- Prise en compte au niveau du paramétrage des classes en admin des choix
+  d'affichage ou non des moyennes de classe, bloc adresse responsable,...
+- Possibilité d'afficher une colonne Moyenne du carnet de notes
+  Possibilité d'autoriser ou non les parents/élèves à voir cette colonne
+  (qui donne une info à un instant T, mais qui peut donner une fausse impression
+  (le prof peut ajouter des devoirs par la suite, modifier les coefficients,...))
+
+Cahiers de textes :
+- Possibilité d'inclure les documents joints dans l'export ZIP.
+- Possibilité d'insérer des liens vers un visionneur GeoGebra.
+- Possibilité de limiter l'accès des profs aux CDT de leurs seules classes.
+- Archivage: ajout d'un dispositif de sélection de notices dans l'archive
+  produite.
+- Affichage du volume occupé par les documents joints dans les CDT.
+
+Abs2 :
+- Possibilité de cocher les absences, retards, infirmerie,... sur le plan de 
+  classe sous réserve d'avoir créé son plan de classe dans le module Trombinoscope.
+- Ajout de liens (sur des élèves, sur des saisies,...) pour passer plus vite
+  à des informations associées.
+- Ajout d'un bouton pour créer directement des notifications à partir d'une saisie
+- Ajout d'une information sur les saisies englobantes
+- Simplification du menu abs2
+
+Emplois du temps :
+- Possibilité de restreindre l'accès prof aux EDT des autres profs.
+- Possibilité de générer un export CSV type UnDeuxTemps à partir d'un export XML
+  EDT d'IndexEducation (l'export CSV produit permet un import de l'emploi du
+  temps dans Gepi).
+
+Discipline :
+- Possibilité de définir ses propres types de sanctions de types retenue,
+  exclusion ou travail.
+- Possibilité de préciser le matériel à apporter lors d'une retenue.
+- Possibilité d'imprimer les retenues et incidents avec les adresses distinctes
+  pour les parents séparés.
+
+Trombinoscope :
+- Possibilité de déplacer les photos dans le plan de classe en cliquant sur le
+  corps de l'infobulle et plus seulement sur son entête.
+- Possibilité de choisir le titre des infobulles parmi login, nom ou prénom.
+
+Gestion:
+- Possibilité de masquer certains groupes dans les Cahiers de textes
+  (comme on peut masquer des groupes dans les bulletins et/ou carnets de notes).
+- Possibilité de renommer automatiquement les groupes d'une classe dont les
+  descriptions sont identiques.
+- Possibilité pour les comptes scolarité de réinitialiser les mots de passe 
+  des élèves et des responsables d'élèves (sous réserve de donner le droit)
+- Ajout de précautions pour l'accès aux choix sensibles 'Effacer la base' et 
+  'Données de test'.
+- Possibilité pour l'admin de supprimer par lots les actions en 
+  attente.
+- Possibilité de faire la mise à jour d'après Sconet en compte scolarité
+  (sous réserve de donner le droit dans Gestion des droits).
+- Possibilité de modifier par lots la visibilité des enseignements de telle 
+  matière.
+- Options de connexion: Dispositif pour permettre à un responsable de demander
+  un compte/mot de passe ou de récupérer un compte/mot de passe (cela répond à 
+  un besoin complémentaire de la Récupération de mot de passe qui, elle, 
+  nécessite de connaitre le login et d'avoir renseigné l'adresse mail dans 
+  Gérer mon compte)
+- Dans le cas où il y a plusieurs professeurs principaux dans une classe,
+  possibilité de donner les mêmes droits à tous les PP de la classe sur 
+  l'ensemble des élèves de la classe.
+- Possibilité de choisir si on souhaite afficher le nom court du groupe 
+  ou sa description dans la barre de menu horizontale (en prof) et dans le CDT2.
+- Ajout d'explications à divers endroits pour répondre à des questions 
+  fréquentes sur la liste de diffusion.
+- Ajout d'un droit distincts des droits pour les paramètres des bulletins pour
+  accéder aux paramètres des relevés HTML.
+- Possibilité de créer des comptes d'utilisateurs pour des resp_legal=0
+  (famille d'accueil,...), de donner ou non l'accès aux données de l'élève,...
+- Possibilité de restaurer plus vite une sauvegarde de la base via la commande système 'mysql'
+  (commande PHP exec() faisant appel à mysql en ligne de commande).
+
+Graphes:
+- Possibilité d'afficher le rang de l'élève sur les graphes en courbe/étoile
+  (comme un choix au lieu d'afficher la Moyenne de la classe).
+- Possibilité de modifier la taille de police dans la fenêtre déroulante 
+  contenant les appréciations dans les graphes en courbe/étoile
+- Possibilité de donner ou non l'accès aux moyenne de classe, moyenne min et
+  moyenne max pour les responsables et élèves.
+
+Divers:
+- Affichage des AID dans le choix Bulletins de la barre de menu horizontale prof
+  et sur la page d'accueil simplifiée prof.
+- Ajouts divers dans les barres de menu horizontales.
+- Ajout de l'affichage des graphes dans l'onglet Bulletin des fiches de 
+  consultation des infos concernant un élève.
+- Affichage des responsables non légaux dans l'onglet responsables de la page
+  Consult.élève.
+  Possibilité d'interdire la consultation du rang pour les responsables/élèves.
+
 
 Gepi-1.6.1 (10/06/2012)
 ===========================

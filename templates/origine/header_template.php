@@ -5,14 +5,8 @@
 ?>
  
 	<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-	<meta http-equiv="Pragma" content="no-cache" />
-	<meta http-equiv="Cache-Control" content="no-cache" />
-	<meta http-equiv="Expires" content="0" />
 	<!-- <meta http-equiv="refresh" content="[tbs_refresh.tempsmax]; URL=[tbs_refresh.lien]/logout.php?auto=3&amp;debut_session=[tbs_refresh.debut]&amp;session_id=[tbs_refresh.id_session]" /> -->
 
-	<!-- déclaration par défaut pour les scripts et les mises en page -->
-	<meta http-equiv="Content-Script-Type" content="text/javascript" />
-	<meta http-equiv="Content-Style-Type" content="text/css" />
 
 	<title><?php echo "$titre_page : $tbs_gepiSchoolName" ?></title>
 	
@@ -85,6 +79,8 @@
 			</script>
 		";
 	}
+
+	//maintien_de_la_session();
 ?>
 	<script type="text/javascript" src="<?php echo $tbs_gepiPath?>/lib/cookieClass.js"></script>
 	<script type="text/javascript">
@@ -187,22 +183,38 @@
 				var seconds_before_alert = 180;
 				var seconds_int_betweenn_2_msg = 30;
 
+				<?php
+					$sessionMaxLength=getSettingValue("sessionMaxLength");
+
+					/*
+					// Avec le dispositif maintien_de_la_session() de lib/share.inc.php pointant vers lib/echo.php, on devrait pouvoir ne tenir compte que de la variable Gepi: sessionMaxLength
+					$session_gc_maxlifetime=ini_get("session.gc_maxlifetime");
+					if($session_gc_maxlifetime!=FALSE) {
+						$session_gc_maxlifetime_minutes=$session_gc_maxlifetime/60;
+
+						if((getSettingValue("sessionMaxLength")!="")&&($session_gc_maxlifetime_minutes<getSettingValue("sessionMaxLength"))) {
+							$sessionMaxLength=$session_gc_maxlifetime_minutes;
+						}
+					}
+					*/
+				?>
+
 				if (gepi_start_session.get('GEPI_start_session')) {
 					debut_alert.setTime(parseInt(gepi_start_session.get('GEPI_start_session'),10));
 				}
 				digital=new Date()
 				seconds=(digital-debut_alert)/1000
 				//if (1==1) {
-				  if (seconds>=<?php echo getSettingValue("sessionMaxLength")*60; ?>) {
+				  if (seconds>=<?php echo $sessionMaxLength*60; ?>) {
 				  	if (!warn_msg2_already_displayed) {
 						var message = "vous avez été probablement déconnecté du serveur, votre travail ne pourra pas être enregistré dans gepi depuis cette page, merci de le sauvegarder dans un bloc note.";
 						display_alert(message);				  
 						warn_msg2_already_displayed = true;
 					}
 				  }
-				else if (seconds><?php echo getSettingValue("sessionMaxLength")*60; ?> - seconds_before_alert) {
+				else if (seconds><?php echo $sessionMaxLength*60; ?> - seconds_before_alert) {
 					if (!warn_msg1_already_displayed) {
-						var seconds_reste = Math.floor(<?php echo getSettingValue("sessionMaxLength")*60; ?> - seconds);
+						var seconds_reste = Math.floor(<?php echo $sessionMaxLength*60; ?> - seconds);
 						now=new Date()
 						var hrs=now.getHours();
 						var mins=now.getMinutes();

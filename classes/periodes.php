@@ -1,7 +1,7 @@
 <?php
 /*
  *
- * Copyright 2001, 2011 Thomas Belliard, Laurent Delineau, Edouard Hue, Eric Lebrun
+ * Copyright 2001, 2013 Thomas Belliard, Laurent Delineau, Edouard Hue, Eric Lebrun
  *
  * This file is part of GEPI.
  *
@@ -47,7 +47,7 @@ if (isset($is_posted) and ($is_posted == "yes")) {
 
     $msg = '';
     //
-    // Insertion et suppresion de périodes
+    // Insertion et suppression de périodes
     //
     $pb_reg_per = '';
     $periode_query = mysql_query("SELECT * FROM periodes WHERE id_classe = '$id_classe'");
@@ -91,7 +91,9 @@ if (isset($is_posted) and ($is_posted == "yes")) {
         $k = $nb_periode + 1;
         $nombre_periode++;
         while ($k < $nombre_periode) {
-            $register = mysql_query("INSERT INTO periodes SET nom_periode='période ".$k."', num_periode='$k', verouiller = 'N', id_classe='$id_classe'");
+            $sql="INSERT INTO periodes SET nom_periode='période ".$k."', num_periode='$k', verouiller = 'N', id_classe='$id_classe';";
+            //echo "$sql<br />";
+            $register = mysql_query($sql);
             if (!$register) {$pb_reg_per = 'yes';}
             $k++;
         }
@@ -101,7 +103,9 @@ if (isset($is_posted) and ($is_posted == "yes")) {
     // Verrouillage et déverrouillage; changement de noms
     //
 
-   $periode_query = mysql_query("SELECT * FROM periodes WHERE id_classe = '$id_classe'");
+    $date_fin_period=isset($_POST['date_fin_period']) ? $_POST['date_fin_period'] : NULL;
+
+    $periode_query = mysql_query("SELECT * FROM periodes WHERE id_classe = '$id_classe'");
     $nb_periode = mysql_num_rows($periode_query) + 1 ;
     $k = "1";
     while ($k < $nb_periode) {
@@ -109,7 +113,19 @@ if (isset($is_posted) and ($is_posted == "yes")) {
         $nom_period[$k] = trim($nom_period[$k]);
         if ($nom_period[$k] == '') $nom_period[$k] = "période ".$k;
         //$register = mysql_query("UPDATE periodes SET nom_periode='$nom_period[$k]' WHERE (num_periode='$k' and id_classe='$id_classe')");
-        $register = mysql_query("UPDATE periodes SET nom_periode='".html_entity_decode($nom_period[$k])."' WHERE (num_periode='$k' and id_classe='$id_classe')");
+        $sql="UPDATE periodes SET nom_periode='".html_entity_decode($nom_period[$k])."'";
+        if(isset($date_fin_period[$k])) {
+            $tmp_tab=explode("/", $date_fin_period[$k]);
+            if((!isset($tmp_tab[2]))||(!checkdate($tmp_tab[1], $tmp_tab[0], $tmp_tab[2]))) {
+                $msg.="Erreur sur la date de fin de période en période $k<br />";
+            }
+            else {
+                $sql.=", date_fin='".$tmp_tab[2]."-".$tmp_tab[1]."-".$tmp_tab[0]." 00:00:00'";
+            }
+        }
+        $sql.=" WHERE (num_periode='$k' and id_classe='$id_classe');";
+        //echo "$sql<br />";
+        $register = mysql_query($sql);
         if (!$register) {$pb_reg_per = 'yes';}
         $k++;
     }
@@ -171,6 +187,11 @@ if(mysql_num_rows($res_class_tmp)>0){
 	}
 }
 // =================================
+
+$style_specifique[] = "lib/DHTMLcalendar/calendarstyle";
+$javascript_specifique[] = "lib/DHTMLcalendar/calendar";
+$javascript_specifique[] = "lib/DHTMLcalendar/lang/calendar-fr";
+$javascript_specifique[] = "lib/DHTMLcalendar/calendar-setup";
 
 $themessage  = 'Des informations ont été modifiées. Voulez-vous vraiment quitter sans enregistrer ?';
 //**************** EN-TETE *****************
@@ -258,16 +279,17 @@ echo "</form>\n";
 
 ?>
 
-<form enctype="multipart/form-data" method="post" action="periodes.php">
+<form enctype="multipart/form-data" method="post" name="formulaire" action="periodes.php">
 <center><input type='submit' value='Enregistrer' /></center>
 <p class='bold'>Classe : <?php echo $classe; ?></p>
-<p><b>Remarque : </b>Le verrouillage/déverrouillage d'une période est possible en étant connecté sous un compte ayant le statut "scolarité".</p>
+<p><b>Remarque&nbsp;: </b>Le verrouillage/déverrouillage d'une période est possible en étant connecté sous un compte ayant le statut "scolarité"<br />
+(<em>il est question ici de verrrouillage des saisies dans le carnet de notes, contrairement à la date de fin proposée ci-dessous</em>).</p>
 
 <?php
 
 echo add_token_field();
 
-echo "<p>Nombre de périodes : ";
+echo "<p>Nombre de périodes&nbsp;: ";
 
 //$sql="SELECT 1=1 FROM j_groupes_classes WHERE id_classe='$id_classe';";
 $sql="SELECT 1=1 FROM j_groupes_classes jgc, j_eleves_groupes jeg WHERE jgc.id_classe='$id_classe' AND jeg.id_groupe=jgc.id_groupe;";
@@ -304,30 +326,46 @@ if ($test_periode == 0) {
 
 } else {
 ?>
-    <!--center-->
-    <!--table width=100% border=2 cellspacing=1 bordercolor=#330033 cellpadding=3-->
-    <table class='boireaus'>
-    <tr>
-    <th>&nbsp;</th>
-    <th style='padding: 5px;'>Nom de la période</th>
-    </tr>
-    <?php
-    $k = '1';
+	<!--center-->
+	<!--table width=100% border=2 cellspacing=1 bordercolor=#330033 cellpadding=3-->
+	<table class='boireaus'>
+	<tr>
+	<th>&nbsp;</th>
+	<th style='padding: 5px;'>Nom de la période</th>
+	<th style='padding: 5px;' title="La date précisée ici est prise en compte pour les appartenances des élèves à telle classe sur telle période (notamment pour les élèves changeant de classe).
+Il n'est pas question ici de verrouiller automatiquement une période de note à la date saisie.">Date de fin<br />de la période</th>
+	</tr>
+<?php
+	$k = '1';
 	$alt=1;
-    while ($k < $nb_periode) {
-        if ($nom_periode[$k] == '') {$nom_periode[$k] = "période ".$k;}
-        $alt=$alt*(-1);
+
+	include("../lib/calendrier/calendrier.class.php");
+
+	while ($k < $nb_periode) {
+		if ($nom_periode[$k] == '') {$nom_periode[$k] = "période ".$k;}
+		$alt=$alt*(-1);
+
+		//$cal[$k] = new Calendrier("formulaire", "date_fin_period_".$k);
+
 		echo "<tr class='lig$alt'>\n";
-        echo "<td style='padding: 5px;'>Période $k</td>\n";
-        echo "<td style='padding: 5px;'><input type='text' name='nom_period[$k]'";
+		echo "<td style='padding: 5px;'>Période $k</td>\n";
+		echo "<td style='padding: 5px;'><input type='text' id='nom_period_$k' name='nom_period[$k]'";
 		echo " onchange='changement()'";
 		echo " value=\"".$nom_periode[$k]."\" size='30' /></td>\n";
-        echo "</tr>\n";
-        $k++;
-    }
-    ?>
-    </table>
-    <!--/center-->
+		echo "<td style='padding: 5px;'><input type='text' id='date_fin_period_$k' name='date_fin_period[$k]'";
+		echo " onchange='changement()'";
+		echo " onKeyDown=\"clavier_date(this.id,event);\" AutoComplete=\"off\"";
+		echo " value=\"".strftime("%d/%m/%Y", mysql_date_to_unix_timestamp($date_fin_periode[$k]))."\" size='10' />";
+
+		//echo "<a href=\"#calend\" onClick=\"".$cal[$k]->get_strPopup('../lib/calendrier/pop.calendrier.php', 350, 170)."\"><img src=\"../lib/calendrier/petit_calendrier.gif\" border=\"0\" alt=\"Petit calendrier\" /></a>\n";
+		echo img_calendrier_js("date_fin_period_".$k, "img_bouton_date_fin_period_".$k);
+		echo "</td>\n";
+		echo "</tr>\n";
+	$k++;
+	}
+?>
+	</table>
+	<!--/center-->
 <?php } ?>
 <center><input type='submit' value='Enregistrer' style='margin: 30px 0 30px 0;'/></center>
 <input type='hidden' name='is_posted' value="yes" />
@@ -340,6 +378,96 @@ if($ouvrir_infobulle_nav=='y') {
 	setTimeout(\"afficher_div('navigation_classe','y',-100,20);\",1000)
 </script>\n";
 }
+
+if($nb_periode>1) {
+	//$sql="SELECT num_periode, nom_periode, date_fin, COUNT(date_fin) AS eff_date_fin FROM periodes  GROUP BY nom_periode ORDER BY eff_date_fin DESC, num_periode ASC;";
+	$sql="SELECT DISTINCT num_periode, nom_periode, date_fin FROM periodes ORDER BY num_periode ASC;";
+	$res=mysql_query($sql);
+	if(mysql_num_rows($res)>0) {
+		echo "<p>Prendre modèle sur d'autres classes&nbsp;:</p>
+<table class='boireaus'>
+	<tr>
+		<th>Numéro</th>
+		<th colspan='2'>Nom</th>
+		<th colspan='2'>Date de fin</th>
+		<th>Effectif</th>
+		<th>Classes</th>
+		<!--th title='Prendre cette date pour la classe courante'><img src='../images/up.png' width='18' height='18' /></th-->
+	</tr>";
+		$alt=1;
+		$cpt=0;
+		while($lig=mysql_fetch_object($res)) {
+			$alt=$alt*(-1);
+			$date_fin_formatee=formate_date($lig->date_fin);
+			echo "
+	<tr class='lig$alt white_hover'>
+		<td>".$lig->num_periode."</td>
+		<td id='modele_nom_periode_$cpt'>".$lig->nom_periode."</td>
+		<td><a href=\"javascript:set_nom_periode(".$lig->num_periode.", ".$cpt.")\" title='Prendre ce nom de période pour la classe courante'><img src='../images/icons/wizard.png' width='16' height='16' /></a></td>
+		<td>".$date_fin_formatee."</td>
+		<td><a href=\"javascript:set_date_fin(".$lig->num_periode.", '".$date_fin_formatee."')\" title='Prendre cette date pour la classe courante'><img src='../images/icons/wizard.png' width='16' height='16' /></a></td>";
+
+			echo "
+		<td>";
+			//formate_date($lig->date_fin)
+			$sql="SELECT COUNT(date_fin) AS eff_date_fin FROM periodes p WHERE p.num_periode='".$lig->num_periode."' AND p.nom_periode='".$lig->nom_periode."' AND p.date_fin='".$lig->date_fin."';";
+			$res2=mysql_query($sql);
+			if(mysql_num_rows($res2)>0) {
+				$lig2=mysql_fetch_object($res2);
+				echo $lig2->eff_date_fin;
+			}
+		echo "</td>
+		<td>";
+
+			$sql="SELECT c.id, c.classe FROM classes c, periodes p WHERE p.id_classe=c.id AND p.num_periode='".$lig->num_periode."' AND p.nom_periode='".$lig->nom_periode."' AND p.date_fin='".$lig->date_fin."' ORDER BY c.classe;";
+			//echo "$sql<br />";
+			$res2=mysql_query($sql);
+			if(mysql_num_rows($res2)>0) {
+				$cpt2=0;
+				while($lig2=mysql_fetch_object($res2)) {
+					if($cpt2>0) {echo ", ";}
+					echo $lig2->classe;
+					$cpt2++;
+				}
+			}
+			echo "
+	</tr>";
+			$cpt++;
+		}
+		echo "
+</table>
+
+<script type='text/javascript'>
+	function set_nom_periode(num, num_ligne) {
+		if(document.getElementById('nom_period_'+num)) {
+			//alert(document.getElementById('modele_nom_periode_'+num_ligne).innerHTML);
+			document.getElementById('nom_period_'+num).value=document.getElementById('modele_nom_periode_'+num_ligne).innerHTML;
+			changement();
+		}
+	}
+
+	function set_date_fin(num, valeur) {
+		if(document.getElementById('date_fin_period_'+num)) {
+			document.getElementById('date_fin_period_'+num).value=valeur;
+			changement();
+		}
+	}
+</script>
+";
+
+	}
+}
+
+echo "<br />
+<p><em>NOTES&nbsp;:</em></p>
+<ul>
+<li><p>Les dates de fin de période indiquées ici ne correspondent pas à une date de verrouillage des saisies de notes.<br />
+Il s'agit de dates prises en compte pour l'appartenance d'élèves à la classe pour telle période.<br />
+C'est utile notamment pour les élèves qui changent de classe.<br />
+Ces dates sont aussi prises en compte dans les modules Absences.</p></li>
+<li><p>Le verrouillage des périodes de notes s'effectue en compte \"scolarité\" à la rubrique \"Verrouillage/déverrouillage des périodes\".</p></li>
+<li><p>L'accès des parents/élèves aux appréciations et avis des conseils de classe se paramètre en compte \"administrateur\" ou sous réserve d'en donner le droit dans Gestion générale/Droits d'accès en compte \"scolarité\" ou \"professeur\" s'il est ".getSettingValue('gepi_prof_suivi').".</p></li>
+</ul>\n";
 
 require("../lib/footer.inc.php");
 

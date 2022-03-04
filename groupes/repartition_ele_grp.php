@@ -437,7 +437,7 @@ if(!isset($id_groupe)) {
 				$current_group=get_group($group["id"]);
 		
 				//echo "<input type='checkbox' name='id_groupe[]' id='id_groupe_$cpt' value='".$current_group['id']."' onchange='change_style_grp($cpt)' /><label id='label_id_groupe_$cpt' for='id_groupe_$cpt'>".$current_group['name'];
-				echo "<input type='checkbox' name='id_groupe[]' id='id_groupe_$cpt' value='".$current_group['id']."' onchange='change_style_grp($cpt);controle_doublons($cpt);' /><label id='label_id_groupe_$cpt' for='id_groupe_$cpt'>".$current_group['name'];
+			echo "<input type='checkbox' name='id_groupe[]' id='id_groupe_$cpt' value='".$current_group['id']."' onchange='change_style_grp($cpt);controle_doublons($cpt);' /><label id='label_id_groupe_$cpt' for='id_groupe_$cpt' title=\"Enseignement de ".$current_group['matiere']['matiere']." dispensé en ".$current_group['classlist_string']." par ".$current_group['profs']['proflist_string']."\">".$current_group['name'];
 				echo "<span style='font-size:x-small;'>";
 				echo " (<i>".$current_group['description']."</i>)";
 				if(count($current_group["classes"]["list"])>1) {echo " en ".$current_group['classlist_string'];}
@@ -604,7 +604,7 @@ if(!isset($_POST['recopie_select'])) {
 	//===============================
 	echo "<div style='float:right; text-align:center; width:15em;'>\n";
 	echo "<form action='".$_SERVER['PHP_SELF']."' name='form2' method='post'>\n";
-	echo "<fieldset style='padding-top: 8px; padding-bottom: 8px;  margin-left: auto; margin-right: auto;'>\n";
+	echo "<fieldset style='padding-top: 8px; padding-bottom: 8px;  margin-left: 3px; margin-right: auto; background-image: url(\"../images/background/opacite50.png\");'>\n";
 	for($i=0;$i<count($id_classe);$i++) {echo "<input type='hidden' name='id_classe[]' value='$id_classe[$i]' />\n";}
 	for($i=0;$i<count($id_groupe);$i++) {echo "<input type='hidden' name='id_groupe[]' value='$id_groupe[$i]' />\n";}
 		echo "<input type='hidden' name='num_periode' value='$num_periode' />\n";
@@ -675,11 +675,10 @@ if(!isset($_POST['recopie_select'])) {
 			}
 		}
 	}
-
 </script>\n";
 
 	echo "<form action='".$_SERVER['PHP_SELF']."' name='form1' method='post'>\n";
-	echo "<fieldset style='padding-top: 8px; padding-bottom: 8px;  margin-left: auto; margin-right: 1em;'>\n";
+	echo "<fieldset style='padding-top: 8px; padding-bottom: 8px;  margin-left: auto; margin-right: 1em; background-image: url(\"../images/background/opacite50.png\"); '>\n";
 	echo add_token_field();
 	for($i=0;$i<count($id_classe);$i++) {echo "<input type='hidden' name='id_classe[]' value='$id_classe[$i]' />\n";}
 	for($i=0;$i<count($id_groupe);$i++) {echo "<input type='hidden' name='id_groupe[]' value='$id_groupe[$i]' />\n";}
@@ -710,21 +709,17 @@ if(!isset($_POST['recopie_select'])) {
 		echo $group[$i]['name'];
 		echo "<br />\n";
 		echo "<span style='font-size:small;'>".$group[$i]['classlist_string']."</span>\n";
-		echo "<br /><span style='font-size:small; color:red;'>".$id_groupe[$i]."</span>";
+		echo "<br /><a href='edit_group.php?id_groupe=".$id_groupe[$i]."&amp;mode=regroupement' title=\"Paramétrer le groupe n°".$id_groupe[$i]."\" onclick=\"return confirm_abandon (this, change, '$themessage')\"><span style='font-size:small; color:red;'>".$id_groupe[$i]."</span></a>";
 		echo "<br />".preg_replace("/,/","<br />",$group[$i]['profs']['proflist_string']);
 
+		/*
 		//$tmp_tab_eleve=array_merge($tmp_tab_eleve,$group[$i]["eleves"][$num_periode]["list"]);
 		for($j=0;$j<count($group[$i]["eleves"][$num_periode]["list"]);$j++) {
-			//echo $group[$i]["eleves"][$num_periode]["list"][$j]." ";
-			/*
-			if(!in_array($group[$i]["eleves"][$num_periode]["list"][$j],$tmp_tab_eleve)) {
-				$tmp_tab_eleve[]=$group[$i]["eleves"][$num_periode]["list"][$j];
-			}
-			*/
 			if(!in_array($group[$i]["eleves"][$num_periode]["list"][$j],$tab_eleve)) {
 				$tab_eleve[]=$group[$i]["eleves"][$num_periode]["list"][$j];
 			}
 		}
+		*/
 		echo "</th>\n";
 	}
 	echo "<th>\n";
@@ -736,7 +731,8 @@ if(!isset($_POST['recopie_select'])) {
 	}
 	echo "</td><td>";
 	*/
-	//$order_by='classe';
+
+	/*
 	if($order_by=='classe') {
 		$tmp_tab_eleve=$tab_eleve;
 		unset($tab_eleve);
@@ -748,15 +744,47 @@ if(!isset($_POST['recopie_select'])) {
 				$test=mysql_query($sql);
 				if(mysql_num_rows($test)>0) {
 					$tab_eleve[]=$tmp_tab_eleve[$j];
-					//echo "$tmp_tab_eleve[$j]<br />";
+					echo "$tmp_tab_eleve[$j]<br />";
 				}
 			}
 		}
-
 	}
 	else {
-		sort($tab_eleve);
+		// On trie suivant le login... ce n'est pas forcément correct
+		//sort($tab_eleve);
 	}
+	*/
+
+	$tab_eleve=array();
+
+	$chaine_groupes="jeg.id_groupe='".$id_groupe[0]."'";
+	for($loop=1;$loop<count($id_groupe);$loop++) {
+		$chaine_groupes.=" OR jeg.id_groupe='".$id_groupe[$loop]."'";
+	}
+
+	if($order_by=='classe') {
+
+		for($loop=0;$loop<count($id_classe);$loop++) {
+			$sql="SELECT DISTINCT jeg.login FROM j_eleves_classes jec, j_eleves_groupes jeg, eleves e WHERE (jec.id_classe='".$id_classe[$loop]."' AND jec.periode='$num_periode' AND jec.login=jeg.login AND jeg.login=e.login AND ($chaine_groupes) AND jeg.periode='$num_periode') ORDER BY e.nom, e.prenom;";
+			$res_clas_grp=mysql_query($sql);
+			if(mysql_num_rows($res_clas_grp)>0) {
+				while($lig_clas_grp=mysql_fetch_object($res_clas_grp)) {
+					$tab_eleve[]=$lig_clas_grp->login;
+				}
+			}
+		}
+	}
+	else {
+		$sql="SELECT DISTINCT jeg.login FROM j_eleves_groupes jeg, eleves e WHERE jeg.login=e.login AND ($chaine_groupes) AND jeg.periode='$num_periode' ORDER BY e.nom, e.prenom;";
+		//echo "$sql<br />";
+		$res_ele_grp=mysql_query($sql);
+		if(mysql_num_rows($res_ele_grp)>0) {
+			while($lig_ele_grp=mysql_fetch_object($res_ele_grp)) {
+				$tab_eleve[]=$lig_ele_grp->login;
+			}
+		}
+	}
+
 	//echo "</td></tr></table>";
 	echo "</th>\n";
 	echo "</tr>\n";
@@ -781,7 +809,16 @@ if(!isset($_POST['recopie_select'])) {
 	echo "</td>\n";
 	echo "</tr>\n";
 	*/
-	
+
+	echo "<tr id='tr_effectifs' style='display:none;'>\n";
+	echo "<th>Effectifs</th>\n";
+	echo "<th id='effectif_total'></th>\n";
+	for($i=0;$i<count($id_groupe);$i++) {
+		echo "<th id='effectif_colonne_$i'></th>\n";
+	}
+	echo "<th></th>\n";
+	echo "</tr>\n";
+
 	// LISTE FOIREUSE UNE FOIS QU'ON A VALIDE UNE FOIS
 	//for($j=0;$j<count($group["eleves"]["all"]["list"]);$j++) {
 	$cpt=0;
@@ -806,7 +843,8 @@ if(!isset($_POST['recopie_select'])) {
 		echo "<tr class='lig$alt white_hover'>\n";
 		echo "<td>\n";
 		echo "<input type='hidden' name='login_ele[$cpt]' value='".$login_ele."' />\n";
-		echo get_nom_prenom_eleve($login_ele);
+		$nom_prenom_ele=get_nom_prenom_eleve($login_ele);
+		echo $nom_prenom_ele;
 		echo "</td>\n";
 	
 		echo "<td>\n";
@@ -833,8 +871,8 @@ if(!isset($_POST['recopie_select'])) {
 			echo "</td>\n";
 			*/
 
-			$ligne_si_desinscription_possible.="<td>\n";
-			$ligne_si_desinscription_possible.="<input type='radio' name='grp_eleve[$cpt]' id='grp_eleve_".$i."_".$cpt."' value='".$id_groupe[$i]."' onchange='changement()' title=\"$tab_eleve[$j] -&gt; ".$group[$i]['name']." de ".$group[$i]['classlist_string']."\" ";
+			$ligne_si_desinscription_possible.="<td onclick=\"document.getElementById('grp_eleve_".$i."_".$cpt."').checked=true;calcule_effectifs();changement();\" title=\"Mettre $nom_prenom_ele dans le groupe ".$group[$i]['name']." de ".$group[$i]['classlist_string']."\">\n";
+			$ligne_si_desinscription_possible.="<input type='radio' name='grp_eleve[$cpt]' id='grp_eleve_".$i."_".$cpt."' value='".$id_groupe[$i]."' onchange='calcule_effectifs();changement()' ";
 			if(in_array($login_ele,$group[$i]["eleves"][$num_periode]["list"])) {
 				$ligne_si_desinscription_possible.="checked ";
 				if($nb_grp_ele>0) {$info_plusieurs_grp_ele.=", ";}
@@ -900,7 +938,7 @@ if(!isset($_POST['recopie_select'])) {
 
 	//===============================
 	echo "<form action='".$_SERVER['PHP_SELF']."' name='form3' method='post'>\n";
-	echo "<fieldset style='padding-top: 8px; padding-bottom: 8px;  margin-left: auto; margin-right: auto;'>\n";
+	echo "<fieldset style='padding-top: 8px; padding-bottom: 8px;  margin-left: auto; margin-right: auto; background-image: url(\"../images/background/opacite50.png\"); '>\n";
 	echo add_token_field();
 	for($i=0;$i<count($id_classe);$i++) {echo "<input type='hidden' name='id_classe[]' value='$id_classe[$i]' />\n";}
 	for($i=0;$i<count($id_groupe);$i++) {echo "<input type='hidden' name='id_groupe[]' value='$id_groupe[$i]' />\n";}
@@ -964,6 +1002,20 @@ if(!isset($_POST['recopie_select'])) {
 		}
 	}
 
+	function calcule_effectifs() {
+		for (var i=0;i<".count($id_groupe).";i++) {
+			total=0;
+			for (var ki=0;ki<$cpt;ki++) {
+				if(document.getElementById('grp_eleve_'+i+'_'+ki)) {
+					if(document.getElementById('grp_eleve_'+i+'_'+ki).checked==true) {total++;}
+				}
+			}
+			document.getElementById('effectif_colonne_'+i).innerHTML=total;
+		}
+		document.getElementById('effectif_total').innerHTML=$cpt;
+	}
+	calcule_effectifs();
+	document.getElementById('tr_effectifs').style.display='';
 </script>\n";
 
 	//====================================
@@ -1128,11 +1180,13 @@ else {
 	*/
 	echo "</th>\n";
 
+	// 20130919
+	$tab_champs_modele_coller=array();
 	for($i=0;$i<count($id_groupe);$i++) {
-
 		for($m=1;$m<=$maxper;$m++) {
 			echo "<th>";
-			echo "<input type='radio' name='modele' id='modele_$i' value='$i.$m' />\n";
+			echo "<input type='radio' name='modele' id='modele_".$i."_".$m."' value='$i.$m' onchange=\"update_liens_coller_visibles();changement();\" />\n";
+			$tab_champs_modele_coller[]=$i."_".$m;
 			echo "</th>\n";
 		}
 	}
@@ -1147,7 +1201,7 @@ else {
 	for($i=0;$i<count($id_groupe);$i++) {
 		for($m=1;$m<=$maxper;$m++) {
 			echo "<th>";
-			echo "<a href='javascript:copier_selection($i,$m);changement();'><img src='../images/icons/coller_23x24.png' width='23' height='24' alt='Coller la sélection' title='Coller la sélection' /></a>\n";
+			echo "<a id='coller_".$i."_".$m."' href='javascript:copier_selection($i,$m);changement();'><img src='../images/icons/coller_23x24.png' width='23' height='24' alt='Coller la sélection' title='Coller la sélection' /></a>\n";
 			echo "</th>\n";
 		}
 
@@ -1322,7 +1376,35 @@ else {
 	echo "</form>\n";
 */
 
+	// 20130919
+	$init_coches="var tab_suffixe_coller=new Array();\n";
+	for($loop=0;$loop<count($tab_champs_modele_coller);$loop++) {
+		$init_coches.="
+		if(document.getElementById('coller_".$tab_champs_modele_coller[$loop]."')) {
+			document.getElementById('coller_".$tab_champs_modele_coller[$loop]."').style.display='none';
+		}
+		tab_suffixe_coller[$loop]='".$tab_champs_modele_coller[$loop]."';\n";
+	}
+
 	echo "<script type='text/javascript'>
+	$init_coches;
+
+	function update_liens_coller_visibles() {
+		for(i=0;i<tab_suffixe_coller.length;i++) {
+			if(document.getElementById('coller_'+tab_suffixe_coller[i])) {
+				document.getElementById('coller_'+tab_suffixe_coller[i]).style.display='';
+			}
+
+			if(document.getElementById('modele_'+tab_suffixe_coller[i])) {
+				if(document.getElementById('modele_'+tab_suffixe_coller[i]).checked==true) {
+					if(document.getElementById('coller_'+tab_suffixe_coller[i])) {
+						document.getElementById('coller_'+tab_suffixe_coller[i]).style.display='none';
+					}
+				}
+			}
+		}
+	}
+
 	function copier_selection(indice_grp,num_per) {
 		// Récupération du bouton radio sélectionné pour trouver la colonne modèle.
 		modele='';

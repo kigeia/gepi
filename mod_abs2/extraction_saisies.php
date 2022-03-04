@@ -106,6 +106,14 @@ if ($affichage != 'ods') {// on affiche pas de html
 	    include('menu_bilans.inc.php');
 	    ?>
 	    <div id="contain_div" class="css-panes">
+	    <?php
+	        /*
+	        if(acces("/mod_abs2/calcul_score.php", $_SESSION['statut'])) {
+	            echo "
+	    <div style='float:right; width:3em;'><a href='calcul_score.php'>Scores</a></div>";
+	        }
+	        */
+	    ?>
 	    <form dojoType="dijit.form.Form" id="choix_extraction" name="choix_extraction" action="<?php $_SERVER['PHP_SELF']?>" method="post">
 	    <h2>Extraire les saisies du 		
 	    <input style="width : 8em;font-size:14px;" type="text" dojoType="dijit.form.DateTextBox" id="date_absence_eleve_debut" name="date_absence_eleve_debut" value="<?php echo $dt_date_absence_eleve_debut->format('Y-m-d')?>" />
@@ -189,6 +197,8 @@ if ($affichage != null && $affichage != '') {
 }
 
 if ($affichage == 'html') {
+	$alt=1;
+
 	$saisie_col = $saisie_query->find();
     echo '<table style="border:1px solid">';
     $precedent_eleve_id = null;
@@ -207,14 +217,24 @@ if ($affichage == 'html') {
 	    //on affiche une nouvelle ligne
 	    echo '<tr style="border:1px solid">';
 	    echo '<td style="border:1px solid; vertical-align:top">';
+	    echo '<a href="../eleves/visu_eleve.php?ele_login='.$saisie->getEleve()->getLogin().'&amp;onglet=absences&amp;quitter_la_page=y" target="_blank" title="Voir la fiche élève">';
 	    echo $saisie->getEleve()->getNom().' '.$saisie->getEleve()->getPrenom().' '.$saisie->getEleve()->getClasseNom();
+	    echo '</a>';
 	    echo '</td>';
 	    echo '<td style="border:1px solid">';
-	    echo '<table>';
+	    echo '<table cellspacing="0" width="100%">';
 	}
-	echo '<tr>';
+
+	$tmp_tab=explode(" ", $saisie->getDateDescription());
+	if((!isset($jour_precedent))||($tmp_tab[2]!=$jour_precedent)) {
+		$alt=$alt*(-1);
+		$jour_precedent=$tmp_tab[2];
+	}
+	echo '<tr class="lig'.$alt.'">';
 	echo '<td>';
+	echo '<a href="visu_saisie.php?id_saisie='.$saisie->getId().'">';
 	echo $saisie->getDateDescription();
+	echo '</a>';
 	echo '</td>';
 	echo '<td>';
 	echo $saisie->getTypesDescription();

@@ -335,6 +335,7 @@ elseif($disable_login=="no"){
 </p>
 
 <form action="gestion_connect.php" id="form_acti_connect" method="post">
+<fieldset style='border: 1px solid grey; background-image: url("../images/background/opacite50.png"); '>
 	<p>
 <?php echo add_token_field(); ?>
 		<input type='radio' 
@@ -377,6 +378,7 @@ elseif($disable_login=="no"){
 	<p class="center">
 		<input type="submit" name="valid_acti_mdp" value="Valider" />
 	</p>
+</fieldset>
 </form>
 
 <hr />
@@ -385,7 +387,7 @@ elseif($disable_login=="no"){
 //
 // Message sur la page de login
 // ?>
-<a name='message_login'></a>
+<a id='message_login'></a>
 <h2>Faire apparaitre un message sur la page de login</h2>
 
 <?php 
@@ -401,27 +403,33 @@ if(mysql_num_rows($res)==0) {
 <?php } else { ?>
 
 <form action="gestion_connect.php" id="form_message_login" method="post">
-	<p>
-	<?php echo add_token_field(); ?>
-		<input type='radio' 
-			   name='message_login' 
-			   id='message_login0' 
-			   value='0'
-			   <?php if($message_login==0) {echo " checked='checked'";} ?> />
-		<label for='message_login0'> Aucun message</label>
-	</p>
+<fieldset style='border: 1px solid grey; background-image: url("../images/background/opacite50.png"); '>
+	<div style='border:1px dashed black; margin:1em;'>
+		<p>
+		<?php echo add_token_field(); ?>
+			<input type='radio' 
+				   name='message_login' 
+				   id='message_login0' 
+				   value='0'
+				   <?php if($message_login==0) {echo " checked='checked'";} ?> />
+			<label for='message_login0'> Aucun message</label>
+		</p>
+	</div>
 <?php 
 	while($lig=mysql_fetch_object($res)) { ?>
-	<p>
-		<input type='radio' 
-			   name='message_login' 
-			   id='message_login<?php echo $lig->id; ?>' 
-			   value='<?php echo $lig->id; ?>'
-			   <?php if($message_login==$lig->id) {echo " checked='checked'";} ?> />
-		<label for='message_login<?php echo $lig->id; ?>'> <?php echo nl2br($lig->texte); ?></label>
-	</p>
+	<div style='border:1px dashed black; margin:1em;'>
+		<p>
+			<input type='radio' 
+				   name='message_login' 
+				   id='message_login<?php echo $lig->id; ?>' 
+				   value='<?php echo $lig->id; ?>'
+				   <?php if($message_login==$lig->id) {echo " checked='checked'";} ?> />
+			<label for='message_login<?php echo $lig->id; ?>'> <?php echo nl2br($lig->texte); ?></label>
+		</p>
+	</div>
 <?php } ?>
 	<p class="center"><input type="submit" name="valid_message" value="Valider" /></p>
+</fieldset>
 </form>
 
 <p><a href='saisie_message_connexion.php'>Saisir de nouveaux messages ou modifier des messages existants.</a></p>
@@ -448,6 +456,7 @@ if(mysql_num_rows($res)==0) {
 </p>
 
 <form action="gestion_connect.php" id="form_param_mdp" method="post">
+<fieldset style='border: 1px solid grey; background-image: url("../images/background/opacite50.png"); '>
 	<table>
 	<tr style="text-align:left;">
 	<td>
@@ -483,6 +492,7 @@ if(mysql_num_rows($res)==0) {
 	<p class="center">
 		<input type="submit" name="valid_param_mdp" value="Valider" />
 	</p>
+</fieldset>
 </form>
 
 <hr />
@@ -506,6 +516,7 @@ if(mysql_num_rows($res)==0) {
 </p>
 
 <form action="gestion_connect.php" id="form_mail_connexion" method="post">
+<fieldset style='border: 1px solid grey; background-image: url("../images/background/opacite50.png"); '>
 	<p>
 	<?php echo add_token_field(); ?>
 			Activer l'envoi de mail lors de la connexion :
@@ -530,6 +541,7 @@ if(mysql_num_rows($res)==0) {
 	<p class="center">
 		<input type="submit" name="valid_envoi_mail_connexion" value="Valider" />
 	</p>
+</fieldset>
 </form>
 
 <hr />
@@ -708,9 +720,10 @@ switch( $duree2 ) {
 </ul>
 	
 <form action="gestion_connect.php#tab_connexions" id="form_affiche_log" method="post">
+<fieldset style='border: 1px solid grey; background-image: url("../images/background/opacite50.png"); '>
 	<p>
-	Afficher le journal des connexions : 
-	<select name="duree2" size="1">
+        <label for="duree2" >Afficher le journal des connexions : </label>
+	<select id="duree2" size="1">
 		<option <?php if ($duree2 == '20dernieres') echo "selected = 'selected'"; ?> value='20dernieres'>
 			les 20 dernières
 		</option>
@@ -744,6 +757,7 @@ switch( $duree2 ) {
 		<input type="submit" name="Valider" value="Valider" />
 		<input type="hidden" name="mode_navig" value='$mode_navig' />
 	</p>
+</fieldset>
 </form>
 	
 <div class='noprint' 
@@ -751,16 +765,17 @@ switch( $duree2 ) {
 	<a href='<?php echo $_SERVER['PHP_SELF']; ?>?mode=csv'>CSV</a>
 </div>
 
-<a name='tab_connexions'></a>
+<a id='tab_connexions'></a>
 	<table class='boireaus center'>
-         <th class="col">Statut</th>
-		<th class="col">Identifiant</th>
-        <th class="col">Début session</th>
-        <th class="col">Fin session</th>
-        <th class="col"><a href='gestion_connect.php?order_by=ip<?php if(isset($duree2)){echo "&amp;duree2=$duree2";}?>#tab_connexions'>Adresse IP et nom de la machine cliente</a></th>
-        <th class="col">Navigateur</th>
-        <th class="col">Provenance</th>
-    </tr>
+        <tr>
+            <th class="col">Statut</th>
+		    <th class="col">Identifiant</th>
+            <th class="col">Début session</th>
+            <th class="col">Fin session</th>
+            <th class="col"><a href='gestion_connect.php?order_by=ip<?php if(isset($duree2)){echo "&amp;duree2=$duree2";}?>#tab_connexions'>Adresse IP et nom de la machine cliente</a></th>
+            <th class="col">Navigateur</th>
+            <th class="col">Provenance</th>
+        </tr>
 
 <?php
 $requete = '';

@@ -2,7 +2,7 @@
 
 /*
  *
- * Copyright 2001, 2011 Thomas Belliard, Laurent Delineau, Edouard Hue, Eric Lebrun
+ * Copyright 2001, 2013 Thomas Belliard, Laurent Delineau, Edouard Hue, Eric Lebrun
  *
  * This file is part of GEPI.
  *
@@ -47,11 +47,23 @@ if(mb_strtolower(mb_substr(getSettingValue('active_mod_discipline'),0,1))!='y') 
 	die();
 }
 
+require('sanctions_func_lib.php');
+
+$acces_ok="n";
+if(($_SESSION['statut']=='administrateur')||
+(($_SESSION['statut']=='cpe')&&(getSettingAOui('GepiDiscDefinirRolesCpe')))||
+(($_SESSION['statut']=='scolarite')&&(getSettingAOui('GepiDiscDefinirRolesScol')))) {
+	$acces_ok="y";
+}
+else {
+	$msg="Vous n'avez pas le droit de définir les rôles dans les ".$mod_disc_terme_incident."s.";
+	header("Location: ./index.php?msg=$msg");
+	die();
+}
+
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 // REMARQUE: Le terme de 'qualité' a été remplacé par 'rôle'
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-require('sanctions_func_lib.php');
 
 $msg="";
 
@@ -94,11 +106,9 @@ if((isset($qualite))&&($qualite!='')) {
 	if($a_enregistrer=='y') {
 		check_token();
 
-		$qualite=preg_replace('/(\\\r\\\n)+/',"\r\n",$qualite);
-		$qualite=preg_replace('/(\\\r)+/',"\r",$qualite);
-		$qualite=preg_replace('/(\\\n)+/',"\n",$qualite);
+		$qualite=suppression_sauts_de_lignes_surnumeraires($qualite);
 
-		$sql="INSERT INTO s_qualites SET qualite='".$qualite."';";
+		$sql="INSERT INTO s_qualites SET qualite='".mysql_real_escape_string($qualite)."';";
 		$res=mysql_query($sql);
 		if(!$res) {
 			$msg.="ERREUR lors de l'enregistrement de ".$qualite."<br />\n";
@@ -111,7 +121,6 @@ if((isset($qualite))&&($qualite!='')) {
 
 $themessage  = 'Des informations ont été modifiées. Voulez-vous vraiment quitter sans enregistrer ?';
 //**************** EN-TETE *****************
-//$titre_page = "Sanctions: Définition des qualités";
 $titre_page = "Discipline: Définition des rôles";
 require_once("../lib/header.inc.php");
 //**************** FIN EN-TETE *****************
@@ -125,7 +134,7 @@ echo "<form enctype='multipart/form-data' action='".$_SERVER['PHP_SELF']."' meth
 echo add_token_field();
 
 //echo "<p class='bold'>Saisie des qualités dans un incident&nbsp;:</p>\n";
-echo "<p class='bold'>Saisie des rôles dans un incident&nbsp;:</p>\n";
+echo "<p class='bold'>Saisie des rôles dans un ".$mod_disc_terme_incident."&nbsp;:</p>\n";
 echo "<blockquote>\n";
 
 $cpt=0;
@@ -166,7 +175,7 @@ else {
 }
 echo "</blockquote>\n";
 
-echo "<p>Nouvelle qualité&nbsp;: <input type='text' name='qualite' value='' onchange='changement();' /></p>\n";
+echo "<p>Nouveau rôle&nbsp;: <input type='text' name='qualite' value='' onchange='changement();' /></p>\n";
 
 echo "<input type='hidden' name='cpt' value='$cpt' />\n";
 

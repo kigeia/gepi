@@ -1,7 +1,7 @@
 <?php
 /*
 *
-* Copyright 2001, 2011 Thomas Belliard, Laurent Delineau, Edouard Hue, Eric Lebrun
+* Copyright 2001, 2012 Thomas Belliard, Laurent Delineau, Edouard Hue, Eric Lebrun
 *
 * This file is part of GEPI.
 *
@@ -41,9 +41,10 @@ if (!checkAccess()) {
 	die();
 }
 include "../lib/periodes.inc.php";
+
 $_SESSION['chemin_retour'] = $gepiPath."/classes/classes_const.php?id_classe=".$id_classe;
 
-$explication_motif_bloquant_suppression_eleve_de_la_classe="La présence de moyennes, appréciations ou avis du conseil de classe est bloquante pour la suppression d'un élève d'une classe.<br />Vous pouvez demander aux professeurs de vider leurs notes et appréciations pour le ou les élèves en question.<br />Sinon, un compte de statut 'secours' permet de corriger/vider des moyennes, appréciations et/ou avis du conseil de classe.";
+$explication_motif_bloquant_suppression_eleve_de_la_classe="La présence de moyennes, appréciations ou avis du conseil de classe est bloquante pour la suppression d'un élève d'une classe.<br />Vous pouvez demander aux professeurs de vider leurs notes et appréciations pour le ou les élèves en question.<br />Sinon, un compte de statut 'secours' permet de corriger/vider des moyennes, appréciations et/ou avis du conseil de classe en se rendant dans la <em>rubrique Saisie/Bulletin : saisie des moyennes et des appréciations par matière/Choix d'un élève</em>.";
 
 if (isset($is_posted)) {
 	check_token();
@@ -518,7 +519,7 @@ echo add_token_field();
 
 
 
-<p class='bold'>Classe : <?php echo $classe; ?></p>
+<p class='bold'>Classe&nbsp;: <?php echo $classe; ?></p>
 <center><input type="submit" value="Enregistrer" /></center>
 <p>
 
@@ -526,7 +527,7 @@ echo add_token_field();
 echo "<img src='../images/icons/add_user.png' alt='' /> <a href='classes_ajout.php?id_classe=$id_classe' onclick=\"return confirm_abandon (this, change, '$themessage')\">Ajouter des élèves à la classe</a>";
 ?>
 </p>
-<p class='small'><b>Remarque :</b> lors du retrait d'un élève de la classe pour une période donnée, celui-ci sera retiré de tous les enseignements auxquels il était inscrit pour la période en question.</p>
+<p class='small'><b>Remarque&nbsp;:</b> lors du retrait d'un élève de la classe pour une période donnée, celui-ci sera retiré de tous les enseignements auxquels il était inscrit pour la période en question.</p>
 <?php
 
 
@@ -631,14 +632,21 @@ function imposer_cpe() {
 		$login_cpe_unique_actuel="";
 	}
 
+	$tab_eff_per=array();
+	$i="1";
+	while ($i < $nb_periode) {
+		$tab_eff_per[$i]=0;
+		$i++;
+	}
 
+	$gepi_prof_suivi=ucfirst(getSettingValue("gepi_prof_suivi"));
 	$k = '0';
 	echo "<table class='boireaus' border='1' cellpadding='5' class='boireaus' summary='Elèves'>\n";
 	echo "<tr>\n";
 	echo "<th>Nom Prénom </th>\n";
 	echo "<th>Régime</th>\n";
 	echo "<th>Redoublant</th>\n";
-	echo "<th>".ucfirst(getSettingValue("gepi_prof_suivi"));
+	echo "<th>".$gepi_prof_suivi;
 	echo "<select size='1' name='pp_a_imposer' id='pp_a_imposer' style='font-size:small;'";
 	echo ">\n";
 	echo "<option value='0'>(vide)</option>\n";
@@ -670,7 +678,9 @@ function imposer_cpe() {
 	$i="1";
 	while ($i < $nb_periode) {
 		//echo "<th><p class=\"small\">Retirer de la classe<br />$nom_periode[$i]</p></th>\n";
-		echo "<th><p class=\"small\">Retirer de la classe<br />$nom_periode[$i]<br />\n";
+		echo "<th><p class=\"small\" title=\"Fin de la période $i
+au sens Absences/appartenance de l'élève
+à la classe : ".formate_date($date_fin_periode[$i])."\">Retirer de la classe<br />$nom_periode[$i]<br />\n";
 
 		echo "<a href=\"javascript:CocheColonne(".$i.");changement();\"><img src='../images/enabled.png' width='15' height='15' alt='Tout cocher' /></a> / <a href=\"javascript:DecocheColonne(".$i.");changement();\"><img src='../images/disabled.png' width='15' height='15' alt='Tout décocher' /></a>";
 
@@ -680,7 +690,7 @@ function imposer_cpe() {
 	echo "<th>&nbsp;</th>\n";
 	echo "</tr>\n";
 	$alt=1;
-	While ($k < $nombreligne) {
+	while($k < $nombreligne) {
 		$login_eleve = mysql_result($call_eleves, $k, 'login');
 		$call_regime = mysql_query("SELECT * FROM j_eleves_regime WHERE login='$login_eleve'");
 		$doublant = @mysql_result($call_regime, 0, 'doublant');
@@ -726,7 +736,7 @@ function imposer_cpe() {
 
 		echo "";
 
-		echo "<table style='border-collaspe: collapse;' summary='Régime'>\n";
+		echo "<table style='border-collaspe: collapse;' summary='Régime' title='Régime'>\n";
 		echo "<tr>\n";
 
 		echo "<td style='text-align: center; border: 0px;'>I-ext<br /><input type='radio' name='regime_eleve[$k]' value='i-e' ";
@@ -751,12 +761,12 @@ function imposer_cpe() {
 
 		echo "</td>\n";
 
-		echo "<td><p align='center'><input type='checkbox' name='doublant_eleve[$k]' value='yes' ";
+		echo "<td><p align='center' title='Doublant ou non'><input type='checkbox' name='doublant_eleve[$k]' value='yes' ";
 		if ($doublant == 'R') {echo " checked";}
 		echo " onchange='changement()'";
 		echo " /></p></td>\n";
 
-		echo "<td>\n";
+		echo "<td title='".$gepi_prof_suivi."'>\n";
 		echo "<p><select size='1' name='prof_principal[$k]' id='prof_principal_$k'";
 		echo " onchange='changement()'";
 		echo ">\n";
@@ -771,7 +781,7 @@ function imposer_cpe() {
 		echo "</select></p>\n";
 		echo "</td>\n";
 
-		echo "<td>\n";
+		echo "<td title='CPE'>\n";
 		echo "<p><select size='1' name='cpe_resp[$k]' id='cpe_resp_$k'";
 		echo " onchange='changement()'";
 		echo ">\n";
@@ -791,7 +801,11 @@ function imposer_cpe() {
 			$call_trim = mysql_query("SELECT periode FROM j_eleves_classes WHERE (id_classe = '$id_classe' and periode = '$i' and login = '$login_eleve')");
 			$nb_ligne = mysql_num_rows($call_trim);
 			if ($nb_ligne != 0) {
-				echo "<td>";
+				if(!isset($tab_eff_per[$i])) {$tab_eff_per[$i]=0;}
+				$tab_eff_per[$i]++;
+				echo "<td title=\"Fin de la période $i
+au sens Absences/appartenance de l'élève
+à la classe : ".formate_date($date_fin_periode[$i])."\">";
 				echo "<p align='center'>";
 
 				// Tester s'il y a des notes/app dans le bulletin
@@ -857,6 +871,23 @@ function imposer_cpe() {
 		echo "</tr>\n";
 		$k++;
 	}
+
+	echo "<tr>\n";
+	echo "<th>Total</th>\n";
+	echo "<th>&nbsp;</th>\n";
+	echo "<th>&nbsp;</th>\n";
+	echo "<th>&nbsp;</th>\n";
+	echo "<th>&nbsp;</th>\n";
+	$i="1";
+	while ($i < $nb_periode) {
+		echo "<th title='".$tab_eff_per[$i]." élève(s) en période $i'>";
+		echo $tab_eff_per[$i];
+		echo "</th>\n";
+		$i++;
+	}
+	echo "<th>&nbsp;</th>\n";
+	echo "</tr>\n";
+
 	echo "</table>\n";
 	echo "<p align='center'><input type='submit' value='Enregistrer' style='margin: 30px 0 60px 0;'/></p>\n";
 	echo "<br />\n";

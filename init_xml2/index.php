@@ -45,12 +45,25 @@ require_once("../lib/header.inc.php");
 //**************** FIN EN-TETE *****************
 ?>
 <p class='bold'><a href="../gestion/index.php#init_xml2"><img src='../images/icons/back.png' alt='Retour' class='back_link'/> Retour</a></p>
-<?php if (getSettingValue('use_ent') == 'y') {
+<?php
+// A MODIFIER : Pouvoir gérer use_ent et NetCollege ITOP hors 27:
+if ((getSettingValue("use_ent") == 'y')&&(!preg_match("/^027/", getSettingValue('gepiSchoolRne')))) {
 	echo '<p>Avant de commencer, vous devez récupérer les logins de vos utilisateurs dans l\'ENT : <a href="../mod_ent/index.php">RECUPERER</a></p>';
 }
 ?>
 
-<p>Vous allez effectuer l'initialisation de l'année scolaire qui vient de débuter.</p>
+<p><strong>Vous allez effectuer l'initialisation de l'année scolaire qui vient de débuter.</strong><br />
+(<em>c'est une opération que vous ne devez effectuer qu'<span style='color:red'>une seule fois par an</span>.<br />
+<?php
+
+	if(getSettingValue("import_maj_xml_sconet")==1) {
+		echo "Pour mettre à jour la base avec les informations saisies en cours d'année dans Sconet pour les changements d'adresses, arrivées d'èlèves,...<br />il faut effectuer une <a href='../responsables/maj_import.php'>Mise à jour d'après Sconet</a></em>)<br />";
+	}
+	else {
+		echo "L'initialisation d'année ne convient pas pour prendre en compte les changements d'adresses, arrivées d'èlèves,...</em>)<br />";
+	}
+?>
+<br />
 <?php
 
 	//if((getSettingValue('use_sso')=="lcs")||(getSettingValue('use_sso')=="ldap_scribe")) {
@@ -62,6 +75,17 @@ require_once("../lib/header.inc.php");
 	}
 
 	echo "<p>Avez-vous pensé à effectuer les différentes opérations de fin d'année et préparation de nouvelle année à la page <a href='../gestion/changement_d_annee.php' style='font-weight:bold;'>Changement d'année</a>&nbsp?</p>\n";
+
+	$sql="CREATE TABLE IF NOT EXISTS ldap_bx (
+		id INT( 11 ) NOT NULL AUTO_INCREMENT ,
+		login_u VARCHAR( 200 ) NOT NULL ,
+		nom_u VARCHAR( 200 ) NOT NULL ,
+		prenom_u VARCHAR( 200 ) NOT NULL ,
+		statut_u VARCHAR( 50 ) NOT NULL ,
+		identite_u VARCHAR( 50 ) NOT NULL ,
+		PRIMARY KEY ( id )
+		) ENGINE=MyISAM CHARACTER SET utf8 COLLATE utf8_general_ci;";
+	$create_table=mysql_query($sql);
 
 	/*
 	$sql="SELECT 1=1 FROM matieres_notes LIMIT 1;";

@@ -122,6 +122,17 @@ if (isset($is_posted) and ($is_posted == 1)) {
 							$sql="INSERT INTO j_eleves_classes VALUES('$login_eleve', '$id_classe', $i, '0');";
 							$reg_data = mysql_query($sql);
 							if (!($reg_data))  {$reg_ok = 'no';}
+							else {
+								// Ménage:
+								$sql="SELECT id FROM infos_actions WHERE titre LIKE 'Ajout dans une classe % effectuer pour %($login_eleve)';";
+								$res_actions=mysql_query($sql);
+								if(mysql_num_rows($res_actions)>0) {
+									while($lig_action=mysql_fetch_object($res_actions)) {
+										$menage=del_info_action($lig_action->id);
+										if(!$menage) {$msg.="Erreur lors de la suppression de l'action en attente en page d'accueil à propos de $login_eleve<br />";}
+									}
+								}
+							}
 						}
 
 		
@@ -385,7 +396,11 @@ if ($nombreligne == '0') {
 	echo "<th><p><b>Redoublant</b></p></th>\n";
 	$i="1";
 	while ($i < $nb_periode) {
-		echo "<th><p><b>Ajouter per. $i</b></p></th>\n";
+		echo "<th><p><b>Ajouter per. $i</b><br />";
+
+		echo "<a href=\"javascript:CocheColonne(".$i.");changement();\"><img src='../images/enabled.png' width='15' height='15' alt='Tout cocher' /></a> / <a href=\"javascript:DecocheColonne(".$i.");changement();\"><img src='../images/disabled.png' width='15' height='15' alt='Tout décocher' /></a>";
+
+		echo "</p></th>\n";
 		$i++;
 	}
 
@@ -399,8 +414,9 @@ if ($nombreligne == '0') {
 
 	//$ki=0;
 	//=========================
+	$chaine_id_eleve=array();
 	$alt=1;
-	While ($k < $nombreligne) {
+	while($k < $nombreligne) {
 		$id_eleve = mysql_result($call_eleves, $k, 'id_eleve');
 		$login_eleve = mysql_result($call_eleves, $k, 'login');
 		$nom_eleve = mysql_result($call_eleves, $k, 'nom');
@@ -487,6 +503,7 @@ if ($nombreligne == '0') {
 				if ($nom_classe[$i] == 'vide') {
 					//echo "<input type='checkbox' name='ajout_eleve_".$ki."[$i]' id='case_".$ki."_".$i."' value='yes' onchange='changement()' />";
 					echo "<input type='checkbox' name='ajout_eleve_".$id_eleve."[$i]' id='case_".$id_eleve."_".$i."' value='yes' onchange='changement()' />";
+					$chaine_id_eleve[$i][]="case_".$id_eleve."_".$i;
 				} else {
 					echo "$nom_classe[$i]";
 				}
@@ -515,6 +532,47 @@ if ($nombreligne == '0') {
 		echo "<p align='center'><input type='submit' value='Enregistrer' /></p>\n";
 	}
 }
+
+	echo "<script type='text/javascript'>
+";
+	$js_chaine_id_eleve="";
+	$i="1";
+	while ($i < $nb_periode) {
+		$js_chaine_id_eleve.="var js_col_$i=new Array(";
+		for($loop=0;$loop<$k;$loop++) {
+			if((isset($chaine_id_eleve[$i][$loop]))&&($chaine_id_eleve[$i][$loop]!='')) {
+				if($loop>0) {$js_chaine_id_eleve.=", ";}
+				$js_chaine_id_eleve.="'".$chaine_id_eleve[$i][$loop]."'";
+			}
+		}
+		$js_chaine_id_eleve.=");";
+		$i++;
+	}
+
+	echo $js_chaine_id_eleve;
+
+	echo "
+function CocheColonne(i) {
+	tab=eval('js_col_'+i);
+	for (var ki=0;ki<tab.length;ki++) {
+		if(document.getElementById(tab[ki])){
+			document.getElementById(tab[ki]).checked = true;
+		}
+	}
+}
+
+function DecocheColonne(i) {
+	tab=eval('js_col_'+i);
+	for (var ki=0;ki<tab.length;ki++) {
+		if(document.getElementById(tab[ki])){
+			document.getElementById(tab[ki]).checked = false;
+		}
+	}
+}
+
+</script>
+";
+
 ?>
 <input type='hidden' name='id_classe' value='<?php echo $id_classe;?>' />
 <input type='hidden' name='is_posted' value='1' />

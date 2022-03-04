@@ -24,7 +24,8 @@ $autorise[0] = array('/accueil.php',
 				'/gestion/contacter_admin.php',
 				'/gestion/info_gepi.php');
 // droits spécifiques sur les pages relatives aux droits possibles
-$autorise[1] = array('/cahier_notes/visu_releve_notes.php');
+//$autorise[1] = array('/cahier_notes/visu_releve_notes.php');
+$autorise[1] = array('/cahier_notes/visu_releve_notes_bis.php');
 $autorise[2] = array('/prepa_conseil/index3.php', '/prepa_conseil/edit_limite.php');
 $autorise[3] = array('/mod_absences/gestion/voir_absences_viescolaire.php',
 						'/mod_absences/gestion/bilan_absences_quotidien.php',
@@ -61,13 +62,18 @@ $autorise[18]= array('/mod_discipline/index.php',
 					 '/mod_ooo/rapport_incident.php');
 $autorise[19]= array('/mod_abs2/index.php');
 $autorise[20]= array('/mod_abs2/saisir_eleve.php',
+					 '/mod_abs2/saisir_groupe.php',
 					 '/mod_abs2/visu_saisie.php',
 					 '/mod_abs2/enregistrement_modif_saisie.php',
 					 '/mod_abs2/liste_saisies.php',
-					 '/mod_abs2/enregistrement_saisie_eleve.php');
+					 '/mod_abs2/enregistrement_saisie_eleve.php',
+					 '/mod_abs2/enregistrement_saisie_groupe.php');
 $autorise[21]= array('/mod_abs2/bilan_individuel.php' );
 $autorise[22]= array('/mod_abs2/totaux_du_jour.php' );
 $autorise[23]= array('/bulletin/bull_index.php' );
+$autorise[24]= array('/groupes/visu_profs_class.php', '/groupes/popup.php');
+$autorise[25]= array('/groupes/visu_mes_listes.php', '/groupes/popup.php', '/impression/liste_pdf.php', '/impression/impression.php', '/impression/impression_serie.php', '/impression/parametres_impression_pdf.php');
+$autorise[26]= array('/groupes/mes_listes.php', '/groupes/get_csv.php');
 
 
 $iter = count($autorise);
@@ -96,7 +102,10 @@ $menu_accueil[19] = array('Absence2', 'Absence2 : accéder au module.', 'abs');
 $menu_accueil[20] = array('Absence2', 'Absence2 : saisir les absences.', 'abs_saisie');
 $menu_accueil[21] = array('Absence2', 'Absence2 : accéder à la page bilan individuel.', 'abs_bilan');
 $menu_accueil[22] = array('Absence2', 'Absence2 : accéder à la page totaux du jour.', 'abs_totaux');
-$menu_accueil[23] = array('Bulletin', 'Visualisation et impression des bulletins ','bul_print')
+$menu_accueil[23] = array('Bulletin', 'Visualisation et impression des bulletins ','bul_print');
+$menu_accueil[24] = array('Visualisation équipes', 'Visualisation des équipes pédagogiques', 'visu_equipes_peda');
+$menu_accueil[25] = array('Visualisation listes élèves et grilles PDF', 'Visualisation listes élèves et grilles PDF', 'visu_listes_ele');
+$menu_accueil[26] = array('Accès aux listes CSV élèves', 'Accès aux listes CSV élèves', 'listes_ele_csv');
 
 
 ?>

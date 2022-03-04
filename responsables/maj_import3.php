@@ -44,7 +44,7 @@ $sql="INSERT INTO droits SET id='/responsables/maj_import3.php',
 administrateur='V',
 professeur='F',
 cpe='F',
-scolarite='F',
+scolarite='V',
 eleve='F',
 responsable='F',
 secours='F',
@@ -60,6 +60,11 @@ if (!checkAccess()) {
     die();
 }
 
+if(($_SESSION['statut']=='scolarite')&&(!getSettingAOui('GepiAccesMajSconetScol'))) {
+	header("Location: ../accueil.php?msg=Mise à jour Sconet non autorisée en compte scolarité.");
+	die();
+}
+
 $eleve_id_debug="";
 
 $eff_tranche_recherche_diff=isset($_POST['eff_tranche_recherche_diff']) ? $_POST['eff_tranche_recherche_diff'] : getSettingValue('maj_sconet_eff_tranche');
@@ -69,14 +74,31 @@ if(($eff_tranche_recherche_diff=='')||(!is_numeric($eff_tranche_recherche_diff))
 
 $ele_lieu_naissance=getSettingValue("ele_lieu_naissance") ? getSettingValue("ele_lieu_naissance") : "n";
 
+$ele_tel_pers=getSettingValue("ele_tel_pers") ? getSettingValue("ele_tel_pers") : "no";
+$ele_tel_port=getSettingValue("ele_tel_port") ? getSettingValue("ele_tel_port") : "yes";
+$ele_tel_prof=getSettingValue("ele_tel_prof") ? getSettingValue("ele_tel_prof") : "no";
+
 $ne_pas_tester_les_changements_de_classes=getSettingValue("no_test_chgt_clas");
 if($ne_pas_tester_les_changements_de_classes=="") {$ne_pas_tester_les_changements_de_classes="n";}
 // INSERT INTO setting SET name='no_test_chgt_clas', value='n';
 // UPDATE setting SET value='n' WHERE name='no_test_chgt_clas';
 
+$gepi_non_plugin_lcs_mais_recherche_ldap=false;
+if((getSettingAOui('gepi_non_plugin_lcs_mais_recherche_ldap'))&&(file_exists("../secure/config_ldap.inc.php"))) {
+	include("../secure/config_ldap.inc.php");
+
+	$lcs_ldap_base_dn=$ldap_base_dn;
+	$lcs_ldap_host=$ldap_host;
+	$lcs_ldap_port=$ldap_port;
+	$gepi_non_plugin_lcs_mais_recherche_ldap=true;
+
+	$lcs_ldap_people_dn = 'ou=people,'.$lcs_ldap_base_dn;
+	$lcs_ldap_groups_dn = 'ou=groups,'.$lcs_ldap_base_dn;
+}
+
 $auth_sso=getSettingValue("auth_sso") ? getSettingValue("auth_sso") : "";
 
-if($auth_sso=='lcs') {
+if(($auth_sso=='lcs')||($gepi_non_plugin_lcs_mais_recherche_ldap)) {
 	function connect_ldap($l_adresse,$l_port,$l_login,$l_pwd) {
 		$ds = @ldap_connect($l_adresse, $l_port);
 		if($ds) {
@@ -154,6 +176,27 @@ saveSetting('alert_diff_mail_ele', $alert_diff_mail_ele);
 saveSetting('alert_diff_mail_resp', $alert_diff_mail_resp);
 saveSetting('alert_diff_etab_origine', $alert_diff_etab_origine);
 
+$alert_diff_mef=isset($_POST['alert_diff_mef']) ? $_POST['alert_diff_mef'] : (isset($_GET['alert_diff_mef']) ? $_GET['alert_diff_mef'] : (isset($_SESSION['alert_diff_mef']) ? $_SESSION['alert_diff_mef'] : "y"));
+saveSetting('alert_diff_mef', $alert_diff_mef);
+
+$alert_diff_date_entree=isset($_POST['alert_diff_date_entree']) ? $_POST['alert_diff_date_entree'] : (isset($_GET['alert_diff_date_entree']) ? $_GET['alert_diff_date_entree'] : (isset($_SESSION['alert_diff_date_entree']) ? $_SESSION['alert_diff_date_entree'] : "y"));
+saveSetting('alert_diff_date_entree', $alert_diff_date_entree);
+
+// =====================================================
+// Test sur les modifications de telephone élève
+$ele_tel_prof_signaler_modif=isset($_POST['ele_tel_prof_signaler_modif']) ? $_POST['ele_tel_prof_signaler_modif'] : (isset($_GET['ele_tel_prof_signaler_modif']) ? $_GET['ele_tel_prof_signaler_modif'] : (isset($_SESSION['ele_tel_prof_signaler_modif']) ? $_SESSION['ele_tel_prof_signaler_modif'] : getSettingValue('ele_tel_prof_signaler_modif')));
+if(($ele_tel_prof_signaler_modif!='yes')&&($ele_tel_prof_signaler_modif!='no')) {$ele_tel_prof_signaler_modif="yes";}
+saveSetting('ele_tel_prof_signaler_modif', $ele_tel_prof_signaler_modif);
+
+$ele_tel_pers_signaler_modif=isset($_POST['ele_tel_pers_signaler_modif']) ? $_POST['ele_tel_pers_signaler_modif'] : (isset($_GET['ele_tel_pers_signaler_modif']) ? $_GET['ele_tel_pers_signaler_modif'] : (isset($_SESSION['ele_tel_pers_signaler_modif']) ? $_SESSION['ele_tel_pers_signaler_modif'] : getSettingValue('ele_tel_pers_signaler_modif')));
+if(($ele_tel_pers_signaler_modif!='yes')&&($ele_tel_pers_signaler_modif!='no')) {$ele_tel_pers_signaler_modif="yes";}
+saveSetting('ele_tel_pers_signaler_modif', $ele_tel_pers_signaler_modif);
+
+$ele_tel_port_signaler_modif=isset($_POST['ele_tel_port_signaler_modif']) ? $_POST['ele_tel_port_signaler_modif'] : (isset($_GET['ele_tel_port_signaler_modif']) ? $_GET['ele_tel_port_signaler_modif'] : (isset($_SESSION['ele_tel_port_signaler_modif']) ? $_SESSION['ele_tel_port_signaler_modif'] : getSettingValue('ele_tel_port_signaler_modif')));
+if(($ele_tel_port_signaler_modif!='yes')&&($ele_tel_port_signaler_modif!='no')) {$ele_tel_port_signaler_modif="yes";}
+saveSetting('ele_tel_port_signaler_modif', $ele_tel_port_signaler_modif);
+// =====================================================
+
 $stop=isset($_POST['stop']) ? $_POST['stop'] : (isset($_GET['stop']) ? $_GET['stop'] :'n');
 
 //$style_specifique="responsables/maj_import2";
@@ -194,7 +237,35 @@ $titre_page = "Mise à jour eleves/responsables";
 require_once("../lib/header.inc.php");
 //**************** FIN EN-TETE *****************
 
+if((isset($_POST['temoin_suhosin_1']))&&(!isset($_POST['temoin_suhosin_2']))) {
+	echo "<p style='color:red'>Il semble que certaines variables n'ont pas été transmises.<br />Cela peut arriver lorsqu'on tente de transmettre (<em>cocher trop de cases</em>) trop de variables.<br />Vous devriez tenter d'afficher moins de lignes à la fois.</p>\n";
+	echo alerte_config_suhosin();
+}
+
 require_once("../init_xml2/init_xml_lib.php");
+
+$sql="SHOW TABLES LIKE 'log_maj_sconet';";
+//echo "$sql<br />";
+$test = mysql_query($sql);
+if (mysql_num_rows($test) == 0) {
+	echo "<p class='bold'>";
+	if(isset($_SESSION['retour_apres_maj_sconet'])) {
+		echo "<a href=\"".$_SESSION['retour_apres_maj_sconet']."\"><img src='../images/icons/back.png' alt='Retour' class='back_link'/> Retour</a>";
+	}
+	else {
+		echo "<a href=\"index.php\"><img src='../images/icons/back.png' alt='Retour' class='back_link'/> Retour</a>";
+	}
+
+	if($_SESSION['statut']=='administrateur') {
+		echo "<p style='color:red'>La table 'log_maj_sconet' est absente.<br />Une <a href='../utilitaires/maj.php'>Mise à jour de la base</a> est requise.</p>\n";
+	}
+	else {
+		echo "<p style='color:red'>La table 'log_maj_sconet' est absente.<br />Une Mise à jour de la base est requise (<em><a href='../gestion/contacter_admin.php'>contactez l'administrateur</a></em>).</p>\n";
+	}
+
+	require("../lib/footer.inc.php");
+	die();
+}
 
 //debug_var();
 if(getSettingValue('maj_import2_debug_var')=='y') {
@@ -333,6 +404,10 @@ if(isset($_SESSION['retour_apres_maj_sconet'])) {
 else {
 	echo "<a href=\"index.php\"><img src='../images/icons/back.png' alt='Retour' class='back_link'/> Retour</a>";
 }
+
+if(acces("/responsables/consult_maj_sconet.php", $_SESSION['statut'])) {
+	echo " | <a href=\"consult_maj_sconet.php\">Journaux des mises à jour</a>";
+}
 //echo "</p>\n";
 
 
@@ -347,6 +422,26 @@ if(!isset($step)) {
 
 	echo "<p>Cette page est destinée à effectuer l'import des élèves et responsables d'après les modifications et ajouts effectués sur Sconet.</p>\n";
 
+	// 20120922
+	$ts_maj_sconet=getSettingValue('ts_maj_sconet');
+	if($ts_maj_sconet!='') {
+		echo "<br />\n";
+		echo "<p style='margin-left: 10em; text-indent: -7em; color:red'><strong>ATTENTION&nbsp;:</strong> Une mise à jour Sconet a été lancée le ".formate_date($ts_maj_sconet).".<br />L'opération n'est pas arrivée à son terme.<br />Cela peut signifier que la mise à jour est encore en cours.<br />Vous ne devriez pas lancer deux mises à jour d'après Sconet en même temps.<br />Vous pourriez obtenir des choses aberrantes.</p>\n";
+		$texte_maj_sconet=get_infos_maj_sconet("", $ts_maj_sconet);
+		if($texte_maj_sconet!="") {
+			echo "<p style='margin-left: 3em;'>Voici ce qui a été enregistré lors de cette mise à jour&nbsp;:</p>";
+			echo "<div class='infobulle_corps' style='margin-left:3em; margin-right:3em; border:1px solid black; max-height: 10em; overflow:auto;'>";
+			echo $texte_maj_sconet;
+			echo "</div>\n";
+		}
+		echo "<p style='margin-left: 6em; text-indent: -3em;'><em>NOTE&nbsp;:</em> Le témoin de mise à jour sconet lancée n'est supprimé qu'une fois atteinte la dernière étape de mise à jour<br />(<em>après la mise à jour des responsabilités des responsables d'élèves.</em>).<br />Si vous ne faites qu'une partie de la mise à jour, le témoin ne sera pas supprimé.</p>\n";
+		echo "<br />\n";
+	}
+	else {
+		echo get_infos_derniere_maj_sconet();
+	}
+
+
 	$suhosin_post_max_totalname_length=ini_get('suhosin.post.max_totalname_length');
 	if($suhosin_post_max_totalname_length!='') {
 		echo "<p class='color:red'>Le module suhosin est activé.<br />\nUn paramétrage trop restrictif de ce module peut perturber le fonctionnement de Gepi, particulièrement dans les pages comportant de nombreux champs de formulaire.<br />Cela peut empêcher le bon fonctionnement de la Mise à jour d'après Sconet.</p>\n";
@@ -354,14 +449,15 @@ if(!isset($step)) {
 
 	echo "<p>Vous allez importer des fichiers d'exports XML de Sconet.<br />\nLes fichiers requis au cours de la procédure sont dans un premier temps ElevesAvecAdresses.xml, puis le fichier ResponsablesAvecAdresses.xml</p>\n";
 
-	echo "<form enctype='multipart/form-data' action='".$_SERVER['PHP_SELF']."' method='post'>\n";
+	echo "<form enctype='multipart/form-data' id='form_envoi_xml' action='".$_SERVER['PHP_SELF']."' method='post'>\n";
+	echo "<fieldset style='border: 1px solid grey; background-image: url(\"../images/background/opacite50.png\"); '>\n";
 	echo add_token_field();
 
 	//echo "<input type=hidden name='is_posted' value='yes' />\n";
 	echo "<input type=hidden name='step' value='0' />\n";
 	//echo "<input type=hidden name='mode' value='1' />\n";
 	echo "<p>Sélectionnez le fichier <b>ElevesAvecAdresses.xml</b> (<i>ou ElevesSansAdresses.xml</i>):<br />\n";
-	echo "<input type=\"file\" size=\"80\" name=\"eleves_xml_file\" /><br />\n";
+	echo "<input type=\"file\" size=\"80\" name=\"eleves_xml_file\" id='input_xml_file' style='border: 1px solid grey; background-image: url(\"../images/background/opacite50.png\"); ' /><br />\n";
 	if ($gepiSettings['unzipped_max_filesize']>=0) {
 		echo "<p style=\"font-size:small; color: red;\"><i>REMARQUE&nbsp;:</i> Vous pouvez fournir à Gepi le fichier compressé issu directement de SCONET. (Ex : ElevesAvecAdresses.zip)</p>";
 	}
@@ -399,7 +495,14 @@ if(!isset($step)) {
 	$alert_diff_etab_origine=getSettingValue('alert_diff_etab_origine');
 	echo "<br />\n";
 	echo "<p>\n";
-	echo "<strong>Établissement d'origine&nbsp;:</strong>\n";
+
+	$titre_infobulle="Établissement d'origine";
+	$texte_infobulle="Sconet fournit l'établissement \"<em>de l'année précédente</em>\".<br />
+S'il s'agit de l'établissement courant, l'information est ignorée&nbsp;;<br />
+sinon, Gepi le considère comme \"<em>établissement d'origine</em>\".";
+	$tabdiv_infobulle[]=creer_div_infobulle('explication_etab_origine',$titre_infobulle,"",$texte_infobulle,"",30,0,'y','y','n','n');
+
+	echo "<strong>Établissement d'origine&nbsp;:</strong> <a href='#' onmouseover=\"delais_afficher_div('explication_etab_origine','y',-20,20,1000,20,20);\" onclick=\"afficher_div('explication_etab_origine','y',-20,20);return false;\"><img src='../images/icons/ico_ampoule.png' alt=\"Explication établissement d\'origine.\" height='25' width='15'></a>\n";
 	echo "<br />\n";
 	echo "<input type='radio' name='alert_diff_etab_origine' id='alert_diff_etab_origine_y' value='y' ";
 	if($alert_diff_etab_origine=='y') {
@@ -416,6 +519,90 @@ if(!isset($step)) {
 	echo "<label for='alert_diff_etab_origine_n' style='cursor: pointer;'> ne pas signaler";
 	echo " les modifications d'établissement d'origine.</label></p>\n";
 
+	// 20130607
+	$alert_diff_mef=getSettingValue('alert_diff_mef');
+	echo "<br />\n";
+	echo "<p>\n";
+	echo "<strong title=\"MEF : Module élémentaire de formation\">Changement de MEF&nbsp;:</strong>\n";
+	echo "<br />\n";
+	echo "<input type='radio' name='alert_diff_mef' id='alert_diff_mef_y' value='y' ";
+	if($alert_diff_mef=='y') {
+		echo "checked ";
+	}
+	echo "/>\n";
+	echo "<label for='alert_diff_mef_y' style='cursor: pointer;'> signaler";
+	echo " les modifications de MEF.</label><br />\n";
+	echo "<input type='radio' name='alert_diff_mef' id='alert_diff_mef_n' value='n' ";
+	if($alert_diff_mef!='y') {
+		echo "checked ";
+	}
+	echo "/>\n";
+	echo "<label for='alert_diff_mef_n' style='cursor: pointer;'> ne pas signaler";
+	echo " les modifications de MEF.</label></p>\n";
+
+	$alert_diff_date_entree=getSettingValue('alert_diff_date_entree');
+	echo "<br />\n";
+	echo "<p>\n";
+	echo "<strong>Date d'entrée dans l'établissement&nbsp;:</strong>\n";
+	echo "<br />\n";
+	echo "<input type='radio' name='alert_diff_date_entree' id='alert_diff_date_entree_y' value='y' ";
+	if($alert_diff_date_entree=='y') {
+		echo "checked ";
+	}
+	echo "/>\n";
+	echo "<label for='alert_diff_date_entree_y' style='cursor: pointer;'> signaler";
+	echo " les modifications de date d'entrée dans l'établissement.</label><br />\n";
+	echo "<input type='radio' name='alert_diff_date_entree' id='alert_diff_date_entree_n' value='n' ";
+	if($alert_diff_date_entree!='y') {
+		echo "checked ";
+	}
+	echo "/>\n";
+	echo "<label for='alert_diff_date_entree_n' style='cursor: pointer;'> ne pas signaler";
+	echo " les modifications de date d'entrée dans l'établissement.</label></p>\n";
+
+	// 20120630
+	$nb_types_tel_ele_utilises=0;
+	if(getSettingAOui('ele_tel_pers')) {$nb_types_tel_ele_utilises++;}
+	if(getSettingAOui('ele_tel_port')) {$nb_types_tel_ele_utilises++;}
+	if(getSettingAOui('ele_tel_prof')) {$nb_types_tel_ele_utilises++;}
+	if($nb_types_tel_ele_utilises>0) {
+		echo "<br />\n";
+		echo "<p>\n";
+		echo "<strong>Téléphone des élèves&nbsp;:</strong> Tester les modifications de&nbsp;:\n";
+		echo "<br />\n";
+
+		if(getSettingAOui('ele_tel_pers')) {
+			echo "<input type='checkbox' name='ele_tel_pers_signaler_modif' id='ele_tel_pers_signaler_modif' value='yes' ";
+			if($ele_tel_pers_signaler_modif=='yes') {
+				echo "checked ";
+			}
+			echo "/>\n";
+			echo "<label for='ele_tel_pers_signaler_modif' style='cursor: pointer;'> numéro de téléphone personnel";
+			echo "</label><br />\n";
+		}
+
+		if(getSettingAOui('ele_tel_port')) {
+			echo "<input type='checkbox' name='ele_tel_port_signaler_modif' id='ele_tel_port_signaler_modif' value='yes' ";
+			if($ele_tel_port_signaler_modif=='yes') {
+				echo "checked ";
+			}
+			echo "/>\n";
+			echo "<label for='ele_tel_port_signaler_modif' style='cursor: pointer;'> numéro de téléphone portable";
+			echo "</label><br />\n";
+		}
+
+		if(getSettingAOui('ele_tel_prof')) {
+			echo "<input type='checkbox' name='ele_tel_prof_signaler_modif' id='ele_tel_prof_signaler_modif' value='yes' ";
+			if($ele_tel_prof_signaler_modif=='yes') {
+				echo "checked ";
+			}
+			echo "/>\n";
+			echo "<label for='ele_tel_prof_signaler_modif' style='cursor: pointer;'> numéro de téléphone professionnel.";
+			echo "</label><br />\n";
+		}
+		echo "</p>\n";
+	}
+
 	echo "<br />\n";
 	echo "<p>";
 	echo "<label for='id_form_stop' style='cursor: pointer;'> Parcourir les élèves par tranches de &nbsp;: </label><input type='text' name='eff_tranche_recherche_diff' id='eff_tranche_recherche_diff' value='$eff_tranche_recherche_diff' size='3' onkeydown=\"clavier_2(this.id,event,0,200);\" autocomplete='off' />\n";
@@ -430,11 +617,30 @@ if(!isset($step)) {
 	echo "<input type='checkbox' name='stop' id='id_form_stop' value='y' /><label for='id_form_stop' style='cursor: pointer;'> Désactiver le mode automatique.</label>\n";
 	//==============================
 
-	echo "<p><input type='submit' value='Valider' /></p>\n";
+	echo "<p><input type='submit' id='input_submit' value='Valider' />
+<input type='button' id='input_button' value='Valider' style='display:none;' onclick=\"check_champ_file()\" /></p>
+
+<script type='text/javascript'>
+	document.getElementById('input_submit').style.display='none';
+	document.getElementById('input_button').style.display='';
+
+	function check_champ_file() {
+		fichier=document.getElementById('input_xml_file').value;
+		//alert(fichier);
+		if(fichier=='') {
+			alert('Vous n\'avez pas sélectionné de fichier XML à envoyer.');
+		}
+		else {
+			document.getElementById('form_envoi_xml').submit();
+		}
+	}
+</script>\n";
+
+	echo "</fieldset>\n";
 	echo "</form>\n";
 
 	echo "<p>Il est recommandé d'importer les informations élèves et de ne passer qu'ensuite à l'import des informations responsables.<br />\n";
-	echo "<a href='".$_SERVER['PHP_SELF']."?is_posted=y&amp;step=9'>Passer néanmoins à la page d'importation des responsables</a></p>\n";
+	echo "<a href='".$_SERVER['PHP_SELF']."?is_posted=y&amp;step=9&amp;maj_eleve_sautee=y'>Passer néanmoins à la page d'importation des responsables</a></p>\n";
 
 	echo "<p><br /></p>\n";
 
@@ -487,6 +693,8 @@ else{
 
 			$_SESSION['alert_diff_mail_ele']=$alert_diff_mail_ele;
 			$_SESSION['alert_diff_etab_origine']=$alert_diff_etab_origine;
+			// 20130607
+			$_SESSION['alert_diff_mef']=$alert_diff_mef;
 
 			$xml_file = isset($_FILES["eleves_xml_file"]) ? $_FILES["eleves_xml_file"] : NULL;
 
@@ -499,6 +707,8 @@ else{
 				echo "</p>\n";
 
 				echo "<p>Il semblerait que l'absence d'extension .XML ou .ZIP puisse aussi provoquer ce genre de symptômes.<br />Dans ce cas, ajoutez l'extension et ré-essayez.</p>\n";
+
+				echo "<p>Retour à la page <a href='".$_SERVER['PHP_SELF']."'>Mise à jour d'après Sconet</a></p>";
 
 				require("../lib/footer.inc.php");
 				die();
@@ -515,6 +725,8 @@ else{
 					echo "</p>\n";
 
 					echo "<p>Il semblerait que l'absence d'extension .XML ou .ZIP puisse aussi provoquer ce genre de symptômes.<br />Dans ce cas, ajoutez l'extension et ré-essayez.</p>\n";
+
+					echo "<p>Retour à la page <a href='".$_SERVER['PHP_SELF']."'>Mise à jour d'après Sconet</a></p>";
 
 					require("../lib/footer.inc.php");
 					die();
@@ -560,12 +772,18 @@ else{
 
 						if (($list_file_zip = $archive->listContent()) == 0) {
 							echo "<p style='color:red;'>Erreur : ".$archive->errorInfo(true)."</p>\n";
+
+							echo "<p>Retour à la page <a href='".$_SERVER['PHP_SELF']."'>Mise à jour d'après Sconet</a></p>";
+
 							require("../lib/footer.inc.php");
 							die();
 						}
 
 						if(sizeof($list_file_zip)!=1) {
 							echo "<p style='color:red;'>Erreur : L'archive contient plus d'un fichier.</p>\n";
+
+							echo "<p>Retour à la page <a href='".$_SERVER['PHP_SELF']."'>Mise à jour d'après Sconet</a></p>";
+
 							require("../lib/footer.inc.php");
 							die();
 						}
@@ -592,6 +810,9 @@ else{
 						}
 						else {
 							echo "<p style='color:red'>Echec de l'extraction de l'archive ZIP.</p>\n";
+
+							echo "<p>Retour à la page <a href='".$_SERVER['PHP_SELF']."'>Mise à jour d'après Sconet</a></p>";
+
 							require("../lib/footer.inc.php");
 							die();
 						}
@@ -604,6 +825,9 @@ else{
 					echo "<p style='color:red;'>La copie du fichier vers le dossier temporaire a échoué.<br />Vérifiez que l'utilisateur ou le groupe apache ou www-data a accès au dossier <b>temp/$tempdir</b></p>\n";
 					// Il ne faut pas aller plus loin...
 					// SITUATION A GERER
+
+					echo "<p>Retour à la page <a href='".$_SERVER['PHP_SELF']."'>Mise à jour d'après Sconet</a></p>";
+
 					require("../lib/footer.inc.php");
 					die();
 				}
@@ -643,8 +867,13 @@ else{
 					`ELEOPT11` varchar(40) $chaine_mysql_collate NOT NULL default '',
 					`ELEOPT12` varchar(40) $chaine_mysql_collate NOT NULL default '',
 					`LIEU_NAISSANCE` varchar(50) $chaine_mysql_collate NOT NULL default '',
-					`MEL` varchar(255) $chaine_mysql_collate NOT NULL default ''
-					);";
+					`MEL` varchar(255) $chaine_mysql_collate NOT NULL default '',
+					`TEL_PERS` varchar(255) $chaine_mysql_collate NOT NULL default '',
+					`TEL_PORT` varchar(255) $chaine_mysql_collate NOT NULL default '',
+					`TEL_PROF` varchar(255) $chaine_mysql_collate NOT NULL default '',
+					DATE_ENTREE DATETIME,
+					MEF_CODE VARCHAR(50) DEFAULT '' NOT NULL
+					) ENGINE=MyISAM;";
 					info_debug($sql);
 					$create_table = mysql_query($sql);
 
@@ -698,6 +927,8 @@ else{
 			<DONNEES>
 				...
 			*/
+			$xml_uaj="";
+			$xml_horodatage="";
 			$objet_parametres=($ele_xml->PARAMETRES);
 			foreach ($objet_parametres->children() as $key => $value) {
 				if($key=='ANNEE_SCOLAIRE') {
@@ -707,7 +938,21 @@ else{
 						$nb_err++;
 					}
 				}
+				elseif($key=='HORODATAGE') {
+					$xml_horodatage=$value;
+				}
+				elseif($key=='UAJ') {
+					$xml_uaj=$value;
+				}
 			}
+
+			// 20120922
+			saveSetting('ts_maj_sconet', strftime("%Y-%m-%d %H:%M:%S"));
+
+			$texte_maj_sconet="<br /><p><strong>Fichier XML élève</strong>";
+			if($xml_uaj!="") {$texte_maj_sconet.=" ($xml_uaj)";}
+			if($xml_horodatage!="") {$texte_maj_sconet.=" du $xml_horodatage</p>";}
+			enregistre_log_maj_sconet($texte_maj_sconet);
 
 			echo "<p>\n";
 			echo "Analyse de la section STRUCTURES pour ne conserver que les identifiants d'élèves affectés dans une classe...<br />\n";
@@ -891,6 +1136,7 @@ else{
 			"PRENOM",
 			"DATE_NAISS",
 			"DOUBLEMENT",
+			"DATE_ENTREE",
 			"DATE_SORTIE",
 			"CODE_REGIME",
 			"DATE_ENTREE",
@@ -899,7 +1145,11 @@ else{
 			"CODE_COMMUNE_INSEE_NAISS",
 			"CODE_PAYS",
 			"VILLE_NAISS",
-			"MEL"
+			"MEL",
+			"TEL_PERSONNEL",
+			"TEL_PORTABLE",
+			"TEL_PROFESSIONNEL",
+			"CODE_MEF"
 			);
 
 			$tab_champs_scol_an_dernier=array("CODE_STRUCTURE",
@@ -1030,6 +1280,9 @@ else{
 					}
 					*/
 
+					// A FAIRE: Ajouter une case pour choisir si on désactive le compte de l'élève et des parents quand la date de sortie est passée
+					//          On peut souhaiter laisser l'accès un peu au-delà...
+					//          Pour les parents, il faudrait tester si il reste des élèves associés dont la date de sortie n'est pas passée.
 					$temoin_date_sortie="n";
 					if(isset($eleves[$i]['date_sortie'])) {
 						echo $eleves[$i]['prenom']." ".$eleves[$i]['nom']." a quitté l'établissement le ".$eleves[$i]['date_sortie']."<br />\n";
@@ -1053,7 +1306,7 @@ else{
 						info_debug($sql);
 						$insert=mysql_query($sql);
 						//Eric	
-						// Enregistrement de l'information de la date de sortie pour l'élève (à partir de son id)					
+						// Enregistrement de l'information de la date de sortie pour l'élève (à partir de son id)
 						$sql="INSERT INTO tempo2 SET col1='".$eleves[$i]['eleve_id']."', col2='".$eleves[$i]['date_sortie']."';";
 						info_debug($sql);
 						$insert=mysql_query($sql);
@@ -1086,6 +1339,8 @@ else{
 						if(isset($eleves[$i]["scolarite_an_dernier"]["code_rne"])){$sql.=", etocod_ep='".$eleves[$i]["scolarite_an_dernier"]["code_rne"]."'";}
 						if(isset($eleves[$i]["code_regime"])){$sql.=", elereg='".$eleves[$i]["code_regime"]."'";}
 
+						if(isset($eleves[$i]["code_mef"])){$sql.=", mef_code='".$eleves[$i]["code_mef"]."'";}
+
 						//affiche_debug("eleve_id=".$eleves[$i]["eleve_id"]."<br />");
 						//affiche_debug("code_pays=".$eleves[$i]["code_pays"]."<br />");
 						//affiche_debug("ville_naiss=".$eleves[$i]["ville_naiss"]."<br />");
@@ -1101,6 +1356,13 @@ else{
 
 						if(isset($eleves[$i]['mel'])) {$sql.=", mel='".$eleves[$i]['mel']."'";}
 
+						if(isset($eleves[$i]['tel_personnel'])) {$sql.=", tel_pers='".$eleves[$i]['tel_personnel']."'";}
+						if(isset($eleves[$i]['tel_portable'])) {$sql.=", tel_port='".$eleves[$i]['tel_portable']."'";}
+						if(isset($eleves[$i]['tel_professionnel'])) {$sql.=", tel_prof='".$eleves[$i]['tel_professionnel']."'";}
+
+						if(isset($eleves[$i]['date_entree'])) {
+							$sql.=", date_entree='".get_mysql_date_from_slash_date($eleves[$i]['date_entree'])."'";
+						}
 
 						$sql.=" WHERE ele_id='".$eleves[$i]['eleve_id']."';";
 						affiche_debug("$sql<br />\n");
@@ -1116,8 +1378,10 @@ else{
 						}
 					}
 				}
-				else{
+				else {
 					// echo $eleves[$i]['prenom']." ".$eleves[$i]['nom']." n'est pas dans \$tab_ele_id donc pas dans une classe..."."<br />";
+
+
 					// On devrait supprimer l'élève de la table là, non?
 					// Si l'élève est encore dans la table, on enregistre sa date de sortie
 					//création de la chaine au format timestamp
@@ -1362,12 +1626,16 @@ else{
 
 			//===============================================
 			if(isset($_POST['parcours_desinscriptions'])) {
+				$texte_maj_sconet="";
 				if(!isset($_POST['desinscription'])) {
-					echo "<p>Aucune désinscription n'a été validée.</p>\n";
+					$texte="<p>Aucune désinscription n'a été validée.</p>\n";
+					echo $texte;
+					$texte_maj_sconet.=$texte;
 				}
 				else {
 					$desinscription=$_POST['desinscription'];
-					echo "<p>";
+
+					$texte="<p>";
 					for($i=0;$i<count($desinscription);$i++) {
 						$tab=explode("|",$desinscription[$i]);
 						$ele_login=$tab[0];
@@ -1378,40 +1646,45 @@ else{
 						$res_ele=mysql_query($sql);
 						$lig_ele=mysql_fetch_object($res_ele);
 	
-						echo "Désinscription des classes et des enseignements de ".my_strtoupper($lig_ele->nom)." ".casse_mot($lig_ele->prenom,'majf2')." pour la période $periode: ";
-	
+						$texte.="Désinscription des classes et des enseignements de ".my_strtoupper($lig_ele->nom)." ".casse_mot($lig_ele->prenom,'majf2')." pour la période $periode: ";
+
 						$sql="DELETE FROM j_eleves_groupes WHERE login='$ele_login' AND periode='$periode';";
 						info_debug($sql);
 						if(!mysql_query($sql)) {
-							echo "<span style='color:red;'>ERREUR lors de la désinscription des enseignements</span>";
+							$texte.="<span style='color:red;'>ERREUR lors de la désinscription des enseignements</span>";
 						}
 						else {
 							$sql="DELETE FROM j_eleves_classes WHERE login='$ele_login' AND periode='$periode';";
 							info_debug($sql);
 							if(!mysql_query($sql)) {
-								echo "<span style='color:red;'>ERREUR lors de la désinscription de la classe</span>";
+								$texte.="<span style='color:red;'>ERREUR lors de la désinscription de la classe</span>";
 							}
 							else {
-								echo "<span style='color:green;'>OK</span>";
+								$texte.="<span style='color:green;'>OK</span>";
 							}
 						}
-						echo "<br />\n";
+						$texte.="<br />\n";
 	
 						$sql="SELECT 1=1 FROM j_eleves_classes WHERE login='$ele_login';";
 						$test_encore_dans_une_classe_sur_une_periode=mysql_query($sql);
 						if(mysql_num_rows($test_encore_dans_une_classe_sur_une_periode)==0) {
 							$sql="DELETE FROM j_eleves_cpe WHERE e_login='$ele_login';";
 							if(!mysql_query($sql)) {
-								echo "<span style='color:red;'>ERREUR lors de la suppression de la responsabilité CPE.</span><br />\n";
+								$texte.="<span style='color:red;'>ERREUR lors de la suppression de la responsabilité CPE.</span><br />\n";
 							}
 							$sql="DELETE FROM j_eleves_professeurs WHERE login='$ele_login';";
 							if(!mysql_query($sql)) {
-								echo "<span style='color:red;'>ERREUR lors de la suppression de la responsabilité professeur principal.</span><br />\n";
+								$texte.="<span style='color:red;'>ERREUR lors de la suppression de la responsabilité professeur principal.</span><br />\n";
 							}
 						}
 					}
-					echo "</p>\n";
+					$texte.="</p>\n";
+					echo $texte;
+					$texte_maj_sconet.=$texte;
 				}
+
+				// 20120922
+				enregistre_log_maj_sconet($texte_maj_sconet);
 			}
 			//===============================================
 
@@ -1647,7 +1920,7 @@ else{
 			}
 			else {
 				$desinscription=$_POST['desinscription'];
-				echo "<p>";
+				$texte="<p>";
 				for($i=0;$i<count($desinscription);$i++) {
 					$tab=explode("|",$desinscription[$i]);
 					$ele_login=$tab[0];
@@ -1658,39 +1931,44 @@ else{
 					$res_ele=mysql_query($sql);
 					$lig_ele=mysql_fetch_object($res_ele);
 
-					echo "Désinscription des classes et des enseignements de ".my_strtoupper($lig_ele->nom)." ".casse_mot($lig_ele->prenom,'majf2')." pour la période $periode: ";
+					$texte.="Désinscription des classes et des enseignements de ".my_strtoupper($lig_ele->nom)." ".casse_mot($lig_ele->prenom,'majf2')." pour la période $periode: ";
 
 					$sql="DELETE FROM j_eleves_groupes WHERE login='$ele_login' AND periode='$periode';";
 					info_debug($sql);
 					if(!mysql_query($sql)) {
-						echo "<span style='color:red;'>ERREUR lors de la désinscription des enseignements</span>";
+						$texte.="<span style='color:red;'>ERREUR lors de la désinscription des enseignements</span>";
 					}
 					else {
 						$sql="DELETE FROM j_eleves_classes WHERE login='$ele_login' AND periode='$periode';";
 						info_debug($sql);
 						if(!mysql_query($sql)) {
-							echo "<span style='color:red;'>ERREUR lors de la désinscription de la classe</span>";
+							$texte.="<span style='color:red;'>ERREUR lors de la désinscription de la classe</span>";
 						}
 						else {
-							echo "<span style='color:green;'>OK</span>";
+							$texte.="<span style='color:green;'>OK</span>";
 						}
 					}
-					echo "<br />\n";
+					$texte.="<br />\n";
 
 					$sql="SELECT 1=1 FROM j_eleves_classes WHERE login='$ele_login';";
 					$test_encore_dans_une_classe_sur_une_periode=mysql_query($sql);
 					if(mysql_num_rows($test_encore_dans_une_classe_sur_une_periode)==0) {
 						$sql="DELETE FROM j_eleves_cpe WHERE e_login='$ele_login';";
 						if(!mysql_query($sql)) {
-							echo "<span style='color:red;'>ERREUR lors de la suppression de la responsabilité CPE.</span><br />\n";
+							$texte.="<span style='color:red;'>ERREUR lors de la suppression de la responsabilité CPE.</span><br />\n";
 						}
 						$sql="DELETE FROM j_eleves_professeurs WHERE login='$ele_login';";
 						if(!mysql_query($sql)) {
-							echo "<span style='color:red;'>ERREUR lors de la suppression de la responsabilité professeur principal.</span><br />\n";
+							$texte.="<span style='color:red;'>ERREUR lors de la suppression de la responsabilité professeur principal.</span><br />\n";
 						}
 					}
 				}
-				echo "</p>\n";
+				$texte.="</p>\n";
+				echo $texte;
+				$texte_maj_sconet=$texte;
+
+				// 20120922
+				enregistre_log_maj_sconet($texte_maj_sconet);
 			}
 
 			echo "<p align='center'><a href='".$_SERVER['PHP_SELF']."?step=3&amp;stop=$stop' onClick=\"test_stop_suite('3'); return false;\">Passer à l'étape suivante</a>";
@@ -1737,7 +2015,7 @@ else{
 
 				//=========================================
 				// 20110911
-				$sql="CREATE TABLE IF NOT EXISTS tempo4 ( col1 varchar(100) NOT NULL default '', col2 varchar(100) NOT NULL default '', col3 varchar(100) NOT NULL default '', col4 varchar(100) NOT NULL default '');";
+				$sql="CREATE TABLE IF NOT EXISTS tempo4 ( col1 varchar(100) NOT NULL default '', col2 varchar(100) NOT NULL default '', col3 varchar(100) NOT NULL default '', col4 varchar(100) NOT NULL default '') ENGINE=MyISAM;";
 				info_debug($sql);
 				$res_tempo4=mysql_query($sql);
 
@@ -1977,6 +2255,22 @@ else{
 										e.naissance!=t2.col2 OR
 										e.lieu_naissance!=t.LIEU_NAISSANCE OR
 										e.no_gep!=t.ELENONAT";
+					// 20130607
+					if(getSettingAOui('alert_diff_mef')) {
+						$sql.="						OR e.mef_code!=t.MEF_CODE";
+					}
+					if(getSettingAOui('alert_diff_date_entree')) {
+						$sql.="						OR e.date_entree!=t.DATE_ENTREE";
+					}
+					if((getSettingValue('ele_tel_pers')=='yes')) {
+						$sql.="						OR e.tel_pers!=t.TEL_PERS";
+					}
+					if((getSettingValue('ele_tel_port')=='yes')) {
+						$sql.="						OR e.tel_port!=t.TEL_PORT";
+					}
+					if((getSettingValue('ele_tel_prof')=='yes')) {
+						$sql.="						OR e.tel_prof!=t.TEL_PROF";
+					}
 					if((getSettingValue('mode_email_ele')=='')||(getSettingValue('mode_email_ele')=='sconet')) {
 						$sql.="						OR e.email!=t.mel";
 					}
@@ -1994,6 +2288,22 @@ else{
 										e.sexe!=t.ELESEXE OR
 										e.naissance!=t2.col2 OR
 										e.no_gep!=t.ELENONAT";
+					// 20130607
+					if(getSettingAOui('alert_diff_mef')) {
+						$sql.="						OR e.mef_code!=t.MEF_CODE";
+					}
+					if(getSettingAOui('alert_diff_date_entree')) {
+						$sql.="						OR e.date_entree!=t.DATE_ENTREE";
+					}
+					if((getSettingValue('ele_tel_pers')=='yes')) {
+						$sql.="						OR e.tel_pers!=t.TEL_PERS";
+					}
+					if((getSettingValue('ele_tel_port')=='yes')) {
+						$sql.="						OR e.tel_port!=t.TEL_PORT";
+					}
+					if((getSettingValue('ele_tel_prof')=='yes')) {
+						$sql.="						OR e.tel_prof!=t.TEL_PROF";
+					}
 					if((getSettingValue('mode_email_ele')=='')||(getSettingValue('mode_email_ele')=='sconet')) {
 						$sql.="						OR e.email!=t.mel";
 					}
@@ -2045,8 +2355,20 @@ else{
 					}
 				}
 
+				$temoin_init_date_entree="n";
+				if((mysql_num_rows($test)==0)&&($temoin_chgt_ancien_etab!="y")&&(getSettingAOui('alert_diff_date_entree'))) {
+					// On teste aussi le cas d'une initialisation de date_entree
+					$sql="SELECT e.ele_id FROM eleves e, temp_gep_import2 t
+							WHERE e.ele_id=t.ELE_ID AND 
+									e.date_entree IS NULL AND
+									t.DATE_ENTREE IS NOT NULL AND
+									e.ele_id='$tab_ele_id[$i]';";
+					$test2=mysql_query($sql);
+					if(mysql_num_rows($test2)>0) {$temoin_init_date_entree="y";}
+				}
+
 				//if(mysql_num_rows($test)>0) {
-				if((mysql_num_rows($test)>0)||($temoin_chgt_ancien_etab=="y")) {
+				if((mysql_num_rows($test)>0)||($temoin_chgt_ancien_etab=="y")||($temoin_init_date_entree=="y")) {
 					if($cpt==0){
 						echo "<p>Une ou des différences ont été trouvées dans la tranche étudiée à cette phase.";
 						echo "<br />\n";
@@ -2222,9 +2544,33 @@ else{
 						$sql="SELECT classe FROM classes c, eleves e, j_eleves_classes jec WHERE c.id=jec.id_classe AND jec.login=e.login AND e.ele_id='$tab_ele_id[$i]' ORDER BY jec.periode DESC LIMIT 1;";
 						if($tab_ele_id[$i]==$eleve_id_debug) {echo "$sql<br />\n";}
 						//if($tab_ele_id[$i]=='596023') {affiche_debug($sql."<br />");}
+						//if(in_array($tab_ele_id[$i], array(406245, 549369, 406271, 407090))) {affiche_debug($sql."<br />");}
 						$test_clas1=mysql_query($sql);
-		
-						if(mysql_num_rows($test_clas1)>0) {
+
+						if(mysql_num_rows($test_clas1)==0) {
+							// L'élève n'est dans aucune classe dans Gepi, mais inscrit dans une classe dans le XML uploadé.
+							if($cpt==0){
+								echo "<p>Une ou des différences ont été trouvées dans la tranche étudiée à cette phase.";
+								echo "<br />\n";
+								echo "En voici le(s) ELE_ID: ";
+							}
+							else{
+								echo ", ";
+							}
+
+							//echo "<span style='color:green'>";
+							echo $tab_ele_id[$i];
+							//echo "</span>";
+							//echo "<input type='hidden' name='tab_ele_id_diff[]' value='".$tab_ele_id[$i]."' />\n";
+							$sql="UPDATE tempo4 SET col3='modif' WHERE col1='maj_sconet_eleves' AND col2='$tab_ele_id[$i]';";
+							$update=mysql_query($sql);
+							//echo "<br />\n";
+							// Pour le cas où on est dans la dernière tranche:
+							$tab_ele_id_diff[]=$tab_ele_id[$i];
+							$cpt++;
+							$cpt_tab_ele_id_diff++;
+						}
+						elseif(mysql_num_rows($test_clas1)>0) {
 							$lig_clas1=mysql_fetch_object($test_clas1);
 		
 							$sql="SELECT DIVCOD FROM temp_gep_import2 t WHERE t.ELE_ID='$tab_ele_id[$i]';";
@@ -2304,11 +2650,24 @@ else{
 		case "4":
 			echo "<h2>Import/mise à jour des élèves</h2>\n";
 
+			/*
+			$tab_mef=get_tab_mef();
+			echo "tab_mef:<pre>";
+			print_r($tab_mef);
+			echo "</pre>";
+			*/
+
 			$eff_tranche=isset($_POST['eff_tranche']) ? $_POST['eff_tranche'] : 10;
 			if(preg_match("/[^0-9]/",$eff_tranche)) {$eff_tranche=10;}
 
 			info_debug("==============================================");
 			info_debug("=============== Phase step $step =================");
+
+			// 20120630
+			$nb_types_tel_ele_a_tester=0;
+			if((getSettingAOui('ele_tel_pers'))&&(getSettingAOui('ele_tel_pers_signaler_modif'))) {$nb_types_tel_ele_a_tester++;}
+			if((getSettingAOui('ele_tel_port'))&&(getSettingAOui('ele_tel_port_signaler_modif'))) {$nb_types_tel_ele_a_tester++;}
+			if((getSettingAOui('ele_tel_prof'))&&(getSettingAOui('ele_tel_prof_signaler_modif'))) {$nb_types_tel_ele_a_tester++;}
 
 			// 20110913
 			$sql="SELECT * FROM tempo4 WHERE col1='maj_sconet_eleves' AND (col3='modif' OR col3='new');";
@@ -2318,6 +2677,11 @@ else{
 				$tab_ele_id_diff=array();
 				while($lig=mysql_fetch_object($res)) {
 					$tab_ele_id_diff[]=$lig->col2;
+					/*
+					if(in_array($lig->col2, array(406245, 549369, 406271, 407090))) {
+						affiche_debug("$lig->col2 est dans tempo4 avec col3=$lig->col3<br />");
+					}
+					*/
 				}
 			}
 
@@ -2406,12 +2770,14 @@ else{
 				//echo "\$nblignes=$nblignes<br />";
 
 
-				echo "<form action='".$_SERVER['PHP_SELF']."' name='formulaire' method='post'>\n";
+				echo "<form action='".$_SERVER['PHP_SELF']."' name='formulaire' id='formulaire' method='post'>\n";
 				//==============================
 				// AJOUT pour tenir compte de l'automatisation ou non:
 				echo "<input type='hidden' name='stop' id='id_form_stop' value='$stop' />\n";
 				//==============================
 				echo "<input type='hidden' name='eff_tranche' value='$eff_tranche' />\n";
+
+				echo "<input type='hidden' name='temoin_suhosin_1' value='step4' />\n";
 /*
 				for($i=$eff_tranche;$i<count($tab_ele_id_diff);$i++){
 					//echo "$i: ";
@@ -2429,7 +2795,9 @@ else{
 				$tabdiv_infobulle[]=creer_div_infobulle('chgt_email_non_pris_en_compte',$titre_infobulle,"",$texte_infobulle,"",18,0,'y','y','n','n');
 
 
-				echo "<p align='center'><input type='submit' value='Valider' /></p>\n";
+				//echo "<p align='center'><input type='submit' value='Valider' /></p>\n";
+				echo "<p><input type='submit' id='input_submit' value='Valider' />
+				<input type='button' id='input_button' value='Valider' style='display:none;' onclick=\"check_champ_coche()\" /></p>";
 				//echo "<p align='center'><input type=submit value='Enregistrer les modifications' /></p>\n";
 
 				//echo "<table border='1'>\n";
@@ -2463,7 +2831,23 @@ else{
 					echo "<th>Email</th>\n";
 				}
 
+				if(((getSettingValue('ele_tel_pers')=='yes')&&(getSettingAOui('ele_tel_pers_signaler_modif')))||
+					((getSettingValue('ele_tel_port')=='yes')&&(getSettingAOui('ele_tel_port_signaler_modif')))||
+					((getSettingValue('ele_tel_prof')=='yes')&&(getSettingAOui('ele_tel_prof_signaler_modif')))
+				) {
+					echo "<th>Tel</th>\n";
+				}
+
 				echo "<th>Classe</th>\n";
+				// 20130607
+				if(getSettingAOui('alert_diff_mef')) {
+					echo "<th>MEF</th>\n";
+				}
+
+				if(getSettingAOui('alert_diff_date_entree')) {
+					echo "<th title=\"Date d'entrée de l'élève dans l'établissement\">Date entrée</th>\n";
+				}
+
 				echo "<th>Etablissement d'origine</th>\n";
 				echo "</tr>\n";
 				$cpt=0;
@@ -2483,13 +2867,14 @@ else{
 
 					// Pour ne pas représenter le même au tour suivant:
 					$sql="UPDATE tempo4 SET col3='modif_ou_new_presente' WHERE col1='maj_sconet_eleves' AND col2='$tab_ele_id_diff[$w]';";
+					affiche_debug("<tr><td colspan='13'>$sql</td></tr>\n");
 					if($tab_ele_id_diff[$w]==$eleve_id_debug) {echo "$sql<br />\n";}
 					$update_tempo4=mysql_query($sql);
 
 					$sql="SELECT DISTINCT * FROM temp_gep_import2 WHERE ELE_ID='$tab_ele_id_diff[$w]';";
 					if($tab_ele_id_diff[$w]==$eleve_id_debug) {echo "$sql<br />\n";}
 					info_debug($sql);
-					//echo "<tr><td colspan='13'>$sql</td></tr>\n";
+					affiche_debug("<tr><td colspan='13'>$sql</td></tr>\n");
 					$res1=mysql_query($sql);
 					if(mysql_num_rows($res1)==0){
 						echo "<tr><td colspan='13' style='text-align:left;'>ele_id=\$tab_ele_id_diff[$w]='$tab_ele_id_diff[$w]' non trouvé dans 'temp_gep_import2' ???</td></tr>\n";
@@ -2520,6 +2905,18 @@ else{
 
 						$affiche[12]=nettoyer_caracteres_nom($lig->MEL, "an", " @._-", "");
 
+						$affiche[13]=nettoyer_caracteres_nom($lig->TEL_PERS, "an", " @._-", "");
+						$affiche[14]=nettoyer_caracteres_nom($lig->TEL_PORT, "an", " @._-", "");
+						$affiche[15]=nettoyer_caracteres_nom($lig->TEL_PROF, "an", " @._-", "");
+
+						// 20130607
+						if(getSettingAOui('alert_diff_mef')) {
+							$affiche[16]=nettoyer_caracteres_nom($lig->MEF_CODE, "an", " @._-", "");
+						}
+
+						if(getSettingAOui('alert_diff_date_entree')) {
+							$affiche[17]=$lig->DATE_ENTREE;
+						}
 
 							//$sql="SELECT * FROM eleves WHERE elenoet='$affiche[4]'";
 							$sql="SELECT * FROM eleves WHERE (elenoet='$affiche[4]' OR elenoet='".sprintf("%05d",$affiche[4])."')";
@@ -2566,7 +2963,10 @@ else{
 									//($lig_ele->lieu_naissance!=$affiche[11])||
 									($lig_ele->lieu_naissance!=stripslashes($affiche[11]))||
 									($lig_ele->no_gep!=$affiche[7])||
-									(($test_diff_email=="y")&&($lig_ele->email!=$affiche[12]))
+									(($test_diff_email=="y")&&($lig_ele->email!=$affiche[12]))||
+									((getSettingAOui('ele_tel_pers_signaler_modif'))&&($lig_ele->tel_pers!=$affiche[13]))||
+									((getSettingAOui('ele_tel_port_signaler_modif'))&&($lig_ele->tel_port!=$affiche[14]))||
+									((getSettingAOui('ele_tel_prof_signaler_modif'))&&($lig_ele->tel_prof!=$affiche[15]))
 									){
 										$temoin_modif='y';
 										$cpt_modif++;
@@ -2583,7 +2983,10 @@ else{
 									($lig_ele->sexe!=$affiche[2])||
 									($lig_ele->naissance!=$new_date)||
 									($lig_ele->no_gep!=$affiche[7])||
-									(($test_diff_email=="y")&&($lig_ele->email!=$affiche[12]))
+									(($test_diff_email=="y")&&($lig_ele->email!=$affiche[12]))||
+									((getSettingAOui('ele_tel_pers_signaler_modif'))&&($lig_ele->tel_pers!=$affiche[13]))||
+									((getSettingAOui('ele_tel_port_signaler_modif'))&&($lig_ele->tel_port!=$affiche[14]))||
+									((getSettingAOui('ele_tel_prof_signaler_modif'))&&($lig_ele->tel_prof!=$affiche[15]))
 									){
 										$temoin_modif='y';
 										$cpt_modif++;
@@ -2687,6 +3090,29 @@ else{
 											$cpt_modif++;
 											$cpt_chgt_classe++;
 										}
+										$classe_actuelle_de_l_eleve=$lig_clas1->classe;
+									}
+									else {
+										$temoin_chgt_classe="y";
+										$temoin_modif='y';
+										$cpt_modif++;
+										$cpt_chgt_classe++;
+										$classe_actuelle_de_l_eleve="";
+									}
+								}
+
+								// 20130607
+								if(getSettingAOui('alert_diff_mef')) {
+									if($lig_ele->mef_code!=$affiche[16]) {
+										$temoin_modif='y';
+										$cpt_modif++;
+									}
+								}
+
+								if(getSettingAOui('alert_diff_date_entree')) {
+									if($lig_ele->date_entree!=$affiche[17]) {
+										$temoin_modif='y';
+										$cpt_modif++;
 									}
 								}
 
@@ -2859,7 +3285,7 @@ else{
 										echo "<label for='check_".$cpt."'>";
 										if(($lig_ele->naissance!='')||($lig_ele->lieu_naissance!='')) {
 											if($lig_ele->naissance!='') {
-												echo "$lig_ele->naissance ";
+												echo formate_date($lig_ele->naissance)." ";
 											}
 											if($lig_ele->lieu_naissance!='') {
 												echo "à ".get_commune($lig_ele->lieu_naissance,1)." ";
@@ -2872,7 +3298,7 @@ else{
 										echo ">";
 										echo "<label for='check_".$cpt."'>";
 									}
-									echo "$new_date";
+									echo formate_date($new_date);
 
 									//echo "_".$ele_lieu_naissance;
 
@@ -2889,7 +3315,7 @@ else{
 										echo " class='modif'>";
 										echo "<label for='check_".$cpt."'>";
 										if($lig_ele->naissance!=''){
-											echo "$lig_ele->naissance <font color='red'>-&gt;</font>\n";
+											echo formate_date($lig_ele->naissance)." <font color='red'>-&gt;</font>\n";
 										}
 									}
 									else{
@@ -2897,7 +3323,7 @@ else{
 										echo ">";
 										echo "<label for='check_".$cpt."'>";
 									}
-									echo "$new_date";
+									echo formate_date($new_date);
 //									echo "<input type='hidden' name='modif_".$cpt."_naissance' value='$new_date' />\n";
 									echo "</label>";
 									echo "</td>\n";
@@ -2998,24 +3424,129 @@ else{
 									echo "</td>\n";
 								}
 
+
+								// 20120630
+
+								if(((getSettingValue('ele_tel_pers')=='yes')&&(getSettingAOui('ele_tel_pers_signaler_modif')))||
+									((getSettingValue('ele_tel_port')=='yes')&&(getSettingAOui('ele_tel_port_signaler_modif')))||
+									((getSettingValue('ele_tel_prof')=='yes')&&(getSettingAOui('ele_tel_prof_signaler_modif')))
+								) {
+
+									echo "<td>\n";
+										echo "<table class='boireaus'>\n";
+										if((getSettingValue('ele_tel_pers')=='yes')&&(getSettingAOui('ele_tel_pers_signaler_modif'))) {
+											echo "<tr>\n";
+											echo "<td title=\"Numéro de téléphone personnel\">Pe</td>\n";
+											echo "<td";
+											if(stripslashes($lig_ele->tel_pers)!=stripslashes($affiche[13])){
+												echo " class='modif'>";
+												if($lig_ele->tel_pers!=''){
+													echo stripslashes($lig_ele->tel_pers)." <font color='red'>-&gt;</font>\n";
+												}
+											}
+											else{
+												//echo "'>";
+												echo ">";
+											}
+											echo stripslashes($affiche[13]);
+											echo "</td>\n";
+											echo "</tr>\n";
+										}
+										if((getSettingValue('ele_tel_port')=='yes')&&(getSettingAOui('ele_tel_port_signaler_modif'))) {
+											echo "<tr>\n";
+											echo "<td title=\"Numéro de téléphone portable\">Po</td>\n";
+											echo "<td";
+											if(stripslashes($lig_ele->tel_port)!=stripslashes($affiche[14])){
+												echo " class='modif'>";
+												if($lig_ele->tel_port!=''){
+													echo stripslashes($lig_ele->tel_port)." <font color='red'>-&gt;</font>\n";
+												}
+											}
+											else{
+												//echo "'>";
+												echo ">";
+											}
+											echo stripslashes($affiche[14]);
+											echo "</td>\n";
+											echo "</tr>\n";
+										}
+										if((getSettingValue('ele_tel_prof')=='yes')&&(getSettingAOui('ele_tel_prof_signaler_modif'))) {
+											echo "<tr>\n";
+											echo "<td title=\"Numéro de téléphone professionnel\">Pr</td>\n";
+											echo "<td";
+											if(stripslashes($lig_ele->tel_prof)!=stripslashes($affiche[15])){
+												echo " class='modif'>";
+												if($lig_ele->tel_prof!=''){
+													echo stripslashes($lig_ele->tel_prof)." <font color='red'>-&gt;</font>\n";
+												}
+											}
+											else{
+												//echo "'>";
+												echo ">";
+											}
+											echo stripslashes($affiche[15]);
+											echo "</td>\n";
+											echo "</tr>\n";
+										}
+										echo "</table>\n";
+
+
+									/*
+									if($nb_types_tel_ele_a_tester==1) {
+
+									}
+									else {
+										// On va mettre un tableau
+
+									}
+									*/
+									echo "</td>\n";
+								}
+
+
 								// Classe
 								//echo "<td style='text-align: center; background-color: white;'>";
 								echo "<td style='text-align: center;";
 								if($temoin_chgt_classe=="y") {
 									echo " background-color: red;";
 									echo "'>";
-									echo "<a href='../classes/classes_const.php?id_classe=$lig_clas1->id&amp;msg=A_EFFECTUER_Changement_de_classe_vers_".remplace_accents(stripslashes($affiche[9]))."_pour_".remplace_accents(stripslashes($lig_ele->nom)."_".stripslashes($lig_ele->prenom),'all')."' target='_blank'>";
-									echo preg_replace("/ /", "&nbsp;", $lig_clas1->classe)." -&gt; ".preg_replace("/ /", "&nbsp;", $affiche[9]);
-									echo "</a>";
 
-// RENSEIGNER UNE TABLE AVEC L'INDICATION QU'IL Y AURA UNE MODIF A FAIRE...
+									if($classe_actuelle_de_l_eleve!="") {
+										echo "<a href='../classes/classes_const.php?id_classe=$lig_clas1->id&amp;msg=A_EFFECTUER_Changement_de_classe_vers_".remplace_accents(stripslashes($affiche[9]))."_pour_".remplace_accents(stripslashes($lig_ele->nom)."_".stripslashes($lig_ele->prenom),'all')."' target='_blank'>";
+										echo preg_replace("/ /", "&nbsp;", $lig_clas1->classe)." -&gt; ".preg_replace("/ /", "&nbsp;", $affiche[9]);
+										echo "</a>";
 
-									$info_action_titre="Changement de classe à effectuer pour ".remplace_accents(stripslashes($lig_ele->nom)." ".stripslashes($lig_ele->prenom))." ($lig_ele->login)";
-									$info_action_texte="Effectuer le <a href='classes/classes_const.php?id_classe=$lig_clas1->id&amp;msg=".rawurlencode("Le changement de classe de ".remplace_accents(stripslashes($lig_ele->nom)." ".stripslashes($lig_ele->prenom))." a été signalé lors de la mise à jour Sconet de $lig_clas1->classe vers $affiche[9].")."'>changement de classe</a> de $lig_clas1->classe vers $affiche[9]";
-									$info_action_destinataire="administrateur";
-									$info_action_mode="statut";
-									enregistre_infos_actions($info_action_titre,$info_action_texte,$info_action_destinataire,$info_action_mode);
+										// RENSEIGNER UNE TABLE AVEC L'INDICATION QU'IL Y AURA UNE MODIF A FAIRE...
 
+										$info_action_titre="Changement de classe à effectuer pour ".remplace_accents(stripslashes($lig_ele->nom)." ".stripslashes($lig_ele->prenom))." ($lig_ele->login)";
+										$info_action_texte="Effectuer le <a href='classes/classes_const.php?id_classe=$lig_clas1->id&amp;msg=".rawurlencode("Le changement de classe de ".remplace_accents(stripslashes($lig_ele->nom)." ".stripslashes($lig_ele->prenom))." a été signalé lors de la mise à jour Sconet de $lig_clas1->classe vers $affiche[9].")."'>changement de classe</a> de $lig_clas1->classe vers $affiche[9]";
+										$info_action_destinataire="administrateur";
+										$info_action_mode="statut";
+										enregistre_infos_actions($info_action_titre,$info_action_texte,$info_action_destinataire,$info_action_mode);
+									}
+									else {
+										$info_action_titre="Ajout dans une classe à effectuer pour ".remplace_accents(stripslashes($lig_ele->nom)." ".stripslashes($lig_ele->prenom))." ($lig_ele->login)";
+
+										$sql="SELECT id FROM classes WHERE classe='".mysql_real_escape_string($affiche[9])."';";
+										$res_clas_fut=mysql_query($sql);
+										if(mysql_num_rows($res_clas_fut)>0) {
+											$lig_clas_fut=mysql_fetch_object($res_clas_fut);
+											echo "<a href='../classes/classes_ajout.php?id_classe=$lig_clas_fut->id&amp;msg=A_EFFECTUER_Inscription_en_".remplace_accents(stripslashes($affiche[9]))."_pour_".remplace_accents(stripslashes($lig_ele->nom)."_".stripslashes($lig_ele->prenom),'all')."' target='_blank'>";
+											echo "Aucune -&gt; ".preg_replace("/ /", "&nbsp;", $affiche[9]);
+											echo "</a>";
+
+											$info_action_texte="Effectuer l'<a href='classes/classes_ajout.php?id_classe=$lig_clas_fut->id&amp;msg=".rawurlencode("Ajouter ".remplace_accents(stripslashes($lig_ele->nom)." ".stripslashes($lig_ele->prenom))." en classe de $affiche[9] comme signalé lors de la mise à jour Sconet.")."'>ajout dans la classe $affiche[9]</a>";
+										}
+										else {
+											echo "Aucune -&gt; ".preg_replace("/ /", "&nbsp;", $affiche[9]);
+
+											$info_action_texte="Effectuer l'ajout dans la classe $affiche[9] de ".remplace_accents(stripslashes($lig_ele->nom)." ".stripslashes($lig_ele->prenom))." comme signalé lors de la mise à jour Sconet.";
+										}
+
+										$info_action_destinataire="administrateur";
+										$info_action_mode="statut";
+										enregistre_infos_actions($info_action_titre,$info_action_texte,$info_action_destinataire,$info_action_mode);
+									}
 								}
 								elseif($temoin_modif_sortie=="y") {
 									echo " background-color: red;";
@@ -3056,7 +3587,58 @@ else{
 								echo "</td>\n";
 
 
+								// 20130607
+								if(getSettingAOui('alert_diff_mef')) {
+									echo "<td";
+									if($lig_ele->mef_code!=$affiche[16]){
+										echo " class='modif'>";
+										if($lig_ele->mef_code!='') {
+											if(isset($tab_mef[$lig_ele->mef_code])) {
+												if((isset($tab_mef[$lig_ele->mef_code]['libelle_court']))&&($tab_mef[$lig_ele->mef_code]['libelle_court']!="")) {
+													echo "<span title=\"".$tab_mef[$lig_ele->mef_code]['designation_courte']."\">".$tab_mef[$lig_ele->mef_code]['libelle_court']."</span>";
+												}
+												else {
+													echo $tab_mef[$lig_ele->mef_code]['designation_courte'];
+												}
+											}
+											else {
+												echo "$lig_ele->mef_code";
+											}
+											echo " <font color='red'>-&gt;</font>\n";
+										}
+									}
+									else{
+										echo ">";
+									}
 
+									if(isset($tab_mef[$affiche[16]])) {
+										if((isset($tab_mef[$affiche[16]]['libelle_court']))&&($tab_mef[$affiche[16]]['libelle_court']!="")) {
+											echo "<span title=\"".$tab_mef[$affiche[16]]['designation_courte']."\">".$tab_mef[$affiche[16]]['libelle_court']."</span>";
+										}
+										else {
+											echo $tab_mef[$affiche[16]]['designation_courte'];
+										}
+									}
+									else {
+										echo $affiche[16];
+									}
+									echo "</td>\n";
+								}
+
+								if(getSettingAOui('alert_diff_date_entree')) {
+									echo "<td";
+									if($lig_ele->date_entree!=$affiche[17]){
+										echo " class='modif'>";
+										if($lig_ele->date_entree!=''){
+											echo formate_date($lig_ele->date_entree)." <font color='red'>-&gt;</font>\n";
+										}
+									}
+									else{
+										echo ">";
+									}
+									echo formate_date($affiche[17]);
+									echo "</td>\n";
+								}
 
 								$sql="SELECT id_etablissement FROM j_eleves_etablissements WHERE id_eleve='$lig_ele->elenoet';";
 								info_debug($sql);
@@ -3214,10 +3796,71 @@ else{
 									echo "</td>\n";
 								}
 
+								// 20120630
+
+								if(((getSettingValue('ele_tel_pers')=='yes')&&(getSettingAOui('ele_tel_pers_signaler_modif')))||
+									((getSettingValue('ele_tel_port')=='yes')&&(getSettingAOui('ele_tel_port_signaler_modif')))||
+									((getSettingValue('ele_tel_prof')=='yes')&&(getSettingAOui('ele_tel_prof_signaler_modif')))
+								) {
+
+									echo "<td>\n";
+										echo "<table class='boireaus'>\n";
+										if((getSettingValue('ele_tel_pers')=='yes')&&(getSettingAOui('ele_tel_pers_signaler_modif'))) {
+											echo "<tr>\n";
+											echo "<td>Pe</td>\n";
+											echo "<td>";
+											echo stripslashes($affiche[13]);
+											echo "</td>\n";
+											echo "</tr>\n";
+										}
+										if((getSettingValue('ele_tel_port')=='yes')&&(getSettingAOui('ele_tel_port_signaler_modif'))) {
+											echo "<tr>\n";
+											echo "<td>Po</td>\n";
+											echo "<td>";
+											echo stripslashes($affiche[14]);
+											echo "</td>\n";
+											echo "</tr>\n";
+										}
+										if((getSettingValue('ele_tel_prof')=='yes')&&(getSettingAOui('ele_tel_prof_signaler_modif'))) {
+											echo "<tr>\n";
+											echo "<td>Pr</td>\n";
+											echo "<td>";
+											echo stripslashes($affiche[15]);
+											echo "</td>\n";
+											echo "</tr>\n";
+										}
+										echo "</table>\n";
+									echo "</td>\n";
+								}
+
+
 								echo "<td style='text-align: center;'>";
 								echo "$affiche[9]";
 								echo "</td>\n";
 
+
+								// 20130607
+								if(getSettingAOui('alert_diff_mef')) {
+									echo "<td>";
+									if(isset($tab_mef[$affiche[16]])) {
+										if((isset($tab_mef[$affiche[16]]['libelle_court']))&&($tab_mef[$affiche[16]]['libelle_court']!="")) {
+											echo "<span title=\"".$tab_mef[$affiche[16]]['designation_courte']."\">".$tab_mef[$affiche[16]]['libelle_court']."</span>";
+										}
+										else {
+											echo $tab_mef[$affiche[16]]['designation_courte'];
+										}
+									}
+									else {
+										echo $affiche[16];
+									}
+									echo "</td>\n";
+								}
+
+								if(getSettingAOui('alert_diff_date_entree')) {
+									echo "<td>";
+									echo formate_date($affiche[17]);
+									echo "</td>\n";
+								}
 
 								echo "<td style='text-align: center;'>";
 								if(my_strtolower($affiche[10])!=my_strtolower($gepiSchoolRne)) {
@@ -3269,10 +3912,41 @@ else{
 					echo "<input type='hidden' name='step' value='5' />\n";
 				}
 
-				echo "<p align='center'><input type=submit value='Valider' /></p>\n";
+				echo "<p><input type='submit' id='input_submit2' value='Valider' />
+<input type='button' id='input_button2' value='Valider' style='display:none;' onclick=\"check_champ_coche()\" /></p>
+
+<script type='text/javascript'>
+	document.getElementById('input_submit').style.display='none';
+	document.getElementById('input_submit2').style.display='none';
+	document.getElementById('input_button').style.display='';
+	document.getElementById('input_button2').style.display='';
+
+	function check_champ_coche(){
+		var nb_coche=0;
+		for(i=0;i<$cpt;i++){
+			if(document.getElementById('check_'+i)){
+				if(document.getElementById('check_'+i).checked==true) {
+					nb_coche++;
+					break;
+				}
+			}
+		}
+		if(nb_coche==0) {
+			if(confirm(\"Vous n'avez cochez aucune case.\\nSi ce n'est pas une erreur, confirmez en cliquant sur OK.\\nSinon, annulez pour cocher des cases avant de valider.\")) {
+				document.getElementById('formulaire').submit();
+			}
+		}
+		else {
+			document.getElementById('formulaire').submit();
+		}
+	}
+</script>\n";
+				//echo "<p align='center'><input type=submit value='Valider' /></p>\n";
 				//echo "<p align='center'><input type=submit value='Enregistrer les modifications' /></p>\n";
 
 				echo add_token_field();
+
+				echo "<input type='hidden' name='temoin_suhosin_2' value='step4' />\n";
 
 				echo "</form>\n";
 			}
@@ -3313,17 +3987,19 @@ else{
 			// On recherche dans tempo2 la liste des ELE_ID correspondant à modif ou new
 			// Et on remplit/met à jour 'eleves' avec les enregistrements correspondants de temp_gep_import2
 
+			enregistre_log_maj_sconet("<p class='bold'>Parcours des ajouts/modifications élèves</p>");
+
 			$erreur=0;
 			$cpt=0;
 			$sql="SELECT DISTINCT t.* FROM temp_gep_import2 t, tempo2 t2 WHERE t.ELE_ID=t2.col2 AND t2.col1='modif'";
 			info_debug($sql);
 			$res_modif=mysql_query($sql);
-			if(mysql_num_rows($res_modif)>0){
-				echo "<p>Mise à jour des informations pour ";
+			if(mysql_num_rows($res_modif)>0) {
+				$texte="<p>Mise à jour des informations pour ";
 				while($lig=mysql_fetch_object($res_modif)){
 					//echo "Modif: $lig->ELE_ID : $lig->ELENOM $lig->ELEPRE<br />\n";
 
-					if($cpt>0){echo ", ";}
+					if($cpt>0){$texte.=", ";}
 
 					$naissance=mb_substr($lig->ELEDATNAIS,0,4)."-".mb_substr($lig->ELEDATNAIS,4,2)."-".mb_substr($lig->ELEDATNAIS,6,2);
 
@@ -3373,6 +4049,26 @@ else{
 						$sql.=", email='".mysql_real_escape_string($lig->MEL)."'";
 					}
 
+					// 20120630
+					if((getSettingAOui('ele_tel_pers'))&&(getSettingAOui('ele_tel_pers_signaler_modif'))) {
+						$sql.=", tel_pers='".mysql_real_escape_string($lig->TEL_PERS)."'";
+					}
+					if((getSettingAOui('ele_tel_port'))&&(getSettingAOui('ele_tel_port_signaler_modif'))) {
+						$sql.=", tel_port='".mysql_real_escape_string($lig->TEL_PORT)."'";
+					}
+					if((getSettingAOui('ele_tel_prof'))&&(getSettingAOui('ele_tel_prof_signaler_modif'))) {
+						$sql.=", tel_prof='".mysql_real_escape_string($lig->TEL_PROF)."'";
+					}
+
+					// 20130607
+					if(getSettingAOui('alert_diff_mef')) {
+						$sql.=", mef_code='".$lig->MEF_CODE."'";
+					}
+
+					if(getSettingAOui('alert_diff_date_entree')) {
+						$sql.=", date_entree='".$lig->DATE_ENTREE."'";
+					}
+
 					// Si on a validé des modifs, on a un élève qui est dans l'établissement... pas sorti
 					$sql.=", date_sortie=NULL";
 
@@ -3398,7 +4094,9 @@ else{
 						info_debug($sql);
 						$update=mysql_query($sql);
 						if($update){
-							echo "\n<span style='color:darkgreen;'>";
+							$texte.="\n<a href='../eleves/modify_eleve.php?eleve_login=$login_eleve' target='_blank'><span style='color:darkgreen;'>";
+							$texte.="$lig->ELEPRE $lig->ELENOM";
+							$texte.="</span></a>";
 
 							if(getSettingValue('mode_email_ele')!="mon_compte") {
 								$sql="UPDATE utilisateurs SET email='$lig->MEL' WHERE statut='eleve' AND login IN (SELECT login FROM eleves WHERE ele_id='$lig->ELE_ID');";
@@ -3407,12 +4105,12 @@ else{
 
 						}
 						else{
-							echo "\n<span style='color:red;'>";
+							$texte.="\n<span style='color:red;'>";
+							$texte.="$lig->ELEPRE $lig->ELENOM";
+							$texte.="</span>";
 							$erreur++;
 						}
 						//echo "$sql<br />\n";
-						echo "$lig->ELEPRE $lig->ELENOM";
-						echo "</span>";
 
 						$sql="UPDATE j_eleves_regime SET doublant='$doublant'";
 						if("$regime"!="ERR"){
@@ -3422,7 +4120,7 @@ else{
 						info_debug($sql);
 						$res2=mysql_query($sql);
 						if(!$res2){
-							echo " <span style='color:red;'>(*)</span>";
+							$texte.=" <span style='color:red;'>(*)</span>";
 							$erreur++;
 						}
 					}
@@ -3456,7 +4154,10 @@ else{
 							info_debug($sql);
 							$update=mysql_query($sql);
 							if($update){
-								echo "\n<span style='color:darkgreen;'>";
+
+								$texte.="\n<a href='../eleves/modify_eleve.php?eleve_login=$login_eleve' target='_blank'><span style='color:darkgreen;'>";
+								$texte.="$lig->ELEPRE $lig->ELENOM";
+								$texte.="</span></a>";
 
 								if(getSettingValue('mode_email_ele')!="mon_compte") {
 									$sql="UPDATE utilisateurs SET email='$lig->MEL' WHERE statut='eleve' AND login IN (SELECT login FROM eleves WHERE ele_id='$lig->ELE_ID');";
@@ -3464,12 +4165,12 @@ else{
 								}
 							}
 							else{
-								echo "\n<span style='color:red;'>";
+								$texte.="\n<span style='color:red;'>";
+								$texte.="$lig->ELEPRE $lig->ELENOM";
+								$texte.="</span>";
 								$erreur++;
 							}
 							//echo "$sql<br />\n";
-							echo "$lig->ELEPRE $lig->ELENOM";
-							echo "</span>";
 
 							$sql="UPDATE j_eleves_regime SET doublant='$doublant'";
 							if("$regime"!="ERR"){
@@ -3479,7 +4180,7 @@ else{
 							info_debug($sql);
 							$res2=mysql_query($sql);
 							if(!$res2){
-								echo " <span style='color:red;'>(*)</span>";
+								$texte.=" <span style='color:red;'>(*)</span>";
 								$erreur++;
 							}
 
@@ -3487,7 +4188,7 @@ else{
 							info_debug($sql);
 							$correction2=mysql_query($sql);
 							if(!$correction2){
-								echo " <span style='color:plum;'>(*)</span>";
+								$texte.=" <span style='color:plum;'>(*)</span>";
 								$erreur++;
 							}
 
@@ -3495,10 +4196,10 @@ else{
 						else {
 							// On ne devrait pas arriver là.
 							// Si la reconnaissance de modif a été réalisée, c'est qu'on avait une correspondance soit sur l'ELE_ID soit sur l'ELENOET
-							echo "\n<span style='color:purple;'>";
+							$texte.="\n<span style='color:purple;'>";
 							$erreur++;
-							echo "$lig->ELEPRE $lig->ELENOM";
-							echo "</span>";
+							$texte.="$lig->ELEPRE $lig->ELENOM";
+							$texte.="</span>";
 						}
 					}
 
@@ -3528,7 +4229,13 @@ else{
 
 					$cpt++;
 				}
-				echo "</p>\n";
+				$texte.="</p>\n";
+				echo $texte;
+				$texte_maj_sconet=$texte;
+
+				// 20120922
+				enregistre_log_maj_sconet($texte_maj_sconet);
+
 			}
 
 			$cpt=0;
@@ -3536,6 +4243,7 @@ else{
 			info_debug($sql);
 			$res_new=mysql_query($sql);
 			if(mysql_num_rows($res_new)>0){
+				$texte="";
 
 				$sql="DROP TABLE IF EXISTS temp_ele_classe;";
 				info_debug($sql);
@@ -3544,7 +4252,7 @@ else{
 				$sql="CREATE TABLE IF NOT EXISTS temp_ele_classe (
 				`ele_id` varchar(40) $chaine_mysql_collate NOT NULL default '',
 				`divcod` varchar(40) $chaine_mysql_collate NOT NULL default ''
-				);";
+				) ENGINE=MyISAM;";
 				info_debug($sql);
 				$create_table = mysql_query($sql);
 
@@ -3553,7 +4261,7 @@ else{
 				$vide_table = mysql_query($sql);
 
 				//echo "<p>\$auth_sso=$auth_sso</p>";
-				if($auth_sso=='lcs') {
+				if(($auth_sso=='lcs')||($gepi_non_plugin_lcs_mais_recherche_ldap)) {
 					// On se connecte au LDAP
 					$ds = connect_ldap($lcs_ldap_host,$lcs_ldap_port,"","");
 					//echo "<p>CONNEXION AU LDAP</p>";
@@ -3581,7 +4289,7 @@ else{
 				}
 				else {
 				*/
-					echo "<p>Ajout de ";
+					$texte.="<p>Ajout de ";
 					while($lig=mysql_fetch_object($res_new)){
 						// ON VERIFIE QU'ON N'A PAS DEJA UN ELEVE DE MEME ele_id DANS eleves
 						// CELA PEUT ARRIVER SI ON JOUE AVEC F5
@@ -3591,7 +4299,7 @@ else{
 						if(mysql_num_rows($test)==0){
 							//echo "New: $lig->ELE_ID : $lig->ELENOM $lig->ELEPRE<br />";
 	
-							if($cpt>0){echo ", ";}
+							if($cpt>0){$texte.=", ";}
 	
 							$naissance=mb_substr($lig->ELEDATNAIS,0,4)."-".mb_substr($lig->ELEDATNAIS,4,2)."-".mb_substr($lig->ELEDATNAIS,6,2);
 	
@@ -3629,7 +4337,7 @@ else{
 							// Initialisation
 							$login_eleve="";
 
-							if($auth_sso=='lcs') {
+							if(($auth_sso=='lcs')||($gepi_non_plugin_lcs_mais_recherche_ldap)) {
 
 								// LDAP attribute
 								$ldap_people_attr = array(
@@ -3651,11 +4359,11 @@ else{
 								if ($result) {
 									$info = @ldap_get_entries( $ds, $result );
 									if($info[0]["uid"]["count"]==0) {
-										echo "<span style='color:red;'>Aucun enregistrement n'a été trouvé dans le LDAP pour l'élève ".$lig->ELENOM." ".$lig->ELEPRE."</span><br />\n";
+										$texte.="<span style='color:red;'>Aucun enregistrement n'a été trouvé dans le LDAP pour l'élève ".$lig->ELENOM." ".$lig->ELEPRE."</span><br />\n";
 										$erreur++;
 									}
 									if($info[0]["uid"]["count"]>1) {
-										echo "<span style='color:red;'>Plusieurs enregistrements ont été trouvés dans le LDAP pour l'élève ".$lig->ELENOM." ".$lig->ELEPRE." avec l'employeenumber '$lig->ELENOET'.<br />C'est une anomalie.</span><br />\n";
+										$texte.="<span style='color:red;'>Plusieurs enregistrements ont été trouvés dans le LDAP pour l'élève ".$lig->ELENOM." ".$lig->ELEPRE." avec l'employeenumber '$lig->ELENOET'.<br />C'est une anomalie.</span><br />\n";
 										$erreur++;
 									}
 									elseif($info[0]["uid"]["count"]==1) {
@@ -3667,7 +4375,7 @@ else{
 									@ldap_free_result ( $result );
 								}
 								else {
-									echo "<p>Echec de la recherche dans le LDAP de l'ELENOET pour $lig->ELENOET ($lig->ELENOM $lig->ELEPRE).</p>";
+									$texte.="<p>Echec de la recherche dans le LDAP de l'ELENOET pour $lig->ELENOET ($lig->ELENOM $lig->ELEPRE).</p>";
 								}
 							}
 							else {
@@ -3718,7 +4426,7 @@ else{
 							}
 	
 							if($login_eleve=='') {
-								echo "<p style='color:red;'>Le login de $lig->ELENOM $lig->ELEPRE n'a pas pu être généré ni récupéré.</p>\n";
+								$texte.="<p style='color:red;'>Le login de $lig->ELENOM $lig->ELEPRE n'a pas pu être généré ni récupéré.</p>\n";
 							}
 							else {
 								// On ne renseigne plus l'ERENO et on n'a pas l'EMAIL dans temp_gep_import2
@@ -3734,11 +4442,34 @@ else{
 									$sql.=", lieu_naissance='".$lig->LIEU_NAISSANCE."'";
 								}
 								$sql.=", email='".$lig->MEL."'";
+
+								// 20120630
+								if((getSettingAOui('ele_tel_pers'))&&(getSettingAOui('ele_tel_pers_signaler_modif'))) {
+									$sql.=", tel_pers='".mysql_real_escape_string($lig->TEL_PERS)."'";
+								}
+								if((getSettingAOui('ele_tel_port'))&&(getSettingAOui('ele_tel_port_signaler_modif'))) {
+									$sql.=", tel_port='".mysql_real_escape_string($lig->TEL_PORT)."'";
+								}
+								if((getSettingAOui('ele_tel_prof'))&&(getSettingAOui('ele_tel_prof_signaler_modif'))) {
+									$sql.=", tel_prof='".mysql_real_escape_string($lig->TEL_PROF)."'";
+								}
+
+								// 20130607
+								if(getSettingAOui('alert_diff_mef')) {
+									$sql.=", mef_code='".$lig->MEF_CODE."'";
+								}
+
+								if(getSettingAOui('alert_diff_date_entree')) {
+									$sql.=", date_entree='".$lig->DATE_ENTREE."'";
+								}
+
 								$sql.=";";
 								info_debug($sql);
 								$insert=mysql_query($sql);
 								if($insert){
-									echo "\n<span style='color:blue;'>";
+									$texte.="\n<a href='../eleves/modify_eleve.php?eleve_login=$login_eleve' target='_blank'><span style='color:blue;'>";
+									$texte.="$lig->ELEPRE $lig->ELENOM";
+									$texte.="</span></a>";
 
 									if($nb_comptes_eleves>0) {
 										$info_action_titre="Nouvel élève&nbsp;: ".remplace_accents(stripslashes($lig->ELENOM)." ".stripslashes($lig->ELEPRE))." ($login_eleve)";
@@ -3749,12 +4480,12 @@ else{
 									}
 								}
 								else{
-									echo "\n<span style='color:red;'>";
+									$texte.="\n<span style='color:red;'>";
+									$texte.="$lig->ELEPRE $lig->ELENOM";
+									$texte.="</span>";
 									$erreur++;
 								}
 								//echo "$sql<br />\n";
-								echo "$lig->ELEPRE $lig->ELENOM";
-								echo "</span>";
 		
 		
 								$sql="INSERT INTO j_eleves_regime SET doublant='$doublant',
@@ -3763,7 +4494,7 @@ else{
 								info_debug($sql);
 								$res2=mysql_query($sql);
 								if(!$res2){
-									echo " <span style='color:red;'>(*)</span>";
+									$texte.=" <span style='color:red;'>(*)</span>";
 									$erreur++;
 								}
 		
@@ -3803,7 +4534,13 @@ else{
 							$cpt++;
 						}
 					}
-					echo "</p>\n";
+					$texte.="</p>\n";
+					echo $texte;
+					$texte_maj_sconet=$texte."<p><br /></p>";
+
+					// 20120922
+					enregistre_log_maj_sconet($texte_maj_sconet);
+
 				//}
 			}
 
@@ -3958,7 +4695,7 @@ else{
 
 						// J'ai un doute sur la pertinence de faire des requêtes différentes pour les cas LCS ou non
 						// Dans l'annuaire LDAP, une classe de 5 A2 va apparaitre comme 5_A2, mais on ne cherche pas dans le LDAP la classe de l'élève, il me semble.
-						if($auth_sso=='lcs') {
+						if(($auth_sso=='lcs')||($gepi_non_plugin_lcs_mais_recherche_ldap)) {
 							$sql="SELECT c.id FROM classes c WHERE c.classe='".preg_replace("/'/","_",preg_replace("/ /","_",$lig_ele->divcod))."';";
 						}
 						else {
@@ -3975,7 +4712,7 @@ else{
 							echo "<input type='hidden' name='id_classe[$cpt]' value='$lig_classe->id' />\n";
 							echo "</td>\n";
 
-							if($auth_sso=='lcs') {
+							if(($auth_sso=='lcs')||($gepi_non_plugin_lcs_mais_recherche_ldap)) {
 								$sql="SELECT p.num_periode FROM periodes p, classes c
 													WHERE p.id_classe=c.id AND
 															c.classe='".preg_replace("/'/","_",preg_replace("/ /","_",$lig_ele->divcod))."'
@@ -4084,14 +4821,15 @@ else{
 			$id_classe=isset($_POST['id_classe']) ? $_POST['id_classe'] : NULL;
 			$maxper=isset($_POST['maxper']) ? $_POST['maxper'] : NULL;
 
+			$texte="";
 			if(!isset($login_eleve)) {
-				echo "<p>Vous n'avez affecté aucun élève.</p>\n";
+				$texte.="<p>Vous n'avez affecté aucun élève.</p>\n";
 			}
 			else {
 
 				check_token(false);
 
-				echo "<p>\n";
+				$texte.="<p>\n";
 				for($i=0;$i<count($login_eleve);$i++){
 					$sql="SELECT nom, prenom FROM eleves WHERE login='$login_eleve[$i]'";
 					//echo $sql."<br />";
@@ -4100,7 +4838,7 @@ else{
 					if(mysql_num_rows($res_ele)>0){
 						$lig_ele=mysql_fetch_object($res_ele);
 
-						echo "Affectation de $lig_ele->prenom $lig_ele->nom ";
+						$texte.="Affectation de <a href='../eleves/modify_eleve.php?eleve_login=$login_eleve[$i]' target='_blank'>$lig_ele->prenom $lig_ele->nom</a> ";
 
 						//if(is_int($id_classe[$i])){
 						if(is_numeric($id_classe[$i])){
@@ -4113,12 +4851,12 @@ else{
 								if(mysql_num_rows($test)>0){
 									$lig_classe=mysql_fetch_object($test);
 
-									echo "en $lig_classe->classe pour ";
+									$texte.="en $lig_classe->classe pour ";
 									if(count($tab_periode)==1){
-										echo "la période ";
+										$texte.="la période ";
 									}
 									else{
-										echo "les périodes ";
+										$texte.="les périodes ";
 									}
 
 									$cpt_per=0;
@@ -4146,8 +4884,8 @@ else{
 														info_debug($sql);
 														$insert=mysql_query($sql);
 													}
-													if($cpt_per>0){echo ", ";}
-													echo "$j";
+													if($cpt_per>0){$texte.=", ";}
+													$texte.="$j";
 													$cpt_per++;
 												}
 											}
@@ -4155,21 +4893,27 @@ else{
 									}
 								}
 								else{
-									echo "dans aucune classe (<i>identifiant de classe invalide</i>).";
+									$texte.="dans aucune classe (<i>identifiant de classe invalide</i>).";
 								}
 							}
 							else{
-								echo "dans aucune classe (<i>aucune période cochée</i>).";
+								$texte.="dans aucune classe (<i>aucune période cochée</i>).";
 							}
 						}
 						else{
-							echo "dans aucune classe (<i>identifiant de classe invalide</i>).";
+							$texte.="dans aucune classe (<i>identifiant de classe invalide</i>).";
 						}
-						echo "<br />\n";
+						$texte.="<br />\n";
 					}
 				}
-				echo "</p>\n";
+				$texte.="</p>\n";
 			}
+			echo $texte;
+			$texte_maj_sconet=$texte;
+
+			// 20120922
+			enregistre_log_maj_sconet($texte_maj_sconet);
+
 
 			echo "<p>Passer à l'étape d'<a href='".$_SERVER['PHP_SELF']."?step=8&amp;stop=$stop'>inscription des nouveaux élèves dans les groupes</a>.</p>\n";
 
@@ -4657,13 +5401,15 @@ else{
 			}
 
 
-			echo "<form enctype='multipart/form-data' action='".$_SERVER['PHP_SELF']."' method='post'>\n";
+			echo "<form enctype='multipart/form-data' id='form_envoi_xml' action='".$_SERVER['PHP_SELF']."' method='post'>\n";
+			echo "<fieldset style='border: 1px solid grey; background-image: url(\"../images/background/opacite50.png\"); '>\n";
 			//==============================
 			// AJOUT pour tenir compte de l'automatisation ou non:
 			//echo "<input type='hidden' name='stop' id='id_form_stop' value='$stop' />\n";
 			//==============================
 			echo "<p>Veuillez fournir le fichier <strong>ResponsablesAvecAdresses.xml</strong>&nbsp;:<br />\n";
-			echo "<input type=\"file\" size=\"80\" name=\"responsables_xml_file\" /><br />\n";
+			if(isset($_GET['maj_eleve_sautee'])) {echo "<input type=\"hidden\" name=\"maj_eleve_sautee\" value=\"y\" />";}
+			echo "<input type=\"file\" size=\"80\" name=\"responsables_xml_file\" id='input_xml_file' style='border: 1px solid grey; background-image: url(\"../images/background/opacite50.png\"); ' /><br />\n";
 			echo "<input type='hidden' name='step' value='10' />\n";
 			//echo "<input type='hidden' name='is_posted' value='yes' />\n";
 			if ($gepiSettings['unzipped_max_filesize']>=0) {
@@ -4731,7 +5477,28 @@ else{
 			//echo "</p>\n";
 			//==============================
 
-			echo "<p><input type='submit' value='Valider' /></p>\n";
+			//echo "<p><input type='submit' value='Valider' /></p>\n";
+
+			echo "<p><input type='submit' id='input_submit' value='Valider' />
+<input type='button' id='input_button' value='Valider' style='display:none;' onclick=\"check_champ_file()\" /></p>
+
+<script type='text/javascript'>
+	document.getElementById('input_submit').style.display='none';
+	document.getElementById('input_button').style.display='';
+
+	function check_champ_file() {
+		fichier=document.getElementById('input_xml_file').value;
+		//alert(fichier);
+		if(fichier=='') {
+			alert('Vous n\'avez pas sélectionné de fichier XML à envoyer.');
+		}
+		else {
+			document.getElementById('form_envoi_xml').submit();
+		}
+	}
+</script>\n";
+
+			echo "</fieldset>\n";
 			echo "</form>\n";
 
 			echo "<p><br /></p>\n";
@@ -4912,7 +5679,7 @@ else{
 							`mel` varchar(100) $chaine_mysql_collate NOT NULL,
 							`adr_id` varchar(10) $chaine_mysql_collate NOT NULL,
 							`statut` varchar(100) $chaine_mysql_collate NOT NULL,
-						PRIMARY KEY  (`pers_id`));";
+						PRIMARY KEY  (`pers_id`)) ENGINE=MyISAM;";
 					info_debug($sql);
 					$create_table = mysql_query($sql);
 
@@ -4952,8 +5719,23 @@ else{
 								$nb_err++;
 							}
 						}
+						elseif($key=='HORODATAGE') {
+							$xml_horodatage=$value;
+						}
+						elseif($key=='UAJ') {
+							$xml_uaj=$value;
+						}
 					}
 
+					// 20120922
+					if(isset($_POST['maj_eleve_sautee'])) {
+						saveSetting('ts_maj_sconet', strftime("%Y-%m-%d %H:%M:%S"));
+					}
+
+					$texte_maj_sconet="<br /><p><strong>Fichier XML responsables</strong>";
+					if($xml_uaj!="") {$texte_maj_sconet.=" ($xml_uaj)";}
+					if($xml_horodatage!="") {$texte_maj_sconet.=" du $xml_horodatage</p>";}
+					enregistre_log_maj_sconet($texte_maj_sconet);
 
 					// PARTIE <PERSONNES>
 					// Compteur personnes:
@@ -5153,7 +5935,7 @@ else{
 						`pers_id` varchar(10) $chaine_mysql_collate NOT NULL,
 						`resp_legal` varchar(1) $chaine_mysql_collate NOT NULL,
 						`pers_contact` varchar(1) $chaine_mysql_collate NOT NULL
-						);";
+						) ENGINE=MyISAM;";
 				info_debug($sql);
 				$create_table = mysql_query($sql);
 
@@ -5315,7 +6097,7 @@ else{
 						`pays` varchar(50) $chaine_mysql_collate NOT NULL,
 						`commune` varchar(50) $chaine_mysql_collate NOT NULL,
 						`statut` varchar(100) $chaine_mysql_collate NOT NULL,
-					PRIMARY KEY  (`adr_id`));";
+					PRIMARY KEY  (`adr_id`)) ENGINE=MyISAM;";
 				info_debug($sql);
 				//echo "$sql<br />";
 				$create_table = mysql_query($sql);
@@ -5454,7 +6236,7 @@ else{
 
 				$login_resp=$_POST['login_resp'];
 
-				echo "<p class='bold'>Parcours des modifications de login demandées...</p>\n";
+				$texte="<p class='bold'>Parcours des modifications de login demandées...</p>\n";
 				foreach($login_resp as $key => $value) {
 					// On commence par vider le login pour éviter des collisions
 					$sql="UPDATE resp_pers SET login='' WHERE pers_id='".$key."';";
@@ -5463,49 +6245,58 @@ else{
 
 				foreach($login_resp as $key => $value) {
 					if($value!='') {
-						echo "Mise à jour du login du responsable n°$key vers $value&nbsp;: ";
+						$texte.="Mise à jour du login du responsable n°<a href='modify_resp.php?pers_id=$key' target='_blank'>$key</a> (".civ_nom_prenom_from_pers_id($key).") vers <a href='../utilisateurs/edit_responsable.php?critere_recherche_login=$value' target='_blank'>$value</a>&nbsp;: ";
 						// Vérification
 						$sql="SELECT rp.* FROM resp_pers WHERE login='$value';";
-						$test==mysql_query($sql);
+						$test=mysql_query($sql);
 						if(mysql_num_rows($test)==0) {
 							$sql="UPDATE resp_pers SET login='$value' WHERE pers_id='".$key."';";
 							$update=mysql_query($sql);
 							if($update) {
-								echo "<span style='color:green'>SUCCES</span>";
+								$texte.="<span style='color:green'>SUCCES</span>";
 							}
 							else {
-								echo "<span style='color:red'>ECHEC</span>";
+								$texte.="<span style='color:red'>ECHEC</span>";
 							}
-							echo "<br />\n";
+							$texte.="<br />\n";
 						}
 						else {
-							echo "<br /><span style='color:red'>Le login $value est déjà attribué à un autre utilisateur.</span><br />\n";
+							$texte.="<br /><span style='color:red'>Le login $value est déjà attribué à un autre utilisateur.</span><br />\n";
 						}
+
 					}
 					else {
-						echo "Le login du responsable n°$key est vide.<br />\n";
+						$texte.="Le login du responsable n°<a href='modify_resp.php?pers_id=$key' target='_blank'>$key</a> (".civ_nom_prenom_from_pers_id($key).") est vide.<br />\n";
 					}
 				}
 
-				require("../lib/footer.inc.php");
-				die();
+				echo $texte;
+				enregistre_log_maj_sconet($texte);
+
+				//require("../lib/footer.inc.php");
+				//die();
 			}
 
 			if(isset($_POST['suppr'])) {
 				check_token(false);
 
-				echo "<p class='bold'>Parcours des modifications demandées...</p>\n";
+				$texte="<p class='bold'>Parcours des modifications demandées...</p>\n";
+				echo $texte;
+				enregistre_log_maj_sconet($texte);
 
 				$nb_incertitudes=0;
 				$suppr=$_POST['suppr'];
 				$conserver=isset($_POST['conserver']) ? $_POST['conserver'] : array();
 
 				for($loop=0;$loop<count($suppr);$loop++) {
+					$texte="";
 					$sql="SELECT * FROM resp_pers WHERE pers_id='".$suppr[$loop]."';";
 					$res_rp=mysql_query($sql);
 					if(mysql_num_rows($res_rp)==0) {
 						// On ne devrait pas arriver là
-						echo "<span style='color:red'>Le responsable n°".$suppr[$loop]." proposé à la suppression n'existe pas.</span><br />";
+						$texte.="<span style='color:red'>Le responsable n°".$suppr[$loop]." proposé à la suppression n'existe pas.</span><br />";
+						echo $texte;
+						enregistre_log_maj_sconet($texte);
 					}
 					else {
 						// Chercher les homonymes.
@@ -5514,7 +6305,7 @@ else{
 						$res_rp2=mysql_query($sql);
 						if(mysql_num_rows($res_rp2)==0) {
 							// On ne devrait pas arriver là... si: si on a supprimé les précédents homonymes dans le même submit
-							echo "Le responsable n°".$suppr[$loop]." (<em>$lig_rp->nom $lig_rp->prenom</em>) proposé à la suppression n'a pas ou plus d'homonyme.<br />Suppression&nbsp;: \n";
+							$texte.="Le responsable n°<a href='modify_resp.php?pers_id=".$suppr[$loop]."' target='_blank'>".$suppr[$loop]."</a> (<em>$lig_rp->nom $lig_rp->prenom</em>) proposé à la suppression n'a pas ou plus d'homonyme.<br />Suppression&nbsp;: \n";
 
 							$sql="DELETE FROM utilisateurs WHERE statut='responsable' ANT login IN (SELECT login FROM resp_pers WHERE pers_id='".$suppr[$loop]."');";
 							$menage=mysql_query($sql);
@@ -5522,17 +6313,20 @@ else{
 							$sql="DELETE FROM resp_pers WHERE pers_id='".$suppr[$loop]."';";
 							$menage=mysql_query($sql);
 							if($menage) {
-								echo "<span style='color:green'>SUCCES</span>";
+								$texte.="<span style='color:green'>SUCCES</span>";
 							}
 							else {
-								echo "<span style='color:red'>ECHEC</span>";
+								$texte.="<span style='color:red'>ECHEC</span>";
 							}
-							echo "<br />\n";
+							$texte.="<br />\n";
+
+							echo $texte;
+							enregistre_log_maj_sconet($texte);
 						}
 						else {
 
 							if((!isset($conserver[$lig_rp->pers_id]))||($conserver[$lig_rp->pers_id]=='')) {
-								echo "Suppression du responsable n°".$suppr[$loop]." (<em>$lig_rp->nom $lig_rp->prenom</em>)&nbsp;: ";
+								$texte.="Suppression du responsable n°".$suppr[$loop]." (<em>$lig_rp->nom $lig_rp->prenom</em>)&nbsp;: ";
 
 								$sql="DELETE FROM utilisateurs WHERE statut='responsable' ANT login IN (SELECT login FROM resp_pers WHERE pers_id='".$suppr[$loop]."');";
 								$menage=mysql_query($sql);
@@ -5540,12 +6334,15 @@ else{
 								$sql="DELETE FROM resp_pers WHERE pers_id='".$suppr[$loop]."';";
 								$menage=mysql_query($sql);
 								if($menage) {
-									echo "<span style='color:green'>SUCCES</span>";
+									$texte.="<span style='color:green'>SUCCES</span>";
 								}
 								else {
-									echo "<span style='color:red'>ECHEC</span>";
+									$texte.="<span style='color:red'>ECHEC</span>";
 								}
-								echo "<br />\n";
+								$texte.="<br />\n";
+
+								echo $texte;
+								enregistre_log_maj_sconet($texte);
 							}
 							else {
 								// Le login du compte qui va être supprimé, doit être conservé.
@@ -5554,12 +6351,18 @@ else{
 								$sql="SELECT statut FROM utilisateurs WHERE login='".$conserver[$lig_rp->pers_id]."';";
 								$test=mysql_query($sql);
 								if(mysql_num_rows($test)==0) {
-									echo "<span style='color:red'>Le login proposé ".$conserver[$lig_rp->pers_id]." n'existe pas.</span><br />";
+									$texte.="<span style='color:red'>Le login proposé ".$conserver[$lig_rp->pers_id]." n'existe pas.</span><br />";
+
+									echo $texte;
+									enregistre_log_maj_sconet($texte);
 								}
 								else {
 									$statut_test=mysql_result($test, 0, "statut");
 									if($statut_test!='responsable') {
-										echo "<span style='color:red'>Le login proposé ".$conserver[$lig_rp->pers_id]." n'est pas un compte 'responsable', mais '$statut_test'.</span><br />";
+										$texte.="<span style='color:red'>Le login proposé ".$conserver[$lig_rp->pers_id]." n'est pas un compte 'responsable', mais '$statut_test'.</span><br />";
+
+										echo $texte;
+										enregistre_log_maj_sconet($texte);
 									}
 									else {
 
@@ -5581,32 +6384,39 @@ else{
 										}
 
 										if(($nb_resp_conserves==1)&&(!isset($conserver[$tab_homonymes[0]['pers_id']]))) {
-											echo "Suppression du responsable n°".$suppr[$loop]." (<em>$lig_rp->nom $lig_rp->prenom</em>)&nbsp;: ";
+											$texte.="Suppression du responsable n°".$suppr[$loop]." (<em>$lig_rp->nom $lig_rp->prenom</em>)&nbsp;: ";
 											$sql="DELETE FROM resp_pers WHERE pers_id='".$suppr[$loop]."';";
 											$menage=mysql_query($sql);
 											if($menage) {
-												echo "<span style='color:green'>SUCCES</span>";
+												$texte.="<span style='color:green'>SUCCES</span>";
 											}
 											else {
-												echo "<span style='color:red'>ECHEC</span>";
+												$texte.="<span style='color:red'>ECHEC</span>";
 											}
-											echo "<br />\n";
+											$texte.="<br />\n";
 
-											echo "$lig_rp->nom $lig_rp->prenom&nbsp;: Mise à jour du compte d'utilisateur de l'homonyme conservé (".$tab_homonymes[0]['pers_id'].") vers ".$conserver[$lig_rp->pers_id]."&nbsp;: ";
+											$texte.="$lig_rp->nom $lig_rp->prenom&nbsp;: Mise à jour du compte d'utilisateur de l'homonyme conservé (<a href='modify_resp.php?pers_id=".$tab_homonymes[0]['pers_id']."' target='_blank'>".$tab_homonymes[0]['pers_id']."</a>) vers <a href='../utilisateurs/edit_responsable.php?critere_recherche_login=".$conserver[$lig_rp->pers_id]."' target='_blank'>".$conserver[$lig_rp->pers_id]."</a>&nbsp;: ";
 											$sql="UPDATE resp_pers SET login='".$conserver[$lig_rp->pers_id]."' WHERE pers_id='".$tab_homonymes[0]['pers_id']."';";
 											$update=mysql_query($sql);
 											if($update) {
-												echo "<span style='color:green'>SUCCES</span>";
+												$texte.="<span style='color:green'>SUCCES</span>";
 											}
 											else {
-												echo "<span style='color:red'>ECHEC</span>";
+												$texte.="<span style='color:red'>ECHEC</span>";
 											}
-											echo "<br />\n";
+											$texte.="<br />\n";
+
+											echo $texte;
+											enregistre_log_maj_sconet($texte);
 										}
 										else {
 											// Incertitude:
-											echo "<div id='incertitude_".$nb_incertitudes."'>\n";
-											echo "<span style='color:red'>Il y a une incertitude sur ce qu'il convient d'effectuer pour $lig_rp->nom $lig_rp->prenom</span><br />";
+											$texte.="<div id='incertitude_".$nb_incertitudes."'>\n";
+											$texte.="<span style='color:red'>Il y a une incertitude sur ce qu'il convient d'effectuer pour $lig_rp->nom $lig_rp->prenom</span><br />";
+
+											echo $texte;
+											enregistre_log_maj_sconet($texte);
+
 											echo "<form action='".$_SERVER['PHP_SELF']."' id='form_incertitude".$nb_incertitudes."' target='_blank' method='post'>\n";
 											echo "<input type='hidden' name='stop' id='id_form_stop' value='$stop' />\n";
 											echo "<input type='hidden' name='step' value='13a' />\n";
@@ -5635,16 +6445,20 @@ else{
 											echo "<script type='text/javascript'>document.getElementById('incertitude_submit_".$nb_incertitudes."').style.display='none';</script>\n";
 
 											// Il faut supprimer le responsable pour ne pas se retrouver à imposer deux resp_pers avec un même login (non vide)
-											echo "Suppression du responsable n°".$suppr[$loop]." (<em>$lig_rp->nom $lig_rp->prenom</em>)&nbsp;: ";
+											$texte="Suppression du responsable n°".$suppr[$loop]." (<em>$lig_rp->nom $lig_rp->prenom</em>)&nbsp;: ";
 											$sql="DELETE FROM resp_pers WHERE pers_id='".$suppr[$loop]."';";
 											$menage=mysql_query($sql);
 											if($menage) {
-												echo "<span style='color:green'>SUCCES</span>";
+												$texte.="<span style='color:green'>SUCCES</span>";
 											}
 											else {
-												echo "<span style='color:red'>ECHEC</span>";
+												$texte.="<span style='color:red'>ECHEC</span>";
 											}
-											echo "<br />\n";
+											$texte.="<br />\n";
+
+											echo $texte;
+											enregistre_log_maj_sconet($texte);
+
 											echo "</div>\n";
 											$nb_incertitudes++;
 										}
@@ -5998,6 +6812,9 @@ else{
 				echo "<ul>
 <li>Lors du dédoublonnage dans Sconet, il peut arriver que le responsable conservé (pers_id) ne soit pas celui qui a été pris en compte dans Gepi pour la distribution des comptes d'utilisateurs aux parents.<br />Il faut alors recoller les morceaux dans Gepi.</li>
 <li>Si un seul enregistrement subsiste dans Sconet/Siècle pour un responsable, il est recommandé de conserver dans Gepi ce responsable et de lui affecter l'ancien login si le responsable disposait d'un compte pour se connecter dans Gepi.</li>
+<li>Cocher la case 'Conserver le login' ne présente d'intérêt que si vous supprimez la personne associée.<br />
+Dans ce cas, le doublon restant prendra le login de celui qui a été coché à la suppression.<br />
+Sinon, les comptes non supprimés conservent leur login, même si vous ne cochez pas la colonne 'Conserver'.</li>
 <li>Si un ancien responsable (<em>présent dans la base Gepi</em>) et un nouveau responsable (<em>présent dans Sconet/Siècle et proposé ici à l'importation dans Gepi</em>) sont tous les deux associés à des élèves dans la colonne XML (<em>Sconet/Siècle</em>), alors vous ne devriez supprimer ni l'un, ni l'autre, mais faire le ménage dans Sconet/Siècle pour ne pas conserver ces doublons.</li>
 </ul>\n";
 
@@ -6854,6 +7671,7 @@ else{
 
 				echo "<input type='hidden' name='parcours_suppressions' value='y' />\n";
 
+				echo "<input type='hidden' name='temoin_suhosin_1' value='step14b' />\n";
 
 				$sql="SELECT col2 FROM tempo2 WHERE col1='pers_id_disparu' LIMIT $eff_tranche_recherche_diff;";
 				info_debug($sql);
@@ -7105,6 +7923,8 @@ else{
 
 				echo "<p><input type='submit' value='Supprimer les personnes cochées et passer à la suite' /></p>\n";
 
+				echo "<input type='hidden' name='temoin_suhosin_2' value='step14b' />\n";
+
 				echo "</form>\n";
 
 				echo "<p style='text-indent:-4em; margin-left:4em;'><em>NOTE&nbsp;:</em> Si des doublonnages de responsables sont détectés, il est recommandé de ne pas supprimer les responsables existants (<em>particulièrement si ces responsables disposent de comptes utilisateurs</em>).<br />La gestion du doublon pourra être effectuée un peu plus loin (<em>après la recherche des nouveaux responsables et des modifications de responsables existants</em>) dans la mise à jour.</p>\n";
@@ -7287,6 +8107,7 @@ else{
 			echo "<input type='hidden' name='ne_pas_proposer_redoublonnage_adresse' value='".getSettingValue('ne_pas_proposer_redoublonnage_adresse')."' />\n";
 			echo "</form>\n";
 
+			echo "<br /><p style='text-indent:-4em; margin-left:4em;'><em>NOTE&nbsp;</em> A l'étape suivante, nous allons contrôler la présence éventuelle de doublons avant d'afficher les différences.</p>";
 			break;
 
 		case "16a":
@@ -7295,7 +8116,7 @@ else{
 
 
 			if(isset($_POST['rapprocher_pers_id'])) {
-				echo "<p class='bold'>Prise en compte des modifications&nbsp;:</p>\n";
+				$texte="<p class='bold'>Prise en compte des modifications&nbsp;:</p>\n";
 				$rapprocher_pers_id=$_POST['rapprocher_pers_id'];
 				for($loop=0;$loop<count($rapprocher_pers_id);$loop++) {
 					$tab=explode("|", $rapprocher_pers_id[$loop]);
@@ -7308,40 +8129,42 @@ else{
 						$res=mysql_query($sql);
 						if(mysql_num_rows($res)>0) {
 							$lig=mysql_fetch_object($res);
-							echo "<span style='color:red'>Le pers_id n°$nouveau_pers_id est déjà attribué à $lig->nom $lig->prenom.</span><br />\n";
+							$texte.="<span style='color:red'>Le pers_id n°<a href='modify_resp.php?pers_id=$nouveau_pers_id' target='_blank'>$nouveau_pers_id</a> est déjà attribué à $lig->nom $lig->prenom.</span><br />\n";
 						}
 						else {
 							$sql="SELECT * FROM resp_pers WHERE pers_id='$ancien_pers_id';";
 							$res=mysql_query($sql);
 							if(mysql_num_rows($res)>0) {
 								$lig=mysql_fetch_object($res);
-
-								echo "Mise à jour de la responsabilité pour $lig->nom $lig->prenom (<em>$ancien_pers_id&gt;$nouveau_pers_id</em>)&nbsp;: ";
+								$texte.="Mise à jour de la responsabilité pour $lig->nom $lig->prenom (<em>$ancien_pers_id&gt;<a href='modify_resp.php?pers_id=$nouveau_pers_id' target='_blank'>$nouveau_pers_id</a></em>)&nbsp;: ";
 								$sql="UPDATE responsables2 SET pers_id='$nouveau_pers_id' WHERE pers_id='$ancien_pers_id';";
 								$update=mysql_query($sql);
 								if($update) {
-									echo "<span style='color:green'>SUCCES</span>";
+									$texte.="<span style='color:green'>SUCCES</span>";
 								}
 								else {
-									echo "<span style='color:red'>ECHEC</span>";
+									$texte.="<span style='color:red'>ECHEC</span>";
 								}
-								echo "<br />\n";
+								$texte.="<br />\n";
 
-								echo "Mise à jour de l'identité dans resp_pers pour $lig->nom $lig->prenom (<em>$ancien_pers_id&gt;$nouveau_pers_id</em>)&nbsp;: ";
+								$texte.="Mise à jour de l'identité dans resp_pers pour $lig->nom $lig->prenom (<em>$ancien_pers_id&gt;<a href='modify_resp.php?pers_id=$nouveau_pers_id' target='_blank'>$nouveau_pers_id</a></em>)&nbsp;: ";
 								$sql="UPDATE resp_pers SET pers_id='$nouveau_pers_id' WHERE pers_id='$ancien_pers_id';";
 								$update=mysql_query($sql);
 								if($update) {
-									echo "<span style='color:green'>SUCCES</span>";
+									$texte.="<span style='color:green'>SUCCES</span>";
 								}
 								else {
-									echo "<span style='color:red'>ECHEC</span>";
+									$texte.="<span style='color:red'>ECHEC</span>";
 								}
-								echo "<br />\n";
+								$texte.="<br />\n";
 							}
 						}
 					}
 				}
-				echo "<p><br /></p>\n";
+				$texte.="<p><br /></p>\n";
+
+				echo $texte;
+				enregistre_log_maj_sconet($texte);
 			}
 
 
@@ -7513,9 +8336,11 @@ else{
 				}
 			}
 
+			$temoin_rapprochement_propose="n";
 			if($chaine!="") {
+				$temoin_rapprochement_propose="y";
 				echo "<form action='".$_SERVER['PHP_SELF']."' method='post'>\n";
-				echo "<fieldset style='border: 1px solid grey;'>\n";
+				echo "<fieldset style='border: 1px solid grey; background-image: url(\"../images/background/opacite50.png\");'>\n";
 
 				echo "<p class='bold'>Contrôle des doublons...</p>\n";
 				echo "<p>Veuillez contrôler si les nouveaux repérés sont vraiment des nouveaux ou s'il s'agit de doublons.<br />Voir en bas de tableau les explications.</p>\n";
@@ -7551,17 +8376,29 @@ else{
 
 				//echo "<span style='color:red'>Ajouter une colonne 'Prendre le pers_id du nouveau'<br />Tester quand même si les anciens sont aussi dans temp_resp_pers_import... si oui, il n'y a pas lieu de proposer la modif... sauf si le resp n'est plus associé à aucun élève</span><br />";
 
-				echo "<p style='text-indent:-4em; margin-left:4em;'><em>NOTE&nbsp;:</em> Si les responsables n'ont pas de compte d'utilisateur pour se connecter dans Gepi, cette phase ne présente pas franchement d'intérêt.<br />L'objectif est ici d'éviter de changer le responsable qui dispose déjà d'un compte d'utilisateur.<br />Un nouveau login pourrait sinon être généré.</p>\n";
+				echo "<br /><p style='text-indent:-4em; margin-left:4em;'><em>NOTES&nbsp;:</em></p>
+				<ul>
+				<li>On recherche ici si les responsables détectés comme nouveaux sont bien des nouveaux.<br />
+				Pour cela, on recherche les autres responsables associés aux mêmes élèves que les nouveaux.<br />
+				Si les deux responsables légaux d'un enfant ne sont pas ajoutés en même temps dans la base, il peut arriver que l'on vous propose ici des doublons qui n'en sont pas.<br />
+				Vous les reconnaitrez facilement sauf si les époux sont de parfaits homonymes (<em>nom et prénom</em>)</li>
+				<li>Si les responsables n'ont pas de compte d'utilisateur pour se connecter dans Gepi, cette phase ne présente pas franchement d'intérêt.<br />L'objectif est ici d'éviter de changer le responsable qui dispose déjà d'un compte d'utilisateur.<br />Un nouveau login pourrait sinon être généré.</li>
+				</ul>\n";
 
 				echo "</fieldset>\n";
 				echo "</form>\n";
 				echo "<p><br /></p>\n";
 			}
 
+			if($temoin_rapprochement_propose=="n") {
+				echo "<p>Aucun doublon n'a été détecté à ce stade.</p>\n";
+			}
 
 			echo "<form action='".$_SERVER['PHP_SELF']."' method='post'>\n";
-			echo "<fieldset style='border: 1px solid grey;'>\n";
-			echo "<p class='bold'>Ou passer à la suite</p>\n";
+			echo "<fieldset style='border: 1px solid grey; background-image: url(\"../images/background/opacite50.png\");'>\n";
+			if($temoin_rapprochement_propose=="y") {
+				echo "<p class='bold'>Ou passer à la suite</p>\n";
+			}
 			echo "<input type='hidden' name='stop' id='id_form_stop' value='$stop' />\n";
 			echo "<input type='hidden' name='step' value='16' />\n";
 
@@ -7599,7 +8436,7 @@ else{
 
 			$ne_pas_proposer_redoublonnage_adresse=isset($_POST['ne_pas_proposer_redoublonnage_adresse']) ? $_POST['ne_pas_proposer_redoublonnage_adresse'] : "n";
 
-			echo "<form action='".$_SERVER['PHP_SELF']."' method='post'>\n";
+			echo "<form action='".$_SERVER['PHP_SELF']."' id='formulaire' method='post'>\n";
 			//==============================
 			// AJOUT pour tenir compte de l'automatisation ou non:
 			echo "<input type='hidden' name='stop' id='id_form_stop' value='$stop' />\n";
@@ -7607,6 +8444,8 @@ else{
 			echo "<input type='hidden' name='ne_pas_proposer_redoublonnage_adresse' value='$ne_pas_proposer_redoublonnage_adresse' />\n";
 			echo "<input type='hidden' name='eff_tranche' value='$eff_tranche' />\n";
 			echo add_token_field();
+
+			echo "<input type='hidden' name='temoin_suhosin_1' value='step16' />\n";
 
 			if(!isset($parcours_diff)) {
 				info_debug("========================================================");
@@ -7700,7 +8539,9 @@ else{
 			if(mysql_num_rows($res1)>0) {
 
 				//echo "<p align='center'><input type='submit' value='Poursuivre' /></p>\n";
-				echo "<p align='center'><input type='submit' value='Valider' /></p>\n";
+				//echo "<p align='center'><input type='submit' value='Valider' /></p>\n";
+				echo "<p><input type='submit' id='input_submit' value='Valider' />
+<input type='button' id='input_button' value='Valider' style='display:none;' onclick=\"check_champ_coche()\" /></p>\n";
 
 				// Affichage du tableau
 				//echo "<table border='1'>\n";
@@ -8498,7 +9339,38 @@ delete FROM temp_resp_pers_import where pers_id not in (select pers_id from temp
 				//echo "<input type='hidden' name='step' value='15' />\n";
 				echo "<input type='hidden' name='step' value='16' />\n";
 				//echo "<p align='center'><input type='submit' value='Poursuivre' /></p>\n";
-				echo "<p align='center'><input type='submit' value='Valider' /></p>\n";
+				//echo "<p align='center'><input type='submit' value='Valider' /></p>\n";
+
+				echo "<p><input type='submit' id='input_submit2' value='Valider' />
+<input type='button' id='input_button2' value='Valider' style='display:none;' onclick=\"check_champ_coche()\" /></p>
+
+<script type='text/javascript'>
+	document.getElementById('input_submit').style.display='none';
+	document.getElementById('input_submit2').style.display='none';
+	document.getElementById('input_button').style.display='';
+	document.getElementById('input_button2').style.display='';
+
+	function check_champ_coche(){
+		var nb_coche=0;
+		for(i=0;i<$cpt;i++){
+			if(document.getElementById('check_'+i)){
+				if(document.getElementById('check_'+i).checked==true) {
+					nb_coche++;
+					break;
+				}
+			}
+		}
+		if(nb_coche==0) {
+			if(confirm(\"Vous n'avez cochez aucune case.\\nSi ce n'est pas une erreur, confirmez en cliquant sur OK.\\nSinon, annulez pour cocher des cases avant de valider.\")) {
+				document.getElementById('formulaire').submit();
+			}
+		}
+		else {
+			document.getElementById('formulaire').submit();
+		}
+	}
+</script>\n";
+
 			}
 			else{
 				// On est à la fin on peut passer à step=12 et effectuer les changements confirmés.
@@ -8508,6 +9380,8 @@ delete FROM temp_resp_pers_import where pers_id not in (select pers_id from temp
 				echo "<input type='hidden' name='step' value='17' />\n";
 				echo "<p><input type='submit' value='Valider les modifications' /></p>\n";
 			}
+
+			echo "<input type='hidden' name='temoin_suhosin_2' value='step16' />\n";
 
 			//echo "<input type='hidden' name='is_posted' value='yes' />\n";
 			echo "</form>\n";
@@ -8524,21 +9398,28 @@ delete FROM temp_resp_pers_import where pers_id not in (select pers_id from temp
 
 			//echo "<p>On doit parcourir 'tempo2' en recherchant 'pers_id_confirm'.</p>\n";
 
+			enregistre_log_maj_sconet("<p class='bold'>Ajout et/ou modifications de responsables&nbsp;:</p>");
+
 			$sql="SELECT DISTINCT col2 FROM tempo2 WHERE col1='pers_id_confirm';";
 			info_debug($sql);
 			$res1=mysql_query($sql);
 			if(mysql_num_rows($res1)==0){
-				echo "<p>Aucune modification n'a été confirmée/demandée.</p>\n";
+				$texte="<p>Aucune modification n'a été confirmée/demandée.</p>\n";
+
+				echo $texte;
+				$texte_maj_sconet=$texte;
+
+				// 20120922
+				enregistre_log_maj_sconet($texte_maj_sconet);
 
 				// IL RESTE... les responsabilités
 				//echo "<p>Passer à l'étape de <a href='".$_SERVER['PHP_SELF']."?step=17&amp;stop=$stop'>mise à jour des responsabilités</a>.</p>\n";
 				echo "<p>Passer à l'étape de <a href='".$_SERVER['PHP_SELF']."?step=18&amp;stop=$stop'>mise à jour des responsabilités</a>.</p>\n";
-
 			}
-			else{
+			else {
 				$erreur=0;
 				$cpt=0;
-				echo "<p>Ajout ou modification de: ";
+				$texte="<p>Ajout ou modification de: ";
 				while($lig1=mysql_fetch_object($res1)){
 					$sql="SELECT DISTINCT t.* FROM temp_resp_pers_import t WHERE t.pers_id='$lig1->col2'";
 					info_debug($sql);
@@ -8547,7 +9428,7 @@ delete FROM temp_resp_pers_import where pers_id not in (select pers_id from temp
 						$lig=mysql_fetch_object($res);
 
 						if($cpt>0){
-							echo ", ";
+							$texte.=", ";
 						}
 
 						$sql="SELECT 1=1 FROM resp_pers WHERE pers_id='$lig1->col2'";
@@ -8568,14 +9449,37 @@ delete FROM temp_resp_pers_import where pers_id not in (select pers_id from temp
 							info_debug($sql);
 							$insert=mysql_query($sql);
 							if($insert){
-								echo "\n<span style='color:blue;'>";
+								$texte.="\n<a href='modify_resp.php?pers_id=".$lig1->col2."' target='_blank'><span style='color:blue;'>";
+								$texte.="$lig->prenom $lig->nom";
+								$texte.="</span></a>";
 
 								if($nb_comptes_resp>0) {
 									$sql="SELECT 1=1 FROM temp_responsables2_import WHERE pers_id='".$lig1->col2."' AND (resp_legal='1' OR resp_legal='2');";
 									$test_resp_legal=mysql_query($sql);
 									if(mysql_num_rows($test_resp_legal)>0) {
-										$info_action_titre="Nouveau responsable&nbsp;: ".remplace_accents(stripslashes($lig->nom)." ".stripslashes($lig->prenom))." ($lig1->col2)";
-										$info_action_texte="Vous souhaitez peut-être créer un compte pour ce nouveau responsable&nbsp;: <a href='utilisateurs/create_responsable.php?critere_recherche=$lig->nom&afficher_tous_les_resp=n'>".remplace_accents(stripslashes($lig->nom)." ".stripslashes($lig->prenom))."</a>.";
+										$info_action_titre="Nouveau responsable&nbsp;: ".remplace_accents(stripslashes($lig->nom)." ".stripslashes($lig->prenom))." (".$lig1->col2.")";
+										// 20130405
+										$info_action_texte="";
+										$sql="SELECT e.login, t.resp_legal FROM eleves e, temp_responsables2_import t WHERE e.ele_id=t.ele_id AND t.pers_id='".$lig1->col2."' ORDER BY e.nom, e.prenom;";
+										$res_ele_resp=mysql_query($sql);
+										if(mysql_num_rows($res_ele_resp)>0) {
+											$info_action_texte.="Le nouveau responsable <a href='responsables/modify_resp.php?pers_id=".$lig1->col2."'>".remplace_accents(stripslashes($lig->nom)." ".stripslashes($lig->prenom))." (".$lig1->col2.")</a> est associé d'après vos fichiers Sconet à ";
+											$cpt_ele_resp=0;
+											while($lig_ele_resp=mysql_fetch_object($res_ele_resp)) {
+												if($cpt_ele_resp>0) {$info_action_texte.=", ";}
+												$info_action_texte.="<a href='eleves/modify_eleve.php?eleve_login=".$lig_ele_resp->login."'>".get_nom_prenom_eleve($lig_ele_resp->login, 'avec_classe')." <span title=\"";
+												if(($lig_ele_resp->resp_legal==1)||($lig_ele_resp->resp_legal==2)) {
+													$info_action_texte.="en responsable légal $lig_ele_resp->resp_legal";
+												}
+												else {
+													$info_action_texte.="en responsable non légal (contact,...)";
+												}
+												$info_action_texte.="\">($lig_ele_resp->resp_legal)</span></a>";
+												$cpt_ele_resp++;
+											}
+											$info_action_texte.="<br />";
+										}
+										$info_action_texte.="Vous souhaitez peut-être créer un compte pour ce nouveau responsable&nbsp;: <a href='utilisateurs/create_responsable.php?critere_recherche=$lig->nom&afficher_tous_les_resp=n'>".remplace_accents(stripslashes($lig->nom)." ".stripslashes($lig->prenom))."</a>.";
 										$info_action_destinataire=array("administrateur");
 										$info_action_mode="statut";
 										enregistre_infos_actions($info_action_titre,$info_action_texte,$info_action_destinataire,$info_action_mode);
@@ -8583,11 +9487,12 @@ delete FROM temp_resp_pers_import where pers_id not in (select pers_id from temp
 								}
 							}
 							else{
-								echo "\n<span style='color:red;'>";
+								$texte.="\n<span style='color:red;'>";
+								$texte.="$lig->prenom $lig->nom";
+								$texte.="</span>";
+
 								$erreur++;
 							}
-							echo "$lig->prenom $lig->nom";
-							echo "</span>";
 						}
 						else{
 							$sql="UPDATE resp_pers SET nom='".mysql_real_escape_string(my_strtoupper($lig->nom))."',
@@ -8636,7 +9541,9 @@ delete FROM temp_resp_pers_import where pers_id not in (select pers_id from temp
 							info_debug($sql);
 							$update=mysql_query($sql);
 							if($update){
-								echo "\n<span style='color:darkgreen;'>";
+								$texte.="\n<a href='modify_resp.php?pers_id=".$lig1->col2."' target='_blank'><span style='color:darkgreen;'>";
+								$texte.="$lig->prenom $lig->nom";
+								$texte.="</span></a>";
 
 								if(getSettingValue('mode_email_resp')=='sconet') {
 									$sql="UPDATE utilisateurs SET email='".mysql_real_escape_string($lig->mel)."' WHERE statut='responsable' AND login IN (SELECT login FROM resp_pers WHERE pers_id='$lig1->col2');";
@@ -8646,14 +9553,14 @@ delete FROM temp_resp_pers_import where pers_id not in (select pers_id from temp
 							}
 							else{
 								info_debug("ERREUR sur l'update");
-								echo "\n<span style='color:red;'>";
+								$texte.="\n<span style='color:red;'>";
+								$texte.="$lig->prenom $lig->nom";
+								$texte.="</span>";
 								$erreur++;
 							}
 							//echo "$sql<br />\n";
-							echo "$lig->prenom $lig->nom";
-							echo "</span>";
 
-							if((isset($update_utilisateurs))&&(!$update_utilisateurs)) {echo " <span style='color:red;'>Erreur lors de la mise à jour du mail du compte utilisateur.</span><br />\n";}
+							if((isset($update_utilisateurs))&&(!$update_utilisateurs)) {$texte.=" <span style='color:red;'>Erreur lors de la mise à jour du mail du compte utilisateur.</span><br />\n";}
 
 							$sql_tmp="UPDATE utilisateurs SET nom='".mysql_real_escape_string(my_strtoupper($lig->nom))."',
 													prenom='".mysql_real_escape_string(maj_ini_prenom($lig->prenom))."',
@@ -8705,7 +9612,7 @@ delete FROM temp_resp_pers_import where pers_id not in (select pers_id from temp
 									$update=mysql_query($sql);
 									if(!$update){
 										$erreur++;
-										echo "<span style='color:red;'>(*)</span>";
+										$texte.="<span style='color:red;'>(*)</span>";
 									}
 								}
 								else{
@@ -8729,7 +9636,7 @@ delete FROM temp_resp_pers_import where pers_id not in (select pers_id from temp
 									$insert=mysql_query($sql);
 									if(!$insert){
 										$erreur++;
-										echo "<span style='color:red;'>(*)</span>";
+										$texte.="<span style='color:red;'>(*)</span>";
 									}
 
 								}
@@ -8744,8 +9651,13 @@ delete FROM temp_resp_pers_import where pers_id not in (select pers_id from temp
 					}
 					$cpt++;
 				}
+				$texte.="<p><br /></p>\n";
+				echo $texte;
+				$texte_maj_sconet=$texte;
 
-				echo "<p><br /></p>\n";
+				// 20120922
+				enregistre_log_maj_sconet($texte_maj_sconet);
+
 
 				echo "<p><b>Indication:</b> En <span style='color:blue;'>bleu</span>, les personnes ajoutées et en <span style='color:darkgreen;'>vert</span> les personnes/adresses mises à jour.<br />Les <span style='color:red;'>(*)</span> éventuellement présents signalent un souci concernant l'adresse.</p>\n";
 
@@ -8803,7 +9715,7 @@ delete FROM temp_resp_pers_import where pers_id not in (select pers_id from temp
 
 				//=========================================
 				// 20110911
-				$sql="CREATE TABLE IF NOT EXISTS tempo4 ( col1 varchar(100) $chaine_mysql_collate NOT NULL default '', col2 varchar(100) $chaine_mysql_collate NOT NULL default '', col3 varchar(100) $chaine_mysql_collate NOT NULL default '', col4 varchar(100) $chaine_mysql_collate NOT NULL default '');";
+				$sql="CREATE TABLE IF NOT EXISTS tempo4 ( col1 varchar(100) $chaine_mysql_collate NOT NULL default '', col2 varchar(100) $chaine_mysql_collate NOT NULL default '', col3 varchar(100) $chaine_mysql_collate NOT NULL default '', col4 varchar(100) $chaine_mysql_collate NOT NULL default '') ENGINE=MyISAM;";
 				info_debug($sql);
 				$res_tempo4=mysql_query($sql);
 
@@ -9120,7 +10032,7 @@ delete FROM temp_resp_pers_import where pers_id not in (select pers_id from temp
 				//echo "<p>Parcourir les différences par tranches de <input type='text' name='eff_tranche' id='eff_tranche' value='".min($eff_tranche_recherche_diff,$nb_associations_a_consulter)."' size='3' onkeydown=\"clavier_2(this.id,event,0,200);\" autocomplete='off' /> sur un total de $nb_associations_a_consulter.<br />\n";
 				echo "<p>Parcourir les différences par tranches de <input type='text' name='eff_tranche' id='eff_tranche' value='".min(20,$nb_associations_a_consulter)."' size='3' onkeydown=\"clavier_2(this.id,event,0,200);\" autocomplete='off' /> sur un total de $nb_associations_a_consulter.<br />\n";
 
-				echo "Ne pas proposer de supprimer des responsables non associés à des élèves <input type='checkbox' name='suppr_resp_non_assoc' value='n' /><br />\n";
+				echo "<label for='suppr_resp_non_assoc'>Ne pas proposer de supprimer des responsables non associés à des élèves </label><input type='checkbox' name='suppr_resp_non_assoc' id='suppr_resp_non_assoc' value='n' /><br />\n";
 				echo add_token_field();
 				echo "<input type='submit' value='Afficher les différences' /></p>\n";
 /*
@@ -9153,7 +10065,7 @@ delete FROM temp_resp_pers_import where pers_id not in (select pers_id from temp
 			$suppr_resp_non_assoc=isset($_POST['suppr_resp_non_assoc']) ? $_POST['suppr_resp_non_assoc'] : 'y';
 			
 
-			echo "<form action='".$_SERVER['PHP_SELF']."' name='formulaire' method='post'>\n";
+			echo "<form action='".$_SERVER['PHP_SELF']."' name='formulaire' id='formulaire' method='post'>\n";
 			echo add_token_field();
 			//==============================
 			// AJOUT pour tenir compte de l'automatisation ou non:
@@ -9161,6 +10073,8 @@ delete FROM temp_resp_pers_import where pers_id not in (select pers_id from temp
 			//==============================
 			echo "<input type='hidden' name='eff_tranche' value='$eff_tranche' />\n";
 			echo "<input type='hidden' name='suppr_resp_non_assoc' value='$suppr_resp_non_assoc' />\n";
+
+			echo "<input type='hidden' name='temoin_suhosin_1' value='step19' />\n";
 
 			echo "<input type='hidden' name='temoin_phase_19' value='19' />\n";
 			//if(!isset($parcours_diff)){
@@ -9208,6 +10122,9 @@ delete FROM temp_resp_pers_import where pers_id not in (select pers_id from temp
 						$sql="DELETE FROM responsables2 WHERE WHERE pers_id='$pers_id';";
 						info_debug($sql);
 						$nettoyage=mysql_query($sql);
+
+						if($nettoyage) {enregistre_log_maj_sconet("Suppression des responsabilités pour le responsable n°<a href='modify_resp.php?pers_id=$pers_id' target='_blank'>$pers_id</a> (".civ_nom_prenom_from_pers_id($pers_id).").<br />");}
+
 					}
 				}
 
@@ -9335,6 +10252,7 @@ delete FROM temp_resp_pers_import where pers_id not in (select pers_id from temp
 																resp_legal='$resp_legal';";
 								info_debug($sql);
 								$insert=mysql_query($sql);
+								if($insert) {enregistre_log_maj_sconet("Enregistrement de la responsabilité du responsable n°<a href='modify_resp.php?pers_id=$pers_id' target='_blank'>$pers_id</a> (".civ_nom_prenom_from_pers_id($pers_id).") en tant que responsable légal $resp_legal de l'élève n°$ele_id (".get_nom_prenom_eleve_from_ele_id($ele_id).").<br />");}
 							}
 							else{
 								// Cas de resp_legal=0
@@ -9344,6 +10262,7 @@ delete FROM temp_resp_pers_import where pers_id not in (select pers_id from temp
 																resp_legal='$resp_legal';";
 								info_debug($sql);
 								$insert=mysql_query($sql);
+								if($insert) {enregistre_log_maj_sconet("Enregistrement de la responsabilité du responsable n°<a href='modify_resp.php?pers_id=$pers_id' target='_blank'>$pers_id</a> (".civ_nom_prenom_from_pers_id($pers_id).") en tant que responsable légal $resp_legal de l'élève n°$ele_id (".get_nom_prenom_eleve_from_ele_id($ele_id).").<br />");}
 							}
 						}
 					}
@@ -9414,6 +10333,7 @@ delete FROM temp_resp_pers_import where pers_id not in (select pers_id from temp
 																resp_legal='$resp_legal';";
 								info_debug($sql);
 								$insert=mysql_query($sql);
+								if($insert) {enregistre_log_maj_sconet("Enregistrement de la responsabilité du responsable n°<a href='modify_resp.php?pers_id=$pers_id' target='_blank'>$pers_id</a> (".civ_nom_prenom_from_pers_id($pers_id).") en tant que responsable légal $resp_legal de l'élève n°$ele_id (".get_nom_prenom_eleve_from_ele_id($ele_id).").<br />");}
 
 							}
 							else{
@@ -9424,6 +10344,7 @@ delete FROM temp_resp_pers_import where pers_id not in (select pers_id from temp
 																resp_legal='$resp_legal';";
 								info_debug($sql);
 								$update=mysql_query($sql);
+								if($update) {enregistre_log_maj_sconet("Mise à jour de la responsabilité du responsable n°<a href='modify_resp.php?pers_id=$pers_id' target='_blank'>$pers_id</a> (".civ_nom_prenom_from_pers_id($pers_id).") en tant que responsable légal $resp_legal de l'élève n°$ele_id (".get_nom_prenom_eleve_from_ele_id($ele_id).").<br />");}
 							}
 						}
 					}
@@ -9463,7 +10384,9 @@ delete FROM temp_resp_pers_import where pers_id not in (select pers_id from temp
 			if(mysql_num_rows($res0)>0){
 
 				//echo "<p align='center'><input type='submit' value='Poursuivre' /></p>\n";
-				echo "<p align='center'><input type=submit value='Valider' /></p>\n";
+				//echo "<p align='center'><input type=submit value='Valider' /></p>\n";
+				echo "<p><input type='submit' id='input_submit' value='Valider' />
+				<input type='button' id='input_button' value='Valider' style='display:none;' onclick=\"check_champ_coche()\" /></p>\n";
 
 				// Affichage du tableau
 
@@ -9956,7 +10879,38 @@ delete FROM temp_resp_pers_import where pers_id not in (select pers_id from temp
 					echo "<p>Aucune ligne de différence n'est proposée après contrôle.</p>\n";
 				}
 				else {
-					echo "<p align='center'><input type=submit value='Valider' /></p>\n";
+					//echo "<p align='center'><input type=submit value='Valider' /></p>\n";
+
+					echo "<p><input type='submit' id='input_submit2' value='Valider' />
+<input type='button' id='input_button2' value='Valider' style='display:none;' onclick=\"check_champ_coche()\" /></p>
+
+<script type='text/javascript'>
+	document.getElementById('input_submit').style.display='none';
+	document.getElementById('input_submit2').style.display='none';
+	document.getElementById('input_button').style.display='';
+	document.getElementById('input_button2').style.display='';
+
+	function check_champ_coche(){
+		var nb_coche=0;
+		for(i=0;i<$cpt;i++){
+			if(document.getElementById('check_'+i)){
+				if(document.getElementById('check_'+i).checked==true) {
+					nb_coche++;
+					break;
+				}
+			}
+		}
+		if(nb_coche==0) {
+			if(confirm(\"Vous n'avez cochez aucune case.\\nSi ce n'est pas une erreur, confirmez en cliquant sur OK.\\nSinon, annulez pour cocher des cases avant de valider.\")) {
+				document.getElementById('formulaire').submit();
+			}
+		}
+		else {
+			document.getElementById('formulaire').submit();
+		}
+	}
+</script>\n";
+
 				}
 
 				echo "<p><br /></p>\n";
@@ -9999,6 +10953,9 @@ delete FROM temp_resp_pers_import where pers_id not in (select pers_id from temp
 						$sql="DELETE FROM responsables2 WHERE pers_id='$lig_nett->pers_id' AND ele_id='$lig_nett->ele_id';";
 						info_debug($sql);
 						$nettoyage=mysql_query($sql);
+
+						if($nettoyage) {enregistre_log_maj_sconet("Suppression de responsabilité sans élève associé pour le responsable n°<a href='modify_resp.php?pers_id=$lig_nett->pers_id' target='_blank'>$lig_nett->pers_id</a> (".civ_nom_prenom_from_pers_id($lig_nett->pers_id).") en tant que responsable légal $resp_legal de l'élève n°$lig_nett->ele_id.<br />");}
+
 						flush();
 						$cpt_nett++;
 					}
@@ -10018,6 +10975,8 @@ delete FROM temp_resp_pers_import where pers_id not in (select pers_id from temp
 				echo "</ul>\n";
 				*/
 			}
+
+			echo "<input type='hidden' name='temoin_suhosin_2' value='step19' />\n";
 
 			echo "</form>\n";
 
@@ -10043,6 +11002,12 @@ delete FROM temp_resp_pers_import where pers_id not in (select pers_id from temp
 				echo "<li><a href='index.php'>l'index Responsables</a></li>\n";
 				echo "<li><a href='../eleves/index.php'>l'index Elèves</a></li>\n";
 				echo "</ul>\n";
+
+				// 20120922
+				enregistre_log_maj_sconet("<p>Fin</p>", "y");
+				$sql="DELETE FROM setting WHERE name='ts_maj_sconet';";
+				$menage=mysql_query($sql);
+
 			}
 			else {
 				if($nb==1) {
@@ -10220,6 +11185,21 @@ delete FROM temp_resp_pers_import where pers_id not in (select pers_id from temp
 			echo "<li><a href='index.php'>l'index Responsables</a></li>\n";
 			echo "<li><a href='../eleves/index.php'>l'index Elèves</a></li>\n";
 			echo "</ul>\n";
+
+			// 20120922
+			enregistre_log_maj_sconet("<p>Fin</p>", "y");
+			$sql="DELETE FROM setting WHERE name='ts_maj_sconet';";
+			$menage=mysql_query($sql);
+
+			$tab_tables_temp=array("temp_gep_import2", "tempo2", "temp_ele_classe", "temp_resp_pers_import", "temp_responsables2_import", "temp_resp_adr_import");
+			for($loop⁼0;$loop<count($tab_tables_temp);$loop++) {
+				$sql="SHOW TABLE ".$tab_tables_temp[$loop].";";
+				$test_table=mysql_query($sql);
+				if(mysql_num_rows($test_table)>0) {
+					$sql="TRUNCATE TABLE ".$tab_tables_temp[$loop].";";
+					$menage=mysql_query($sql);
+				}
+			}
 
 			break;
 	}

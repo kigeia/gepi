@@ -1,7 +1,7 @@
 <?php
 /*
  *
- * Copyright 2001-2012 Thomas Belliard, Laurent Delineau, Edouard Hue, Eric Lebrun, Stephane Boireau
+ * Copyright 2001-2013 Thomas Belliard, Laurent Delineau, Edouard Hue, Eric Lebrun, Stephane Boireau
  *
  * This file is part of GEPI.
  *
@@ -76,12 +76,31 @@ function formate_date2($chaine, $from, $to) {
 	return $retour;
 }
 
+function echo_debug_itop($chaine) {
+	$debug="n";
+	if($debug=="y") {
+		echo $chaine;
+	}
+}
+
 // Menage:
 $sql="DELETE FROM sso_table_correspondance WHERE login_gepi='' OR login_sso='';";
 $menage=mysql_query($sql);
 
 if((isset($_POST['temoin_suhosin_1']))&&(!isset($_POST['temoin_suhosin_2']))) {
 	$msg.="Il semble que certaines variables n'ont pas été transmises.<br />Cela peut arriver lorsqu'on tente de transmettre (<em>cocher trop de cases</em>) trop de variables.<br />Vous devriez tenter de cocher moins de cases et vous y prendre en plusieurs fois.<br />";
+}
+
+if(isset($_GET['supprimer_comptes_parents'])) {
+	check_token();
+
+	$sql="DELETE FROM utilisateurs WHERE statut='responsable';";
+	$suppr=mysql_query($sql);
+
+	$sql="UPDATE resp_pers SET login='';";
+	$vider_login=mysql_query($sql);
+
+	$msg.="Les comptes d'utilisateurs responsables ont été supprimés et leur login vidé dans la table 'resp_pers'.<br />";
 }
 
 if(isset($_POST['recherche'])) {
@@ -344,9 +363,10 @@ if(isset($_POST['enregistrement_eleves'])) {
 	$ligne=isset($_POST['ligne']) ? $_POST['ligne'] : NULL;
 
 	$nb_reg=0;
+	$nb_pas_dans_eleves=0;
 
 	if(!isset($ligne)) {
-		$msg="Aucun enregistrement d'association n'a été demandée.<br />";
+		$msg="Aucun enregistrement d'association n'a été demandé.<br />";
 	}
 	else {
 		$ligne_tempo2=array();
@@ -409,26 +429,45 @@ if(isset($_POST['enregistrement_eleves'])) {
 					$tab=explode(";", $ligne_tempo2[$ligne[$loop]]);
 
 					$sql="SELECT * FROM sso_table_correspondance WHERE login_sso='".mysql_real_escape_string($tab[0])."';";
+					echo_debug_itop("$sql<br />");
 					$test=mysql_query($sql);
 					if(mysql_num_rows($test)==0) {
 						$naissance=(isset($tab[5])) ? $tab[5] : "";
 						if(!preg_match("#[0-9]{2}/[0-9]{2}/[0-9]{4}#", $naissance)) {$naissance="";}
 
+						/*
 						if($naissance!="") {
 							$sql="SELECT * FROM eleves WHERE nom='".mysql_real_escape_string($tab[1])."' AND prenom='".mysql_real_escape_string($tab[2])."' AND naissance='".formate_date2($naissance, "jj/mm/aaaa", "aaaammjj")."'";
 						}
 						else {
 							$sql="SELECT * FROM eleves WHERE nom='".mysql_real_escape_string($tab[1])."' AND prenom='".mysql_real_escape_string($tab[2])."' ORDER BY naissance;";
 						}
+						*/
+						// Les accents ne sont pas correctement interprétés
+						$nom_remplacement=preg_replace("/[^A-Za-z]/","%",$tab[1]);
+						$prenom_remplacement=preg_replace("/[^A-Za-z]/","%",$tab[2]);
+						if($naissance!="") {
+							$sql="SELECT * FROM eleves WHERE nom LIKE '".$nom_remplacement."' AND prenom LIKE '".$prenom_remplacement."' AND naissance='".formate_date2($naissance, "jj/mm/aaaa", "aaaammjj")."'";
+						}
+						else {
+							$sql="SELECT * FROM eleves WHERE nom LIKE '".$nom_remplacement."' AND prenom LIKE '".$prenom_remplacement."' ORDER BY naissance;";
+						}
+						echo_debug_itop("$sql<br />");
 						$res=mysql_query($sql);
-						if(mysql_num_rows($res)==1) {
+						if(mysql_num_rows($res)==0) {
+							$msg.="Aucun enregistrement dans la table 'eleves' pour ".$tab[1]." ".$tab[2]." !<br />\n";
+							$nb_pas_dans_eleves++;
+						}
+						elseif(mysql_num_rows($res)==1) {
 							// Un seul élève correspond
 							$lig=mysql_fetch_object($res);
 
 							$sql="SELECT 1=1 FROM sso_table_correspondance WHERE login_gepi='$lig->login';";
+							echo_debug_itop("$sql<br />");
 							$test=mysql_query($sql);
 							if(mysql_num_rows($test)==0) {
 								$sql="INSERT INTO sso_table_correspondance SET login_gepi='$lig->login', login_sso='".mysql_real_escape_string($tab[0])."';";
+								echo_debug_itop("$sql<br />");
 								$insert=mysql_query($sql);
 								if(!$insert) {
 									$msg.="Erreur lors de l'insertion de l'association ".$tab[0]." &gt; ".$lig->login."<br />\n";
@@ -439,6 +478,7 @@ if(isset($_POST['enregistrement_eleves'])) {
 							}
 							else {
 								$sql="UPDATE sso_table_correspondance SET login_sso='".mysql_real_escape_string($tab[0])."' WHERE login_gepi='$lig->login';";
+								echo_debug_itop("$sql<br />");
 								$update=mysql_query($sql);
 								if(!$update) {
 									$msg.="Erreur lors de la mise à jour de l'association ".$tab[0]." &gt; ".$lig->login."<br />\n";
@@ -465,8 +505,12 @@ if(isset($_POST['enregistrement_eleves'])) {
 		}
 	}
 
+	if($nb_pas_dans_eleves>0) {
+		$msg.="<br />$nb_pas_dans_eleves comptes de l'ENT n'ont pas été trouvés dans la table 'eleves' de Gepi.<br />Sont-ce des élèves de l'année précédente ?<br />\n";
+	}
+
 	if($nb_reg>0) {
-		$msg.="$nb_reg enregistrement(s) effectué(s).<br />\n";
+		$msg.="<br />$nb_reg enregistrement(s) effectué(s).<br />\n";
 	}
 
 	$mode="consult_eleves";
@@ -565,13 +609,13 @@ if(isset($_POST['enregistrement_responsables'])) {
 						$tab_resp_login=array();
 						if($chaine!="") {
 							$sql="SELECT e.* FROM eleves e, sso_table_correspondance s WHERE ($chaine) AND e.login=s.login_gepi ORDER BY e.nom, e.prenom;";
-							//echo "$sql<br />";
+							echo_debug_itop("$sql<br />");
 							$res_ele=mysql_query($sql);
 							if(mysql_num_rows($res_ele)>0) {
 								$cpt_ele=0;
 								while($lig_ele=mysql_fetch_object($res_ele)) {
 									$sql="SELECT rp.*, r.resp_legal FROM resp_pers rp, responsables2 r WHERE r.pers_id=rp.pers_id AND r.ele_id='$lig_ele->ele_id' AND rp.nom='".mysql_real_escape_string($tab[1])."' AND rp.prenom='".mysql_real_escape_string($tab[2])."' AND rp.login!='';";
-									//echo "$sql<br />";
+									echo_debug_itop("$sql<br />");
 									$res_resp=mysql_query($sql);
 									if(mysql_num_rows($res_resp)>0) {
 										while($lig_resp=mysql_fetch_object($res_resp)) {
@@ -592,7 +636,7 @@ if(isset($_POST['enregistrement_responsables'])) {
 									}
 									else {
 										$sql="SELECT rp.*, r.resp_legal FROM resp_pers rp, responsables2 r WHERE r.pers_id=rp.pers_id AND r.ele_id='$lig_ele->ele_id' AND rp.login!='';";
-										//echo "$sql<br />";
+										echo_debug_itop("$sql<br />");
 										$res_resp=mysql_query($sql);
 										if(mysql_num_rows($res_resp)>0) {
 											while($lig_resp=mysql_fetch_object($res_resp)) {
@@ -905,7 +949,243 @@ if($mode=='vider') {
 	else {
 		$msg.="Erreur lors du 'vidage' de sso_table_correspondance.<br />";
 	}
-	unset($mode);
+	//unset($mode);
+	$mode="";
+}
+
+if($mode=='suppr_scories') {
+	check_token();
+
+	$sql="SELECT login_gepi FROM sso_table_correspondance WHERE login_gepi NOT IN (SELECT login FROM utilisateurs);";
+	$res=mysql_query($sql);
+	$nb_scories=mysql_num_rows($res);
+	if($nb_scories>0) {
+		$sql="DELETE FROM sso_table_correspondance WHERE login_gepi NOT IN (SELECT login FROM utilisateurs);";
+		$res=mysql_query($sql);
+		if($res) {
+			$msg.="$nb_scories association(s) obsolète(s) supprimée(s).<br />";
+		}
+		else {
+			$msg.="Erreur lors de la suppression des $nb_scories association(s) obsolète(s).<br />";
+		}
+	}
+	else {
+		$msg.="Aucune association .<br />";
+	}
+
+	//unset($mode);
+	$mode="";
+}
+
+if($mode=='valider_forcer_logins_mdp_responsables') {
+	check_token();
+
+	$nb_nouveaux_comptes=0;
+	$nb_comptes_remplaces=0;
+	$nb_erreur=0;
+	$ligne=isset($_POST['ligne']) ? $_POST['ligne'] : array();
+
+	/*
+		echo "<pre>";
+		print_r($ligne);
+		echo "</pre>";
+
+		Posté depuis le formulaire:
+			Array
+			(
+				[col1] => pers_id choisi
+				[0] => 1510775
+				[49] => 1432901
+				[50] => 1432902
+				[106] => 1432905
+			)
+
+		Enregistré préalablement dans la table tempo4;
+		mysql> select * from tempo4 where col1='0' or col1='49' or col1='50' or col1='106';
+		+------+----------------------+----------------------------------+------+
+		| col1 | col2                 | col3                             | col4 |
+		+------+----------------------+----------------------------------+------+
+		| 0    | denis.XXXX1          | 64ce0ed8cXXXXXXXXXXXXXXXXXXXXXXX |      |
+		| 49   | christelle.XXXXXXXX1 | e5e610953XXXXXXXXXXXXXXXXXXXXXXX |      |
+		| 50   | joel.XXXXXXXXX       | f8bad8df0XXXXXXXXXXXXXXXXXXXXXXX |      |
+		| 106  | ludovic.XXXXXX       | fac5cb6f2XXXXXXXXXXXXXXXXXXXXXXX |      |
+		+------+----------------------+----------------------------------+------+
+		4 rows in set (0.01 sec)
+
+		mysql> 
+	*/
+
+	$tab_tempo4=array();
+	$sql="SELECT * FROM tempo4;";
+	$res=mysql_query($sql);
+	if(mysql_num_rows($res)>0) {
+		while($lig=mysql_fetch_object($res)) {
+			$tab_tempo4[$lig->col1]['login']=$lig->col2;
+			$tab_tempo4[$lig->col1]['md5_password']=$lig->col3;
+		}
+	}
+
+	foreach($ligne as $id_col1 => $pers_id) {
+		if($pers_id!="") {
+			$sql="SELECT * FROM resp_pers WHERE pers_id='$pers_id';";
+			echo_debug_itop("$sql<br />");
+			$res=mysql_query($sql);
+			if(mysql_num_rows($res)==0) {
+				$msg.="ERREUR : Le responsable n°$pers_id n'existe pas dans la table 'resp_pers'.<br />";
+				$nb_erreur++;
+			}
+			else {
+				$lig=mysql_fetch_object($res);
+
+				if(!isset($tab_tempo4[$id_col1])) {
+					$msg.="ERREUR : Le numéro $id_col1 de l'enregistrement 'tempo4' que vous souhaitez associer au responsable n°$pers_id (<em>$lig->nom $lig->prenom</em>) n'existe pas dans la table 'tempo4'.<br />";
+					$nb_erreur++;
+				}
+				else {
+					$sql="SELECT * FROM utilisateurs WHERE login='".$tab_tempo4[$id_col1]['login']."';";
+					echo_debug_itop("$sql<br />");
+					$test_u=mysql_query($sql);
+					if(mysql_num_rows($test_u)>0) {
+						$lig_u=mysql_fetch_object($test_u);
+
+						$msg.="ERREUR : Le login ".$tab_tempo4[$id_col1]['login']." que vous souhaitez associer au responsable n°$pers_id (<em>$lig->nom $lig->prenom</em>) est déjà associé à un utilisateur de statut '$lig_u->statut' nommé $lig_u->nom $lig_u->prenom.<br />";
+						$nb_erreur++;
+					}
+					else {
+						if($lig->login!="") {
+							$sql="SELECT * FROM utilisateurs WHERE login='".$lig->login."' AND statut='responsable';";
+							echo_debug_itop("$sql<br />");
+							$test_u=mysql_query($sql);
+							if(mysql_num_rows($test_u)>0) {
+								$sql="DELETE FROM utilisateurs WHERE login='".$lig->login."' AND statut='responsable';";
+								echo_debug_itop("$sql<br />");
+								$menage=mysql_query($sql);
+								if(!$menage) {
+									$msg.="ERREUR : La suppression de l'ancien compte d'utilisateur $lig->login associé au responsable n°$pers_id (<em>$lig->nom $lig->prenom</em>) a échoué.<br />";
+									$nb_erreur++;
+								}
+								else {
+									$sql="INSERT INTO utilisateurs SET login='".$tab_tempo4[$id_col1]['login']."', 
+												password='".$tab_tempo4[$id_col1]['md5_password']."', 
+												salt='', 
+												nom='".mysql_real_escape_string($lig->nom)."', 
+												prenom='".mysql_real_escape_string($lig->prenom)."', 
+												civilite='$lig->civilite', 
+												change_mdp='n', 
+												email='".mysql_real_escape_string($lig->mel)."', 
+												auth_mode='gepi', 
+												statut='responsable', 
+												etat='inactif';";
+									echo_debug_itop("$sql<br />");
+									$insert=mysql_query($sql);
+									if($insert) {
+										$sql="UPDATE resp_pers SET login='".$tab_tempo4[$id_col1]['login']."' WHERE pers_id='$pers_id';";
+										echo_debug_itop("$sql<br />");
+										$update=mysql_query($sql);
+										if($update) {
+											$nb_comptes_remplaces++;
+										}
+										else {
+											$msg.="ERREUR : Le remplacement du login dans 'resp_pers' par ".$tab_tempo4[$id_col1]['login']." pour le responsable n°$pers_id (<em>$lig->nom $lig->prenom</em>) a échoué.<br />";
+											$nb_erreur++;
+										}
+									}
+									else {
+										$nb_erreur++;
+									}
+								}
+							}
+							else {
+								// Il y avait un login dans resp_pers, mais il n'existait pas d'enregistrement dans utilisateurs
+								$sql="INSERT INTO utilisateurs SET login='".$tab_tempo4[$id_col1]['login']."', 
+											password='".$tab_tempo4[$id_col1]['md5_password']."', 
+											salt='', 
+											nom='".mysql_real_escape_string($lig->nom)."', 
+											prenom='".mysql_real_escape_string($lig->prenom)."', 
+											civilite='$lig->civilite', 
+											change_mdp='n', 
+											email='".mysql_real_escape_string($lig->mel)."', 
+											auth_mode='gepi', 
+											statut='responsable', 
+											etat='inactif';";
+								echo_debug_itop("$sql<br />");
+								$insert=mysql_query($sql);
+								if($insert) {
+									$sql="UPDATE resp_pers SET login='".$tab_tempo4[$id_col1]['login']."' WHERE pers_id='$pers_id';";
+									echo_debug_itop("$sql<br />");
+									$update=mysql_query($sql);
+									if($update) {
+										$nb_nouveaux_comptes++;
+									}
+									else {
+										$msg.="ERREUR : Le remplacement du login dans 'resp_pers' par ".$tab_tempo4[$id_col1]['login']." pour le responsable n°$pers_id (<em>$lig->nom $lig->prenom</em>) a échoué.<br />";
+										$nb_erreur++;
+									}
+								}
+								else {
+									$nb_erreur++;
+								}
+							}
+						}
+						else {
+							$sql="INSERT INTO utilisateurs SET login='".$tab_tempo4[$id_col1]['login']."', 
+										password='".$tab_tempo4[$id_col1]['md5_password']."', 
+										salt='', 
+										nom='".mysql_real_escape_string($lig->nom)."', 
+										prenom='".mysql_real_escape_string($lig->prenom)."', 
+										civilite='$lig->civilite', 
+										change_mdp='n', 
+										email='".mysql_real_escape_string($lig->mel)."', 
+										auth_mode='gepi', 
+										statut='responsable', 
+										etat='inactif';";
+							echo_debug_itop("$sql<br />");
+							$insert=mysql_query($sql);
+							if($insert) {
+								$sql="UPDATE resp_pers SET login='".$tab_tempo4[$id_col1]['login']."' WHERE pers_id='$pers_id';";
+								echo_debug_itop("$sql<br />");
+								$update=mysql_query($sql);
+								if($update) {
+									$nb_nouveaux_comptes++;
+								}
+								else {
+									$msg.="ERREUR : L'enregistrement du login dans 'resp_pers' par ".$tab_tempo4[$id_col1]['login']." pour le responsable n°$pers_id (<em>$lig->nom $lig->prenom</em>) a échoué.<br />";
+									$nb_erreur++;
+								}
+							}
+							else {
+								$msg.="ERREUR : L'enregistrement du compte d'utilisateur ".$tab_tempo4[$id_col1]['login']." pour le responsable n°$pers_id (<em>$lig->nom $lig->prenom</em>) a échoué.<br />";
+								$nb_erreur++;
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Les comptes créés sont pour le moment inactifs.
+	if($nb_erreur>0) {
+		$msg.="<br />";
+		$msg.="$nb_erreur erreurs se sont produites.<br />";
+	}
+
+	if($nb_nouveaux_comptes>0) {
+		$msg.="<br />";
+		$msg.="$nb_nouveaux_comptes nouveaux comptes ont été enregistrés.<br />";
+	}
+
+	if($nb_comptes_remplaces>0) {
+		$msg.="<br />";
+		$msg.="$nb_comptes_remplaces comptes d'utilisateurs ont été remplacés.<br />";
+	}
+
+	// Ménage:
+	//$sql="TRUNCATE tempo4;";
+	$menage=mysql_query($sql);
+
+	//unset($mode);
+	$mode="";
 }
 
 //**************** EN-TETE *****************
@@ -914,7 +1194,7 @@ require_once("../lib/header.inc.php");
 //**************** FIN EN-TETE *****************
 
 if($msg!="") {
-	echo "<div style='position:absolute; top:100px; left:20px; width:18px;'><a href='#lien_retour'><img src='../images/down.png' width='18' height='18' title='Passer les messages' /></a></div>\n";
+	echo "<div style='position:absolute; top:100px; left:20px; width:18px;' class='noprint'><a href='#lien_retour'><img src='../images/down.png' width='18' height='18' title='Passer les messages' /></a></div>\n";
 }
 
 $module_suhosin_actif="n";
@@ -951,15 +1231,17 @@ $create_table=mysql_query($sql);
 
 <?php
 
-echo "<a name='lien_retour'></a><p class='bold'>
+echo "<a name='lien_retour'></a>
+<p class='bold noprint'>
 <a href=\"../accueil.php\"><img src='../images/icons/back.png' alt='Retour' class='back_link'/> Retour</a>";
 
-if(!isset($mode)) {
+if((!isset($mode))||($mode=="")) {
 	echo "
 </p>
 
 <h2>Rapprochement des comptes ENT ITOP/GEPI</h2>
 
+<div style='margin-left:4em;'>
 <p><a href='".$_SERVER['PHP_SELF']."?mode=saisie_manuelle'>Saisir manuellement une association</a></p>
 <p>Ou importer un CSV&nbsp;:</p>
 <ul>
@@ -1009,14 +1291,142 @@ if(!isset($mode)) {
 	echo "
 </ul>";
 
+	//======================================================================
+	// Fiches bienvenue Elèves
+	//﻿Nom;Prénom;Login;Numéro de jointure;Mot de passe;Email;Classe;Etat;Date de désactivation
+	//DUPRE;Thomas;thomas.dupre;MENESR$12345;mdp&*;Thomas.DUPRE@ent27.fr;6 A;Actif
+	echo "<p> ou générer des Fiches Bienvenue&nbsp;:</p>
+<ul>";
+
+	$sql="SELECT 1=1 FROM eleves e, sso_table_correspondance s WHERE s.login_gepi=e.login;";
+	$res=mysql_query($sql);
+	$nb_corresp_ele=mysql_num_rows($res);
+	if($nb_corresp_ele==0) {
+		echo "
+	<li>Aucune association élève n'est encore enregistrée.</li>";
+	}
+	else {
+		echo "
+	<li><a href='".$_SERVER['PHP_SELF']."?mode=publipostage_eleves'>Générer les Fiches Bienvenue élèves</a> (<em>".mysql_num_rows($res)." association(s) enregistrée(s)</em>)</li>";
+	}
+
+	//===================================================
+	// Fiches bienvenue Responsables
+	//$sql="SELECT rp.*, s.* FROM resp_pers rp, sso_table_correspondance s WHERE s.login_gepi=rp.login ORDER BY rp.nom, rp.prenom LIMIT 1;";
+	$sql="SELECT 1=1 FROM resp_pers rp, sso_table_correspondance s WHERE s.login_gepi=rp.login;";
+	$res=mysql_query($sql);
+	$nb_corresp_resp=mysql_num_rows($res);
+	if($nb_corresp_resp==0) {
+		echo "
+	<li>Aucune association responsable n'est encore enregistrée.</li>";
+	}
+	else {
+		echo "
+	<li><a href='".$_SERVER['PHP_SELF']."?mode=publipostage_responsables'>Générer les Fiches Bienvenue responsables</a> (<em>".mysql_num_rows($res)." association(s) enregistrée(s)</em>)</li>";
+	}
+
+	//===================================================
+	// Fiches bienvenue Personnels
+	//$sql="SELECT u.*, s.* FROM utilisateurs u, sso_table_correspondance s WHERE s.login_gepi=u.login AND u.statut!='eleve' AND u.statut!='responsable' LIMIT 1;";
+	$sql="SELECT 1=1 FROM utilisateurs u, sso_table_correspondance s WHERE s.login_gepi=u.login AND u.statut!='eleve' AND u.statut!='responsable';";
+	$res=mysql_query($sql);
+	$nb_corresp_pers=mysql_num_rows($res);
+	if($nb_corresp_pers==0) {
+		echo "
+	<li>Aucune association n'est encore enregistrée pour les personnels de l'établissement.</li>";
+	}
+	else {
+		echo "
+	<li><a href='".$_SERVER['PHP_SELF']."?mode=publipostage_personnels'>Générer les Fiches Bienvenue personnels</a> (<em>".mysql_num_rows($res)." association(s) enregistrée(s)</em>)</li>";
+	}
+
+	echo "
+</ul>
+<p>Cette rubrique permet de fournir les fichiers CSV de rénitialisation de mots de passe générés par l'ENT, ou les CSV des nouveaux élèves.</p>";
+
+	//===================================================
+	// Scories:
+	$sql="SELECT login_gepi FROM sso_table_correspondance WHERE login_gepi NOT IN (SELECT login FROM utilisateurs);";
+	$res=mysql_query($sql);
+	$nb_scories=mysql_num_rows($res);
+	if($nb_scories>0) {
+		echo "
+<br />
+<p><strong style='color:red'>SCORIES&nbsp;:</strong> ".$nb_scories." association(s) existent dans la table 'sso_table_correspondance' pour des login qui n'existent plus dans Gepi.<br />
+Ces scories peuvent perturber l'association GUID_ENT/Login_GEPI.<br />
+<a href='".$_SERVER['PHP_SELF']."?mode=suppr_scories".add_token_in_url()."' >Supprimer ces scories</a></p>";
+	}
+
+	//===================================================
+	// Vider:
 	$sql="SELECT 1=1 FROM sso_table_correspondance;";
 	$res=mysql_query($sql);
 	if(mysql_num_rows($res)>0) {
 		echo "
+<br />
 <p>ou <a href='".$_SERVER['PHP_SELF']."?mode=vider".add_token_in_url()."' onclick=\"return confirmlink(this, 'ATTENTION !!! Êtes-vous vraiment sûr de vouloir vider la table sso_table_correspondance ?', 'Confirmation du vidage')\">vider la table des correspondances</a></p>";
 		echo "<p>La table de correspondances contient actuellement ".mysql_num_rows($res)." enregistrements.</p>\n";
 	}
 
+	//===================================================
+	// Associations manquantes
+	if(($nb_corresp_resp>0)||($nb_corresp_ele>0)||($nb_corresp_pers>0)) {
+		echo "<br />
+<p><strong>Associations manquantes&nbsp;:</strong></p>";
+
+		$sql="select distinct e.login, e.nom, e.prenom from eleves e, utilisateurs u where e.login=u.login AND u.auth_mode='sso' and e.login not in (select login_gepi from sso_table_correspondance);";
+		$res=mysql_query($sql);
+		$nb_assoc_manquantes_ele=mysql_num_rows($res);
+		if($nb_assoc_manquantes_ele>0) {
+			echo "
+<br />
+<p>Il manque $nb_assoc_manquantes_ele association(s) élève(s)&nbsp;:";
+			$cpt=0;
+			while($lig=mysql_fetch_object($res)) {
+				if($cpt>0) {echo ", ";}
+				echo "<a href='../eleves/modify_eleve.php?eleve_login=$lig->login' target='_blank'>".casse_mot($lig->nom, 'maj')." ".casse_mot($lig->prenom, 'majf2')."</a>";
+				$cpt++;
+			}
+			echo "</p>";
+		}
+
+		$sql="select distinct rp.login, rp.nom, rp.prenom, rp.civilite, rp.pers_id FROM resp_pers rp, utilisateurs u where u.auth_mode='sso' AND u.login=rp.login AND rp.login!='' and rp.login not in (select login_gepi from sso_table_correspondance);";
+		$res=mysql_query($sql);
+		$nb_assoc_manquantes_resp=mysql_num_rows($res);
+		if($nb_assoc_manquantes_resp>0) {
+			echo "
+<br />
+<p>Il manque $nb_assoc_manquantes_resp association(s) responsable(s)&nbsp;:";
+			$cpt=0;
+			while($lig=mysql_fetch_object($res)) {
+				if($cpt>0) {echo ", ";}
+				echo "<a href='../responsables/modify_resp.php?pers_id=$lig->pers_id' target='_blank'>".$lig->civilite." ".casse_mot($lig->nom, 'maj')." ".casse_mot($lig->prenom, 'majf2')."</a>";
+				$cpt++;
+			}
+			echo "</p>";
+		}
+
+		$sql="select distinct u.login, u.nom, u.prenom, u.civilite from utilisateurs u where u.auth_mode='sso' AND u.statut!='eleve' and u.statut!='responsable' and u.login not in (select login_gepi from sso_table_correspondance);";
+		$res=mysql_query($sql);
+		$nb_assoc_manquantes_resp=mysql_num_rows($res);
+		if($nb_assoc_manquantes_resp>0) {
+			echo "
+<br />
+<p>Il manque $nb_assoc_manquantes_resp association(s) personnel(s)&nbsp;:";
+			$cpt=0;
+			while($lig=mysql_fetch_object($res)) {
+				if($cpt>0) {echo ", ";}
+				echo "<a href='../utilisateurs/modify_user.php?user_login=$lig->login' target='_blank'>".$lig->civilite." ".casse_mot($lig->nom, 'maj')." ".casse_mot($lig->prenom, 'majf2')."</a>";
+				$cpt++;
+			}
+			echo "</p>";
+		}
+
+		echo "<br /><p>Ces utilisateurs disposent d'un compte dans Gepi, mais n'ont pas d'association SSO.<br />
+		Vous devriez refaire un import des fichiers ExportSSO_...</p>";
+	}
+
+	//===================================================
 	echo "
 <br />
 <p style='color:red'>A FAIRE : Détecter et permettre de supprimer des associations pour des élèves,... qui ne sont plus dans le CSV.</p>
@@ -1029,10 +1439,131 @@ if(!isset($mode)) {
 ";
 	}
 
-	echo "<p style='text-indent:-4em; margin-left:4em;'><em>NOTES&nbsp;:</em> Les CSV réclamés dans les pages d'importation sont accessibles en suivant le cheminement suivant&nbsp;:<br />
-	Se connecter avec un compte administrateur de l'ENT.<br />
-	Menu Administration puis Gérer les utilisateurs puis Outils puis Traitement en masse puis Action (<em>Choisir Exportation SSO au format CSV</em>) puis dans Profil sélectionner le profil (<em>Elève, Parent,...</em>)<br />
-	puis Traiter cette action puis Valider.</p>\n";
+	$sql="SELECT 1=1 FROM utilisateurs WHERE statut!='eleve' AND statut!='responsable' AND auth_mode='sso';";
+	$res=mysql_query($sql);
+	$nb_pers_sso=mysql_num_rows($res);
+	$sql="SELECT 1=1 FROM utilisateurs WHERE statut!='eleve' AND statut!='responsable' AND auth_mode='ldap';";
+	$res=mysql_query($sql);
+	$nb_pers_ldap=mysql_num_rows($res);
+	$sql="SELECT 1=1 FROM utilisateurs WHERE statut!='eleve' AND statut!='responsable' AND auth_mode='gepi';";
+	$res=mysql_query($sql);
+	$nb_pers_gepi=mysql_num_rows($res);
+
+	$sql="SELECT 1=1 FROM utilisateurs u, eleves e WHERE u.statut='eleve' AND e.login=u.login AND auth_mode='sso';";
+	$res=mysql_query($sql);
+	$nb_ele_sso=mysql_num_rows($res);
+	$sql="SELECT 1=1 FROM utilisateurs u, eleves e WHERE u.statut='eleve' AND e.login=u.login AND auth_mode='ldap';";
+	$res=mysql_query($sql);
+	$nb_ele_ldap=mysql_num_rows($res);
+	$sql="SELECT 1=1 FROM utilisateurs u, eleves e WHERE u.statut='eleve' AND e.login=u.login AND auth_mode='gepi';";
+	$res=mysql_query($sql);
+	$nb_ele_gepi=mysql_num_rows($res);
+
+	$sql="SELECT 1=1 FROM utilisateurs u, resp_pers rp WHERE u.statut='responsable' AND rp.login=u.login AND auth_mode='sso';";
+	$res=mysql_query($sql);
+	$nb_resp_sso=mysql_num_rows($res);
+	$sql="SELECT 1=1 FROM utilisateurs u, resp_pers rp WHERE u.statut='responsable' AND rp.login=u.login AND auth_mode='ldap';";
+	$res=mysql_query($sql);
+	$nb_resp_ldap=mysql_num_rows($res);
+	$sql="SELECT 1=1 FROM utilisateurs u, resp_pers rp WHERE u.statut='responsable' AND rp.login=u.login AND auth_mode='gepi';";
+	$res=mysql_query($sql);
+	$nb_resp_gepi=mysql_num_rows($res);
+
+	echo "<p><em>NOTES&nbsp;:</em></p>
+<ul>
+	<li>
+		<p>Les CSV réclamés dans les pages d'importation sont accessibles en suivant le cheminement suivant&nbsp;:<br />
+		Se connecter avec un compte administrateur de l'ENT.<br />
+		Menu Administration puis Gérer les utilisateurs puis Outils puis Traitement en masse puis Action (<em>Choisir Exportation SSO au format CSV</em>) puis dans Profil sélectionner le profil (<em>Elève, Parent,...</em>)<br />
+		puis Traiter cette action puis Valider.</p>
+	</li>
+	<li>
+		<p>Les CSV pour les Fiches bienvenue peuvent aussi être ceux des nouveaux élèves ou parents<br />(<em>[V2]CLG-".getSettingValue('gepiSchoolName')."-ac-ROUEN - [".getSettingValue('gepiSchoolRne')."] - [ANNEEMOISJOURHEURE].xlsx<br />ou ".getSettingValue('gepiSchoolRne')."_CSV_ANNEEMOISJOURHEURE.zip</em>).</p>
+	</li>
+	<li>
+		<p>Votre base compte des utilisateurs des statuts suivants avec les modes d'authentification suivants&nbsp;:</p>
+		<table class='boireaus boireaus_alt'>
+			<tr>
+				<th rowspan='2'>Statut</th>
+				<th colspan='3'>Mode d'authentification</th>
+			</tr>
+			<tr>
+				<th>Gepi</th>
+				<th>SSO</th>
+				<th>LDAP</th>
+			</tr>
+			<tr>
+				<td>Personnels</td>
+				<td>$nb_pers_gepi</td>
+				<td>$nb_pers_sso</td>
+				<td>$nb_pers_ldap</td>
+			</tr>
+			<tr>
+				<td>Responsables</td>
+				<td>$nb_resp_gepi</td>
+				<td>$nb_resp_sso</td>
+				<td>$nb_resp_ldap</td>
+			</tr>
+			<tr>
+				<td>Élèves</td>
+				<td>$nb_ele_gepi</td>
+				<td>$nb_ele_sso</td>
+				<td>$nb_ele_ldap</td>
+			</tr>
+		</table>
+		<p>Certains comptes peuvent être inactifs (<em style='color:red'>à détailler dans le futur</em>).</p>
+	</li>
+</ul>
+
+</div>
+
+<h2>Forcer les logins des responsables (<em>expérimental</em>)</h2>
+
+<div style='margin-left:4em;'>
+	<p>Si l'accès SSO de l'ENT vers Gepi tarde à être mis en place, vous pouvez ouvrir l'accès aux parents en limitant les difficultés&nbsp;:<br />
+	Il s'agit de créer des comptes dans Gepi avec les logins et mots de passe proposés par l'ENT.<br />
+	Les parents auront donc les mêmes comptes et mots de passe initiaux dans l'ENT et dans Gepi<br />(<em>s'ils changent leur mot de passe d'un côté ou de l'autre, la synchronisation des mots de passe n'est pas assurée</em>)</p>
+	<p>L'authentification des parents sera locale (<em>sur la base GEPI et non en SSO CAS</em>).</p>
+
+	<p><br /></p>
+
+	<p><a href='".$_SERVER['PHP_SELF']."?supprimer_comptes_parents=y".add_token_in_url()."' onclick=\"return confirmlink(this, 'ATTENTION !!! Êtes-vous vraiment sûr de vouloir supprimer les comptes d utilisateurs des parents d élèves ?', 'Confirmation de la suppression ?')\">Supprimer les comptes d'utilisateurs des parents actuels</a>.<br />
+	Dans cette opération (<em>irréversible</em>), les entrées parents sont supprimées de la table 'utilisateurs' et les logins des responsables sont réinitialisés/vidés dans la table 'resp_pers'.<br />
+	Les responsables ne sont pas pour autant supprimés (<em>simplement, ils n'auront plus de compte utilisateur</em>).<br />
+	Les bulletins pourront toujours porter leurs noms et adresses, les courriers d'absence, pourront leur être adressés,...</p>
+
+	<p><br /></p>
+
+	<form action='".$_SERVER['PHP_SELF']."' method='post' enctype='multipart/form-data'>
+		<fieldset style='border: 1px solid grey; background-image: url(\"../images/background/opacite50.png\");'>
+			".add_token_field()."
+			<p>Fournir le fichier CSV de mots de passe de l'ENT pour créer les comptes parents avec ces logins et mots de passe.<br />
+			</p>
+			<p>Veuillez fournir le fichier <strong>".getSettingValue("gepiSchoolRne")."_MiseaJour_Motdepasse_Parent_JJ_MM_AAAA_HH_MM_SS.csv</strong> généré par l'ENT.</p>
+			<input type='hidden' name='mode' value='forcer_logins_mdp_responsables' />
+			<input type=\"file\" size=\"65\" name=\"csv_file\" style='border: 1px solid grey; background-image: url(\"../images/background/opacite50.png\"); padding:5px; margin:5px;' /><br />
+			<input type='submit' value='Envoyer' />
+		</fieldset>
+	</form>
+
+	<p><br /></p>
+
+	<p style='text-indent:-4em; margin-left:4em;'><em>NOTES&nbsp;:</em></p>
+	<ul>
+		<li>Le fichier CSV attendu doit avoir le format suivant&nbsp;:<br />
+		﻿﻿Nom;Prénom;Login;Numéro de jointure;Mot de passe;Email;Adresse;Code postal;Ville;Nom enfant 1;Prénom enfant 1;Classe enfant 1;Etat;Date de désactivation<br />
+		DUPRE;Denis;denis.dupre1;MENESR$1234567;azerty&*;Denis.DUPRE1@ent27.fr;3 RUE DES PRIMEVERES;27300;BERNAY;DUPRE;Thomas;6 A;Actif<br />
+		...</li>
+	</ul>
+
+	<p><br /></p>
+
+	<p><strong>Si les logins des responsables ont été forcés pour coïncider avec leurs logins dans l'ENT</strong>, et si votre base Sconet contenait les adresses email des parents (<em>si elles étaient demandées sur le dossier d'inscription dans l'établissement, si votre secrétaire s'est embêté(e) à les saisir;</em>), vous pouvez <a href='".$_SERVER['PHP_SELF']."?mode=envoi_mail_logins_mdp'>envoyer par mail les fiches bienvenues avec les logins et mots de passe</a>.</p>
+	<p>Pour que l'envoi fonctionne, il faut que les logins coïncident.<br />
+	En revanche, que les comptes parents soient en authentification locale ou en authentification SSO (<em>CAS</em>) importe peu.</p>
+
+</div>
+\n";
 
 	require("../lib/footer.inc.php");
 	die();
@@ -1073,11 +1604,13 @@ if($mode=="import_eleves") {
 <h2>Rapprochement des comptes ENT ITOP/GEPI</h2>
 
 <form action='".$_SERVER['PHP_SELF']."' method='post' enctype='multipart/form-data'>
-	".add_token_field()."
-	<input type='hidden' name='mode' value='import_eleves' />
-	<input type=\"file\" size=\"65\" name=\"csv_file\" /><br />
-	<input type=\"checkbox\" id=\"exclure_classes_anormales\" name=\"exclure_classes_anormales\" value=\"y\" checked /><label for='exclure_classes_anormales'>Exclure les classes nommées BASE_20XXXXXX (<em>plus précisément contenant la chaine 'BASE_20'</em>)</label><br />
-	<input type='submit' value='Envoyer' />
+	<fieldset style='border: 1px solid grey; background-image: url(\"../images/background/opacite50.png\");'>
+		".add_token_field()."
+		<input type='hidden' name='mode' value='import_eleves' />
+		<input type=\"file\" size=\"65\" name=\"csv_file\" style='border: 1px solid grey; background-image: url(\"../images/background/opacite50.png\"); padding:5px; margin:5px;' /><br />
+		<input type=\"checkbox\" id=\"exclure_classes_anormales\" name=\"exclure_classes_anormales\" value=\"y\" checked /><label for='exclure_classes_anormales'>Exclure les classes nommées BASE20XXXXXX (<em>plus précisément contenant la chaine 'BASE20'</em>)</label><br />
+		<input type='submit' value='Envoyer' />
+	</fieldset>
 </form>
 
 <p><br /></p>
@@ -1089,10 +1622,10 @@ if($mode=="import_eleves") {
 	f73d0f72-0958-4b8f-85f7-a58a96d95220;DISSOIR;Alain;National_1;0310000Z$1L1;16/06/1987<br />
 	...</li>
 	<li>Il peut arriver que le CSV fourni contienne des élèves de l'année précédente.<br />
-	La classe est alors par exemple&nbsp;: BASE_2011-2012<br />
+	La classe est alors par exemple&nbsp;: BASE2011-2012<br />
 	Proposer d'effectuer un rapprochement pour des élèves qui ne sont plus là n'est pas souhaitable.<br />
 	Vous pouvez aussi avoir un même élève qui apparaît avec deux lignes dans le fichier&nbsp;:<br />
-	Une ligne avec le GUID de l'année passée et associé à une classe BASE_20XX-20XX<br />
+	Une ligne avec le GUID de l'année passée et associé à une classe BASE20XX-20XX<br />
 	et une ligne avec le GUID de cette année (<em>c'est celui qu'il faut retenir</em>).</li>
 	<li>Il est recommandé d'envoyer deux fois le même CSV.<br />
 	La première fois pour prendre en compte les élèves correctement identifiés.<br />
@@ -1109,6 +1642,15 @@ if($mode=="import_eleves") {
 			require("../lib/footer.inc.php");
 			die();
 		}
+
+		$motif_nom_fichier="ExportSSO_Eleve_";
+		echo "<p>Le fichier fourni se nomme <strong>".$csv_file['name']."</strong>";
+		if(!preg_match("/$motif_nom_fichier/", $csv_file['name'])) {
+			echo "<br />
+<span style='color:red'>Le nom du fichier contient habituellement la chaine <strong>$motif_nom_fichier</strong>.<br />
+Vous seriez-vous trompé de fichier&nbsp;?</span>";
+		}
+		echo "</p>\n";
 
 		$sql="TRUNCATE tempo2_sso;";
 		$menage=mysql_query($sql);
@@ -1166,6 +1708,19 @@ if($mode=="import_eleves") {
 		<th>Naissance</th>
 	</tr>
 ";
+
+		//$tab_login_associe_a_un_guid=array();
+		$tab_guid_associe_a_un_login=array();
+		$sql="SELECT u.statut, u.nom, u.prenom, stc.* FROM sso_table_correspondance stc, utilisateurs u WHERE stc.login_gepi=u.login;";
+		$res=mysql_query($sql);
+		while($lig=mysql_fetch_object($res)) {
+			//$tab_login_associe_a_un_guid[$lig->login_sso]['login_gepi']=$lig->login_gepi;
+			//$tab_login_associe_a_un_guid[$lig->login_sso]['info']=$lig->nom." ".$lig->prenom." (".$lig->statut.")";
+
+			$tab_guid_associe_a_un_login[$lig->login_gepi]['login_sso']=$lig->login_sso;
+			$tab_guid_associe_a_un_login[$lig->login_gepi]['info']=$lig->nom." ".$lig->prenom." (".$lig->statut.")";
+		}
+
 		$alt=1;
 		$cpt=0;
 		$cpt_deja_enregistres=0;
@@ -1190,7 +1745,7 @@ if($mode=="import_eleves") {
 					if(mysql_num_rows($test)>0) {
 						$cpt_deja_enregistres++;
 					}
-					elseif((!isset($_POST['exclure_classes_anormales']))||(!preg_match("/BASE_20/", $tab[4]))) {
+					elseif((!isset($_POST['exclure_classes_anormales']))||(!preg_match("/BASE20/", $tab[4]))) {
 						$naissance=(isset($tab[5])) ? $tab[5] : "";
 						if(!preg_match("#[0-9]{2}/[0-9]{2}/[0-9]{4}#", $naissance)) {$naissance="";}
 
@@ -1257,7 +1812,14 @@ si cela ne fonctionne pas, corriger l'association élève en mettant le GUID de 
 									if(!document.getElementById('login_$cpt')) {ajout_champ_saisie_login($cpt);};
 									return false;\">
 				<img src='../images/icons/chercher.png' width='16' height='16' alt='Chercher' title='Effectuer une recherche' />
-			</a>
+			</a>";
+
+							//<!-- 20130912 : AJOUTER UN TEST SUR LE FAIT QUE LE LOGIN EST DEJA ASSOCIE -->
+							if(array_key_exists($lig->login, $tab_guid_associe_a_un_login)) {
+								echo "<img src='../images/icons/ico_attention.png' width='22' height='19' title=\"Ce login est associé à un autre GUID ENT\n".$tab_guid_associe_a_un_login[$lig->login]['login_sso']."\net concerne l'utilisateur Gepi ".$tab_guid_associe_a_un_login[$lig->login]['info']."\" />";
+							}
+
+							echo "
 		</td>
 	</tr>
 ";
@@ -1267,7 +1829,12 @@ si cela ne fonctionne pas, corriger l'association élève en mettant le GUID de 
 							// Il va falloir choisir
 							$chaine_options="";
 							while($lig=mysql_fetch_object($res)) {
-								$chaine_options.="				<option value=\"$lig->login\">$lig->nom $lig->prenom (".formate_date($lig->naissance).")";
+								$chaine_options.="				<option value=\"$lig->login\"";
+								// 20130912
+								if(array_key_exists($lig->login, $tab_guid_associe_a_un_login)) {
+									$chaine_options.=" title=\"Ce login est associé à un autre GUID ENT\n".$tab_guid_associe_a_un_login[$lig->login]['login_sso']."\net concerne l'utilisateur Gepi ".$tab_guid_associe_a_un_login[$lig->login]['info']."\"";
+								}
+								$chaine_options.=">$lig->nom $lig->prenom (".formate_date($lig->naissance).")";
 								$tab_classe=get_class_from_ele_login($lig->login);
 								if(isset($tab_classe['liste'])) {
 									$chaine_options.=" en ".$tab_classe['liste'];
@@ -1470,7 +2037,7 @@ if($mode=="consult_eleves") {
 
 	<table class='boireaus'>
 		<tr>
-			<th>
+			<th rowspan='2'>
 				<input type='submit' value='Supprimer' />
 				<span id='tout_cocher_decocher' style='display:none;'>
 					<br />
@@ -1479,6 +2046,11 @@ if($mode=="consult_eleves") {
 					<a href=\"javascript:tout_decocher()\" title='Tout décocher'><img src='../images/disabled.png' width='20' height='20' /></a>
 				</span>
 			</th>
+			<th>Informations ENT</th>
+			<th colspan='6'>Informations GEPI</th>
+			<th rowspan='2'>Corriger</th>
+		</tr>
+		<tr>
 			<th>Guid</th>
 			<th>Login</th>
 			<th title=\"Pour une connexion via un ENT, le champ auth_mode doit en principe avoir pour valeur 'sso'\">Auth_mode</th>
@@ -1486,7 +2058,6 @@ if($mode=="consult_eleves") {
 			<th>Prénom</th>
 			<th>Classe</th>
 			<th>Naissance</th>
-			<th>Corriger</th>
 		</tr>
 ";
 
@@ -1502,13 +2073,15 @@ if($mode=="consult_eleves") {
 			<td><input type='checkbox' name='suppr[]' id='suppr_$cpt' value=\"$lig->login\" onchange=\"change_graisse($cpt)\" /></td>
 			<td><label for='suppr_$cpt'>$lig->login_sso</label></td>
 			<td><label for='suppr_$cpt'>$lig->login</label></td>
-			<td><label for='suppr_$cpt'>";
+			<td>";
 		$sql="SELECT auth_mode, etat FROM utilisateurs WHERE login='".$lig->login."' AND statut='eleve';";
 		$test_u=mysql_query($sql);
 		if(mysql_num_rows($test_u)==0) {
-			echo "<span title='Pas de compte utilisateur pour cet élève.'>-</span>";
+			echo "<a href='../utilisateurs/create_eleve.php?filtrage=Afficher&amp;critere_recherche=".preg_replace("/[^A-Za-z]/", "%", $lig->nom)."&amp;afficher_tous_les_eleves=n' title='Pas de compte utilisateur dans Gepi pour cet élève.
+Créer le compte?' target='_blank'>-</a>";
 		}
 		else {
+			echo "<label for='suppr_$cpt'>";
 			$lig_u=mysql_fetch_object($test_u);
 			if($lig_u->etat=='actif') {
 				echo "<div style='float:right;width:16px;'><img src='../images/icons/buddy.png' width='16' height='16' title='Compte actif' /></div>\n";
@@ -1517,8 +2090,9 @@ if($mode=="consult_eleves") {
 				echo "<div style='float:right;width:16px;'><img src='../images/icons/buddy_no.png' width='16' height='16' title='Compte inactif' /></div>\n";
 			}
 			echo $lig_u->auth_mode;
+			echo "</label>";
 		}
-		echo "</label></td>
+		echo "</td>
 			<td><label for='suppr_$cpt'><span id='nom_$cpt'>$lig->nom</span></label></td>
 			<td><label for='suppr_$cpt'><span id='prenom_$cpt'>$lig->prenom</span></label></td>
 			<td><label for='suppr_$cpt'>$classe</label></td>
@@ -1587,10 +2161,12 @@ if($mode=="import_responsables") {
 <h2>Rapprochement des comptes responsables ENT ITOP/GEPI</h2>
 
 <form action='".$_SERVER['PHP_SELF']."' method='post' enctype='multipart/form-data'>
-	".add_token_field()."
-	<input type='hidden' name='mode' value='import_responsables' />
-	<input type=\"file\" size=\"65\" name=\"csv_file\" /><br />
-	<input type='submit' value='Envoyer' />
+	<fieldset style='border: 1px solid grey; background-image: url(\"../images/background/opacite50.png\");'>
+		".add_token_field()."
+		<input type='hidden' name='mode' value='import_responsables' />
+		<input type=\"file\" size=\"65\" name=\"csv_file\" style='border: 1px solid grey; background-image: url(\"../images/background/opacite50.png\"); padding:5px; margin:5px;' /><br />
+		<input type='submit' value='Envoyer' />
+	</fieldset>
 </form>
 
 <p><br /></p>
@@ -1616,6 +2192,15 @@ if($mode=="import_responsables") {
 			require("../lib/footer.inc.php");
 			die();
 		}
+
+		$motif_nom_fichier="ExportSSO_Parent_";
+		echo "<p>Le fichier fourni se nomme <strong>".$csv_file['name']."</strong>";
+		if(!preg_match("/$motif_nom_fichier/", $csv_file['name'])) {
+			echo "<br />
+<span style='color:red'>Le nom du fichier contient habituellement la chaine <strong>$motif_nom_fichier</strong>.<br />
+Vous seriez-vous trompé de fichier&nbsp;?</span>";
+		}
+		echo "</p>\n";
 
 		$sql="TRUNCATE tempo2_sso;";
 		$menage=mysql_query($sql);
@@ -1675,6 +2260,19 @@ if($mode=="import_responsables") {
 		<th>Enfants</th>
 	</tr>
 ";
+
+		//$tab_login_associe_a_un_guid=array();
+		$tab_guid_associe_a_un_login=array();
+		$sql="SELECT u.statut, u.nom, u.prenom, stc.* FROM sso_table_correspondance stc, utilisateurs u WHERE stc.login_gepi=u.login;";
+		$res=mysql_query($sql);
+		while($lig=mysql_fetch_object($res)) {
+			//$tab_login_associe_a_un_guid[$lig->login_sso]['login_gepi']=$lig->login_gepi;
+			//$tab_login_associe_a_un_guid[$lig->login_sso]['info']=$lig->nom." ".$lig->prenom." (".$lig->statut.")";
+
+			$tab_guid_associe_a_un_login[$lig->login_gepi]['login_sso']=$lig->login_sso;
+			$tab_guid_associe_a_un_login[$lig->login_gepi]['info']=$lig->nom." ".$lig->prenom." (".$lig->statut.")";
+		}
+
 		$alt=1;
 		$cpt=0;
 		$cpt_deja_enregistres=0;
@@ -1748,7 +2346,7 @@ si cela ne fonctionne pas, corriger l'association élève en mettant le GUID de 
 						// Si la chaine est vide, proposer un champ TEXT
 						if($chaine!="") {
 							$sql="SELECT e.* FROM eleves e, sso_table_correspondance s WHERE ($chaine) AND e.login=s.login_gepi ORDER BY e.nom, e.prenom;";
-							//echo "$sql<br />";
+							echo_debug_itop("$sql<br />");
 							$res_ele=mysql_query($sql);
 							if(mysql_num_rows($res_ele)>0) {
 								$temoin_eleve_associe="y";
@@ -1760,7 +2358,7 @@ si cela ne fonctionne pas, corriger l'association élève en mettant le GUID de 
 									if(isset($tab_classe['liste_nbsp'])) {echo " (<em>".$tab_classe['liste_nbsp']."</em>)";}
 
 									$sql="SELECT rp.*, r.resp_legal FROM resp_pers rp, responsables2 r WHERE r.pers_id=rp.pers_id AND r.ele_id='$lig_ele->ele_id' AND rp.nom='".mysql_real_escape_string($tab[1])."' AND rp.prenom='".mysql_real_escape_string($tab[2])."' AND rp.login!='';";
-									//echo "$sql<br />";
+									echo_debug_itop("$sql<br />");
 									$res_resp=mysql_query($sql);
 									if(mysql_num_rows($res_resp)>0) {
 										while($lig_resp=mysql_fetch_object($res_resp)) {
@@ -1851,7 +2449,14 @@ si cela ne fonctionne pas, corriger l'association élève en mettant le GUID de 
 									if(!document.getElementById('login_$cpt')) {ajout_champ_saisie_login($cpt);};
 									return false;\">
 				<img src='../images/icons/chercher.png' width='16' height='16' alt='Chercher' title='Effectuer une recherche' />
-			</a>
+			</a>";
+
+							//<!-- 20130912 : AJOUTER UN TEST SUR LE FAIT QUE LE LOGIN EST DEJA ASSOCIE -->
+							if(array_key_exists($tab_resp[0]['login'], $tab_guid_associe_a_un_login)) {
+								echo "<img src='../images/icons/ico_attention.png' width='22' height='19' title=\"Ce login est associé à un autre GUID ENT\n".$tab_guid_associe_a_un_login[$tab_resp[0]['login']]['login_sso']."\net concerne l'utilisateur Gepi ".$tab_guid_associe_a_un_login[$tab_resp[0]['login']]['info']."\" />";
+							}
+
+							echo "
 		</td>
 	</tr>
 ";
@@ -1865,7 +2470,12 @@ si cela ne fonctionne pas, corriger l'association élève en mettant le GUID de 
 						else {
 							$chaine_options="";
 							for($loop=0;$loop<count($tab_resp);$loop++) {
-								$chaine_options.="				<option value=\"".$tab_resp[$loop]['login']."\">".$tab_resp[$loop]['info']."</option>\n";
+								$chaine_options.="				<option value=\"".$tab_resp[$loop]['login']."\"";
+								// 20130912
+								if(array_key_exists($tab_resp[0]['login'], $tab_guid_associe_a_un_login)) {
+									$chaine_options.=" title=\"Ce login est associé à un autre GUID ENT\n".$tab_guid_associe_a_un_login[$tab_resp[0]['login']]['login_sso']."\net concerne l'utilisateur Gepi ".$tab_guid_associe_a_un_login[$tab_resp[0]['login']]['info']."\"";
+								}
+								$chaine_options.=">".$tab_resp[$loop]['info']."</option>\n";
 							}
 							echo "
 		<td>
@@ -2043,7 +2653,7 @@ if($mode=="consult_responsables") {
 
 	<table class='boireaus'>
 		<tr>
-			<th>
+			<th rowspan='2'>
 				<input type='submit' value='Supprimer' />
 				<span id='tout_cocher_decocher' style='display:none;'>
 					<br />
@@ -2052,13 +2662,18 @@ if($mode=="consult_responsables") {
 					<a href=\"javascript:tout_decocher()\" title='Tout décocher'><img src='../images/disabled.png' width='20' height='20' /></a>
 				</span>
 			</th>
+			<th>Informations ENT</th>
+			<th colspan='5'>Informations GEPI</th>
+			<th rowspan='2'>Corriger</th>
+		</tr>
+
+		<tr>
 			<th>Guid</th>
 			<th>Login</th>
 			<th title=\"Pour une connexion via un ENT, le champ auth_mode doit en principe avoir pour valeur 'sso'\">Auth_mode</th>
 			<th>Nom</th>
 			<th>Prénom</th>
 			<th>Responsable de</th>
-			<th>Corriger</th>
 		</tr>
 ";
 
@@ -2098,9 +2713,14 @@ if($mode=="consult_responsables") {
 		}
 		echo "</label></td>
 			<td><label for='suppr_$cpt'><span id='nom_$cpt'>$lig->nom</span></label></td>
-			<td><label for='suppr_$cpt'><span id='prenom_$cpt'>$lig->prenom</span></label></td>
-			<td><label for='suppr_$cpt'>$chaine_ele</label></td>
-			<td><a href='".$_SERVER['PHP_SELF']."?login_gepi=$lig->login_gepi&amp;login_sso=$lig->login_sso&amp;mode=saisie_manuelle'><img src='../images/edit16.png' width='16' height='16' title=\"Corriger l'association\" /></label></td>
+			<td>
+				<a href='../responsables/modify_resp.php?pers_id=$lig->pers_id' target='_blank' style='float:right;' title=\"Voir la fiche responsable\"><img src='../images/icons/chercher.png' width='16' height='16' /></a>
+				<label for='suppr_$cpt'><span id='prenom_$cpt'>$lig->prenom</span></label>
+			</td>
+			<td>
+				<label for='suppr_$cpt'>$chaine_ele</label>
+			</td>
+			<td><a href='".$_SERVER['PHP_SELF']."?login_gepi=$lig->login_gepi&amp;login_sso=$lig->login_sso&amp;mode=saisie_manuelle'><img src='../images/edit16.png' width='16' height='16' title=\"Corriger l'association\" /></a></td>
 		</tr>
 ";
 		$cpt++;
@@ -2164,10 +2784,12 @@ if($mode=="import_personnels") {
 <h2>Rapprochement des comptes ENT ITOP/GEPI</h2>
 
 <form action='".$_SERVER['PHP_SELF']."' method='post' enctype='multipart/form-data'>
-	".add_token_field()."
-	<input type='hidden' name='mode' value='import_personnels' />
-	<input type=\"file\" size=\"65\" name=\"csv_file\" /><br />
-	<input type='submit' value='Envoyer' />
+	<fieldset style='border: 1px solid grey; background-image: url(\"../images/background/opacite50.png\");'>
+		".add_token_field()."
+		<input type='hidden' name='mode' value='import_personnels' />
+		<input type=\"file\" size=\"65\" name=\"csv_file\" style='border: 1px solid grey; background-image: url(\"../images/background/opacite50.png\"); padding:5px; margin:5px;' /><br />
+		<input type='submit' value='Envoyer' />
+	</fieldset>
 </form>
 
 <p><br /></p>
@@ -2193,6 +2815,15 @@ if($mode=="import_personnels") {
 			require("../lib/footer.inc.php");
 			die();
 		}
+
+		$motif_nom_fichier="ExportSSO_Professeur_";
+		echo "<p>Le fichier fourni se nomme <strong>".$csv_file['name']."</strong>";
+		if(!preg_match("/$motif_nom_fichier/", $csv_file['name'])) {
+			echo "<br />
+<span style='color:red'>Le nom du fichier contient habituellement la chaine <strong>$motif_nom_fichier</strong>.<br />
+Vous seriez-vous trompé de fichier&nbsp;?</span>";
+		}
+		echo "</p>\n";
 
 		$sql="TRUNCATE tempo2_sso;";
 		$menage=mysql_query($sql);
@@ -2624,6 +3255,1458 @@ if($mode=="consult_personnels") {
 	require("../lib/footer.inc.php");
 	die();
 }
+
+//==================================================================================
+if($mode=="publipostage_eleves") {
+	echo "
+ | <a href='".$_SERVER['PHP_SELF']."'>Index rapprochement ENT ITOP</a>";
+
+	$csv_file = isset($_FILES["csv_file"]) ? $_FILES["csv_file"] : NULL;
+
+	if(!isset($csv_file)) {
+		echo " | <a href='".$_SERVER['PHP_SELF']."?mode=publipostage_eleves'>Fiches bienvenue élèves</a></p>
+
+<h2 class='noprint'>Fiches bienvenue élèves</h2>";
+
+		// Liste des classes avec élève:
+		$sql="SELECT DISTINCT c.* FROM j_eleves_classes jec, classes c WHERE (c.id=jec.id_classe) ORDER BY c.classe;";
+		$call_classes=mysql_query($sql);
+
+		$nb_classes=mysql_num_rows($call_classes);
+		if($nb_classes==0){
+			echo "<p>Aucune classe avec élève affecté n'a été trouvée.</p>\n";
+			require("../lib/footer.inc.php");
+			die();
+		}
+		// Affichage sur 3 colonnes
+		$nb_classes_par_colonne=round($nb_classes/3);
+
+
+		echo "<form action='".$_SERVER['PHP_SELF']."' method='post' enctype='multipart/form-data'>
+	<fieldset style='border: 1px solid grey; background-image: url(\"../images/background/opacite50.png\");'>
+		".add_token_field()."
+
+		<p><input type='radio' name='toutes_les_classes' id='toutes_les_classes_y' value='y' checked /><label for='toutes_les_classes_y'> Générer les Fiches bienvenue pour toutes les classes</label><br />
+		ou<br />
+		<input type='radio' name='toutes_les_classes' id='toutes_les_classes_n' value='n' /><label for='toutes_les_classes_n'> Générer les Fiches bienvenue pour une sélection de classes<br />
+		(<em>si votre navigateur peine à effectuer l'impression pour un trop grand nombre de pages par exemple</em>)</label><br />
+		";
+		echo "<table width='100%' summary='Choix des classes'>\n";
+		echo "<tr valign='top' align='center'>\n";
+
+		$cpt = 0;
+
+		echo "<td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</td>\n";
+		echo "<td align='left'>\n";
+
+		while($lig_clas=mysql_fetch_object($call_classes)) {
+
+			//affichage 2 colonnes
+			if(($cpt>0)&&(round($cpt/$nb_classes_par_colonne)==$cpt/$nb_classes_par_colonne)){
+				echo "</td>\n";
+				echo "<td align='left'>\n";
+			}
+
+			//echo "<label id='label_tab_id_classe_$cpt' for='tab_id_classe_$cpt' style='cursor: pointer;'><input type='checkbox' name='id_classe[]' id='tab_id_classe_$cpt' value='$lig_clas->id' onchange=\"change_style_classe($cpt)\" /> $lig_clas->classe</label>";
+			echo "<label id='label_tab_id_classe_$cpt' for='tab_id_classe_$cpt' style='cursor: pointer;'><input type='checkbox' name='classe[]' id='tab_id_classe_$cpt' value='$lig_clas->classe' onchange=\"change_style_classe($cpt)\" /> $lig_clas->classe</label>";
+			echo "<br />\n";
+			$cpt++;
+		}
+
+		echo "</td>\n";
+		echo "</tr>\n";
+		echo "</table>\n";
+
+		echo "<p><a href='#' onClick='ModifCase(true)'>Tout cocher</a> / <a href='#' onClick='ModifCase(false)'>Tout décocher</a></p>\n";
+
+		echo "
+		<br />
+
+		<p>Veuillez fournir le fichier <strong>".getSettingValue("gepiSchoolRne")."_MiseaJour_Motdepasse_Eleve_JJ_MM_AAAA_HH_MM_SS.csv</strong> généré par l'ENT.</p>
+		<input type='hidden' name='mode' value='publipostage_eleves' />
+		<input type=\"file\" size=\"65\" name=\"csv_file\" style='border: 1px solid grey; background-image: url(\"../images/background/opacite50.png\"); padding:5px; margin:5px;' /><br />
+		<p><input type='submit' value='Envoyer' /></p>
+	</fieldset>
+</form>
+
+<p><br /></p>
+
+<p style='text-indent:-4em; margin-left:4em;'><em>NOTES&nbsp;:</em></p>
+<ul>
+	<li>Cette rubrique est destinée à générer des Fiches Bienvenue avec compte et mot de passe de l'ENT.<br />
+	<!--
+		Ne seront pris en compte que les comptes ENT pour lesquels le rapprochement avec un compte Gepi est effectué.
+		Ce n'est pas le cas.
+		Il faudrait enregistrer davantage d'informations dans sso_table_correspondance pour s'en assurer.
+	-->
+	</li>
+	<li>Modifier les <a href='../gestion/modify_impression.php?fiche=eleves'>Fiches Bienvenue élèves</a></li>
+	<li>Le fichier CSV attendu doit avoir le format suivant&nbsp;:<br />
+	﻿Nom;Prénom;Login;Numéro de jointure;Mot de passe;Email;Classe;Etat;Date de désactivation<br />
+	DUPRE;Thomas;thomas.dupre;MENESR$12345;mdp&*;Thomas.DUPRE@ent27.fr;6 A;Actif<br />
+	...</li>
+	<li>Le fichier CSV attendu doit comporter une ligne d'entête avec au moins les champs <strong>Nom;Prénom;Login;Mot de passe;Classe</strong></li>
+	<li>Le fichier CSV attendu peut être&nbsp;:<br />
+		<ul>
+			<li>
+				<p>celui de regénération de tous les mots de passe élèves.<br />
+				Il aura alors le format suivant&nbsp;:<br />
+				<strong>﻿﻿Nom</strong>;<strong>Prénom</strong>;<strong>Login</strong>;Numéro de jointure;<strong>Mot de passe</strong>;Email;<strong>Classe</strong>;<span style='color:green'>Etat</span>;Date de désactivation<br />
+				<strong>DUPRE</strong>;<strong>Denis</strong>;<strong>denis.dupre1</strong>;MENESR$1234567;<strong>azerty&*</strong>;Denis.DUPRE1@ent27.fr;<strong>6 A</strong>;<span style='color:green'>Actif</span><br />
+				...<br />
+				Avec le champ Etat, on peut exclure les comptes désactivés.</p>
+				<br />
+			</li>
+			<li>
+				<p>un fichier CSV obtenu en enregistrant au format CSV avec séparateur point-virgule (<em>édition des paramètres du filtre requise</em>) le feuillet Elève d'un fichier [V2]CLG-".getSettingValue('gepiSchoolName')."-ac-ROUEN - [".getSettingValue('gepiSchoolRne')."] - [ANNEEMOISJOURHEURE].xlsx de l'espace Documents.
+				Il aura alors le format suivant&nbsp;:<br />
+				<strong>﻿﻿Nom</strong>;<strong>Prénom</strong>;<strong>Login</strong>;<strong>Mot de passe</strong>;Adresse Mail;<strong>Classe</strong><br />
+				<strong>DUPRE</strong>;<strong>Denis</strong>;<strong>denis.dupre1</strong>;<strong>azerty&*</strong>;Denis.DUPRE1@ent27.fr;<strong>6 A</strong><br />
+				...<br />
+				Il manque le champ Etat, mais le reste y est.<br /></p>
+				<br />
+			</li>
+			<li>
+				<p>le fichier CSV ".getSettingValue('gepiSchoolRne')."_Extraction_Elève.csv que vous pouvez trouver dans les fichiers ".getSettingValue('gepiSchoolRne')."_CSV_ANNEEMOISJOURHEURE.zip de l'espace Documents.
+				Il aura alors le format suivant&nbsp;:<br />
+				<strong>﻿﻿Nom</strong>;<strong>Prénom</strong>;<strong>Login</strong>;<strong>Mot de passe</strong>;Email;<strong>Classe</strong><br />
+				<strong>DUPRE</strong>;<strong>Denis</strong>;<strong>denis.dupre1</strong>;<strong>azerty&*</strong>;Thomas.DUPRE@ent27.fr;<strong>6 A</strong><br />
+				...<br />
+				</p>
+			</li>
+		</ul>
+	</li>
+</ul>
+
+<script type='text/javascript'>
+	function ModifCase(mode) {
+		for (var k=0;k<$cpt;k++) {
+			if(document.getElementById('tab_id_classe_'+k)){
+				document.getElementById('tab_id_classe_'+k).checked = mode;
+				change_style_classe(k);
+			}
+		}
+	}
+
+	function change_style_classe(num) {
+		if(document.getElementById('tab_id_classe_'+num)) {
+			if(document.getElementById('tab_id_classe_'+num).checked) {
+				document.getElementById('label_tab_id_classe_'+num).style.fontWeight='bold';
+				if(document.getElementById('toutes_les_classes_n')){
+					document.getElementById('toutes_les_classes_n').checked=true;
+				}
+			}
+			else {
+				document.getElementById('label_tab_id_classe_'+num).style.fontWeight='normal';
+			}
+		}
+	}
+
+</script>\n";
+
+
+	}
+	else {
+		echo " | <a href='".$_SERVER['PHP_SELF']."?mode=publipostage_eleves'>Fiches bienvenue élèves</a></p>
+
+<h2 class='noprint'>Fiches bienvenue élèves</h2>";
+
+		check_token(false);
+		$fp=fopen($csv_file['tmp_name'],"r");
+
+		$impression=getSettingValue('ImpressionFicheEleve');
+
+		if(!$fp){
+			echo "<p>Impossible d'ouvrir le fichier CSV !</p>";
+			echo "<p><a href='".$_SERVER['PHP_SELF']."'>Cliquer ici </a> pour recommencer !</center></p>\n";
+			require("../lib/footer.inc.php");
+			die();
+		}
+
+		$motif_nom_fichier="Miseajour_Motdepasse_Eleve_";
+		echo "<p class='noprint'>Le fichier fourni se nomme <strong>".$csv_file['name']."</strong>";
+		if(!preg_match("/$motif_nom_fichier/", $csv_file['name'])) {
+			echo "<br />
+<span style='color:red'>Le nom du fichier contient habituellement la chaine <strong>$motif_nom_fichier</strong>.<br />
+Vous seriez-vous trompé de fichier&nbsp;?</span><br />
+<span style='color:blue'>Si vous n'avez fourni qu'un fichier CSV des nouveaux arrivants (<em>sans regénérer tous les mots de passe</em>), le nom de fichier sera celui de votre choix; ne tenez donc pas compte de cette alerte.</span>";
+		}
+		echo "</p>\n";
+
+		// 20130916
+		// Lire la ligne d'entête pour repérer les indices des colonnes recherchées
+		$tabchamps = array("Nom", "Prénom", "Prenom", "Login", "Mot de passe", "Email", "Adresse Mail", "Classe", "Etat", "Date de désactivation");
+
+		// Lecture de la ligne 1 et la mettre dans $temp
+		$temp=fgets($fp,4096);
+		//echo "$temp<br />";
+		$en_tete=explode(";", trim($temp));
+
+		$tabindice=array();
+
+		// On range dans tabindice les indices des champs retenus
+		for ($k = 0; $k < count($tabchamps); $k++) {
+			//echo "<br /><p style='text-indent:-4em;margin-left:4em'>Recherche du champ ".$tabchamps[$k]."<br />";
+			for ($i = 0; $i < count($en_tete); $i++) {
+				//echo "\$en_tete[$i]=$en_tete[$i]<br />";
+				//echo casse_mot(remplace_accents($en_tete[$i]),'min')."<br />";
+				//echo casse_mot(remplace_accents($tabchamps[$k]), 'min')."<br />";
+				if (casse_mot(remplace_accents($en_tete[$i]),'min') == casse_mot(remplace_accents($tabchamps[$k]), 'min')) {
+					$tabindice[$tabchamps[$k]] = $i;
+					//echo "\$tabindice[$tabchamps[$k]]=$i<br />";
+				}
+			}
+		}
+		if((!isset($tabindice['Nom']))||((!isset($tabindice['Prénom']))&&(!isset($tabindice['Prenom'])))||(!isset($tabindice['Login']))||(!isset($tabindice['Mot de passe']))||(!isset($tabindice['Classe']))) {
+			echo "<p style='color:red'>La ligne d'entête ne comporte pas un des champs indispensables (<em>Nom, Prénom, Login, Mot de passe, Classe</em>).</p>";
+			require("../lib/footer.inc.php");
+			die();
+		}
+
+		if(!isset($tabindice['Prénom'])) {
+			$tabindice['Prénom']=$tabindice['Prenom'];
+		}
+
+		echo "
+<hr class='noprint'/>";
+
+		$cpt=0;
+		$tab_classe_eleve=array();
+		while (!feof($fp)) {
+			$ligne = trim(fgets($fp, 4096));
+			if((substr($ligne,0,3) == "\xEF\xBB\xBF")) {
+				$ligne=substr($ligne,3);
+			}
+
+			if($ligne!='') {
+				$tab=explode(";", ensure_utf8($ligne));
+
+				$ligne_a_prendre_en_compte="y";
+				if(preg_match("/^Nom;Pr/i", trim($ligne))) {
+					$ligne_a_prendre_en_compte="n";
+				}
+				elseif((isset($tabindice['Classe']))&&(preg_match("/^BASE20/",$tab[$tabindice['Classe']]))) {
+					// On exclut l'année précédente
+					$ligne_a_prendre_en_compte="n";
+				}
+				elseif((isset($tabindice['Etat']))&&($tab[$tabindice['Etat']]!='Actif')) {
+					// On exclut les comptes "Désactivé"
+					$ligne_a_prendre_en_compte="n";
+				}
+
+				//if((!preg_match("/^Nom;Pr/i", trim($ligne)))&&(preg_match("/Actif$/", $ligne))) {
+				if($ligne_a_prendre_en_compte=="y") {
+					if(($_POST['toutes_les_classes']=="y")||(in_array($tab[$tabindice['Classe']], $_POST['classe']))) {
+						if(!isset($tab_classe_eleve[$tab[$tabindice['Classe']]])) {
+							$cpt=0;
+						}
+						else {
+							$cpt=count($tab_classe_eleve[$tab[$tabindice['Classe']]]);
+						}
+						$tab_classe_eleve[$tab[$tabindice['Classe']]][$cpt]['nom_prenom']=$tab[$tabindice['Nom']]." ".$tab[$tabindice['Prénom']];
+						//echo "\$tab_classe_parent[$tab[11]][$cpt]['nom_prenom']=".$tab_classe_parent[$tab[11]][$cpt]['nom_prenom']."<br />";
+						$tab_classe_eleve[$tab[$tabindice['Classe']]][$cpt]['login_ent']=$tab[$tabindice['Login']];
+						$tab_classe_eleve[$tab[$tabindice['Classe']]][$cpt]['mdp_ent']=$tab[$tabindice['Mot de passe']];
+						if(isset($tabindice['Email'])) {
+							$tab_classe_eleve[$tab[$tabindice['Classe']]][$cpt]['email_ent']=$tab[$tabindice['Email']];
+						}
+						elseif(isset($tabindice['Adresse Mail'])) {
+							$tab_classe_eleve[$tab[$tabindice['Classe']]][$cpt]['email_ent']=$tab[$tabindice['Adresse Mail']];
+						}
+						//$cpt++;
+					}
+				}
+			}
+		}
+
+		$saut=1;
+		$nb_fiches=getSettingValue("ImpressionNombreEleve");
+		foreach($tab_classe_eleve as $classe => $tab_eleve) {
+			/*
+			echo "<pre>";
+			print_r($tab_parent);
+			echo "</pre>";
+			*/
+			for($loop=0;$loop<count($tab_eleve);$loop++) {
+				echo "<table>
+	<tr>
+		<th style='text-align:left;'>A l'attention de </th>
+		<th>: </th>
+		<td>".$tab_eleve[$loop]['nom_prenom']."</td>
+	</tr>
+	<tr>
+		<th style='text-align:left;'>Login ENT</th>
+		<th>: </th>
+		<td>".$tab_eleve[$loop]['login_ent']."</td>
+	</tr>
+	<tr>
+		<th style='text-align:left;'>Mot de passe ENT</th>
+		<th>: </th>
+		<td>".$tab_eleve[$loop]['mdp_ent']."</td>
+	</tr>";
+				if(isset($tab_eleve[$loop]['email_ent'])) {
+					echo "
+	<tr>
+		<th style='text-align:left;'>Email ENT</th>
+		<th>: </th>
+		<td>".$tab_eleve[$loop]['email_ent']."</td>
+	</tr>";
+				}
+				echo "
+	<tr>
+		<th style='text-align:left;'>Classe</th>
+		<th>: </th>
+		<td>".$classe."</td>
+	</tr>
+</table>
+$impression";
+
+				// Saut de page toutes les $nb_fiches fiches
+				if ($saut == $nb_fiches) {
+					echo "<p class='saut'>&nbsp;</p>\n";
+					$saut = 1;
+				} else {
+					// Mettre le saut de ligne dans la fiche bienvenue elle-même.
+					//echo "<br />";
+					$saut++;
+				}
+
+				echo "<hr class='noprint'/>";
+			}
+		}
+
+	}
+
+	require("../lib/footer.inc.php");
+	die();
+}
+
+//==================================================================================
+if($mode=="publipostage_responsables") {
+	echo "
+ | <a href='".$_SERVER['PHP_SELF']."'>Index rapprochement ENT ITOP</a>";
+
+	$csv_file = isset($_FILES["csv_file"]) ? $_FILES["csv_file"] : NULL;
+
+	if(!isset($csv_file)) {
+
+		echo "</p>
+
+<h2 class='noprint'>Fiches bienvenue responsables</h2>";
+
+		// Liste des classes avec élève:
+		$sql="SELECT DISTINCT c.* FROM j_eleves_classes jec, classes c WHERE (c.id=jec.id_classe) ORDER BY c.classe;";
+		$call_classes=mysql_query($sql);
+
+		$nb_classes=mysql_num_rows($call_classes);
+		if($nb_classes==0){
+			echo "<p>Aucune classe avec élève affecté n'a été trouvée.</p>\n";
+			require("../lib/footer.inc.php");
+			die();
+		}
+		// Affichage sur 3 colonnes
+		$nb_classes_par_colonne=round($nb_classes/3);
+
+
+		echo "<form action='".$_SERVER['PHP_SELF']."' method='post' enctype='multipart/form-data'>
+	<fieldset style='border: 1px solid grey; background-image: url(\"../images/background/opacite50.png\");'>
+		".add_token_field()."
+
+		<p><input type='radio' name='toutes_les_classes' id='toutes_les_classes_y' value='y' checked /><label for='toutes_les_classes_y'> Générer les Fiches bienvenue pour les parents des élèves de toutes les classes</label><br />
+		ou<br />
+		<input type='radio' name='toutes_les_classes' id='toutes_les_classes_n' value='n' /><label for='toutes_les_classes_n'> Générer les Fiches bienvenue pour une sélection de classes<br />
+		(<em>si votre navigateur peine à effectuer l'impression pour un trop grand nombre de pages par exemple</em>)</label><br />
+		";
+		echo "<table width='100%' summary='Choix des classes'>\n";
+		echo "<tr valign='top' align='center'>\n";
+
+		$cpt = 0;
+
+		echo "<td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</td>\n";
+		echo "<td align='left'>\n";
+
+		while($lig_clas=mysql_fetch_object($call_classes)) {
+
+			//affichage 2 colonnes
+			if(($cpt>0)&&(round($cpt/$nb_classes_par_colonne)==$cpt/$nb_classes_par_colonne)){
+				echo "</td>\n";
+				echo "<td align='left'>\n";
+			}
+
+			//echo "<label id='label_tab_id_classe_$cpt' for='tab_id_classe_$cpt' style='cursor: pointer;'><input type='checkbox' name='id_classe[]' id='tab_id_classe_$cpt' value='$lig_clas->id' onchange=\"change_style_classe($cpt)\" /> $lig_clas->classe</label>";
+			echo "<label id='label_tab_id_classe_$cpt' for='tab_id_classe_$cpt' style='cursor: pointer;'><input type='checkbox' name='classe[]' id='tab_id_classe_$cpt' value='$lig_clas->classe' onchange=\"change_style_classe($cpt)\" /> $lig_clas->classe</label>";
+			echo "<br />\n";
+			$cpt++;
+		}
+
+		echo "</td>\n";
+		echo "</tr>\n";
+		echo "</table>\n";
+
+		echo "<p><a href='#' onClick='ModifCase(true)'>Tout cocher</a> / <a href='#' onClick='ModifCase(false)'>Tout décocher</a></p>\n";
+
+		echo "
+		<br />
+		<p><input type='checkbox' name='avec_adresse' id='avec_adresse' value='y' /><label for='avec_adresse'> Inclure le rappel de l'adresse.</p>
+		<br />
+
+		<p>Veuillez fournir le fichier <strong>".getSettingValue("gepiSchoolRne")."_MiseaJour_Motdepasse_Parent_JJ_MM_AAAA_HH_MM_SS.csv</strong> généré par l'ENT.</p>
+		<input type='hidden' name='mode' value='publipostage_responsables' />
+		<input type=\"file\" size=\"65\" name=\"csv_file\" style='border: 1px solid grey; background-image: url(\"../images/background/opacite50.png\"); padding:5px; margin:5px;' /><br />
+		<input type='submit' value='Envoyer' />
+	</fieldset>
+</form>
+
+<p><br /></p>
+
+<p style='text-indent:-4em; margin-left:4em;'><em>NOTES&nbsp;:</em></p>
+<ul>
+	<li>Cette rubrique est destinée à générer des Fiches Bienvenue avec compte et mot de passe de l'ENT.<br />
+	<!--
+		Ne seront pris en compte que les comptes ENT pour lesquels le rapprochement avec un compte Gepi est effectué.
+		Ce n'est pas le cas.
+		Il faudrait enregistrer davantage d'informations dans sso_table_correspondance pour s'en assurer.
+	-->
+	</li>
+	<li>Modifier les <a href='../gestion/modify_impression.php?fiche=responsables'>Fiches Bienvenue responsables</a></li>
+	<li>Le fichier CSV attendu doit comporter une ligne d'entête avec au moins les champs <strong>Nom;Prénom;Login;Mot de passe</strong></li>
+	<li>Le fichier CSV attendu peut être&nbsp;:<br />
+		<ul>
+			<li>
+				<p>celui de regénération de tous les mots de passe parents.<br />
+				Il aura alors le format suivant&nbsp;:<br />
+				<strong>﻿﻿Nom</strong>;<strong>Prénom</strong>;<strong>Login</strong>;Numéro de jointure;<strong>Mot de passe</strong>;Email;Adresse;Code postal;Ville;<span style='color:blue'>Nom enfant 1</span>;<span style='color:blue'>Prénom enfant 1</span>;<span style='color:blue'>Classe enfant 1</span>;<span style='color:green'>Etat</span>;Date de désactivation<br />
+				<strong>DUPRE</strong>;<strong>Denis</strong>;<strong>denis.dupre1</strong>;MENESR$1234567;<strong>azerty&*</strong>;Denis.DUPRE1@ent27.fr;3 RUE DES PRIMEVERES;27300;BERNAY;<span style='color:blue'>DUPRE</span>;<span style='color:blue'>Thomas</span>;<span style='color:blue'>6 A</span>;<span style='color:green'>Actif</span><br />
+				...<br />
+				Avec les nom, prénom et classe de l'enfant sont présents, il est plus simple de distribuer les Fiches bienvenues aux bonnes personnes.<br />
+				Avec le champ Etat, on peut exclure les comptes désactivés.</p>
+				<br />
+			</li>
+			<li>
+				<p>un fichier CSV obtenu en enregistrant au format CSV avec séparateur point-virgule (<em>édition des paramètres du filtre requise</em>) le feuillet Parent d'un fichier [V2]CLG-".getSettingValue('gepiSchoolName')."-ac-ROUEN - [".getSettingValue('gepiSchoolRne')."] - [ANNEEMOISJOURHEURE].xlsx de l'espace Documents.
+				Il aura alors le format suivant&nbsp;:<br />
+				<strong>﻿﻿Nom</strong>;<strong>Prénom</strong>;<strong>Login</strong>;<strong>Mot de passe</strong>;Email;Adresse;Code postal;Ville;<span style='color:blue'>Nom enfant 1</span>;<span style='color:blue'>Prénom enfant 1</span>;<span style='color:blue'>Classe enfant 1</span><br />
+				<strong>DUPRE</strong>;<strong>Denis</strong>;<strong>denis.dupre1</strong>;<strong>azerty&*</strong>;Denis.DUPRE1@ent27.fr;3 RUE DES PRIMEVERES;27300;BERNAY;<span style='color:blue'>DUPRE</span>;<span style='color:blue'>Thomas</span>;<span style='color:blue'>6 A</span><br />
+				...<br />
+				Il manque le champ Etat, mais le reste y est.<br /></p>
+				<br />
+			</li>
+			<li>
+				<p>le fichier CSV ".getSettingValue('gepiSchoolRne')."_Extraction_Parent.csv que vous pouvez trouver dans les fichiers ".getSettingValue('gepiSchoolRne')."_CSV_ANNEEMOISJOURHEURE.zip de l'espace Documents.
+				Il aura alors le format suivant&nbsp;:<br />
+				<strong>﻿﻿Nom</strong>;<strong>Prénom</strong>;<strong>Login</strong>;<strong>Mot de passe</strong><br />
+				<strong>DUPRE</strong>;<strong>Denis</strong>;<strong>denis.dupre1</strong>;<strong>azerty&*</strong><br />
+				...<br />
+				On a le minimum autorisé de champs... et plus de difficultés pour faire le tri et distribuer.</p>
+			</li>
+		</ul>
+	</li>
+	<li>
+		Le fichier demandé n'associe chaque parent qu'à un seul enfant.<br />
+		Un parent de plusieurs enfants dans l'établissement n'apparaitra que dans les fiches bienvenue de la classe de l'enfant auquel il est associé dans le fichier.
+	</li>
+</ul>
+
+
+<script type='text/javascript'>
+	function ModifCase(mode) {
+		for (var k=0;k<$cpt;k++) {
+			if(document.getElementById('tab_id_classe_'+k)){
+				document.getElementById('tab_id_classe_'+k).checked = mode;
+				change_style_classe(k);
+			}
+		}
+	}
+
+	function change_style_classe(num) {
+		if(document.getElementById('tab_id_classe_'+num)) {
+			if(document.getElementById('tab_id_classe_'+num).checked) {
+				document.getElementById('label_tab_id_classe_'+num).style.fontWeight='bold';
+				if(document.getElementById('toutes_les_classes_n')){
+					document.getElementById('toutes_les_classes_n').checked=true;
+				}
+			}
+			else {
+				document.getElementById('label_tab_id_classe_'+num).style.fontWeight='normal';
+			}
+		}
+	}
+
+</script>\n";
+	}
+	else {
+
+		echo " | <a href='".$_SERVER['PHP_SELF']."?mode=publipostage_responsables'>Fiches bienvenue responsables</a></p>
+
+<h2 class='noprint'>Fiches bienvenue responsables</h2>";
+
+		check_token(false);
+		$fp=fopen($csv_file['tmp_name'],"r");
+
+		$impression=getSettingValue('ImpressionFicheParent');
+
+		if(!$fp){
+			echo "<p>Impossible d'ouvrir le fichier CSV !</p>";
+			echo "<p><a href='".$_SERVER['PHP_SELF']."'>Cliquer ici </a> pour recommencer !</center></p>\n";
+			require("../lib/footer.inc.php");
+			die();
+		}
+
+		$motif_nom_fichier="Miseajour_Motdepasse_Parent_";
+		echo "<p class='noprint'>Le fichier fourni se nomme <strong>".$csv_file['name']."</strong>";
+		if(!preg_match("/$motif_nom_fichier/", $csv_file['name'])) {
+			echo "<br />
+<span style='color:red'>Le nom du fichier contient habituellement la chaine <strong>$motif_nom_fichier</strong>.<br />
+Vous seriez-vous trompé de fichier&nbsp;?</span><br />
+<span style='color:blue'>Si vous n'avez fourni qu'un fichier CSV des nouveaux arrivants (<em>sans regénérer tous les mots de passe</em>), le nom de fichier sera celui de votre choix; ne tenez donc pas compte de cette alerte.</span>";
+		}
+		echo "</p>\n";
+
+		// 20130916
+		// Lire la ligne d'entête pour repérer les indices des colonnes recherchées
+		$tabchamps = array("Nom", "Prénom", "Login", "Mot de passe", "Email", "Adresse", "Code postal", "Ville", "Nom enfant 1", "Prénom enfant 1", "Classe enfant 1", "Etat", "Date de désactivation");
+
+		// Lecture de la ligne 1 et la mettre dans $temp
+		$temp=fgets($fp,4096);
+		//echo "$temp<br />";
+		$en_tete=explode(";", trim($temp));
+
+		$tabindice=array();
+
+		// On range dans tabindice les indices des champs retenus
+		for ($k = 0; $k < count($tabchamps); $k++) {
+			//echo "<p style='text-indent:-4em;margin-left:4em'>Recherche du champ ".$tabchamps[$k]."<br />";
+			for ($i = 0; $i < count($en_tete); $i++) {
+				//echo "\$en_tete[$i]=$en_tete[$i]<br />";
+				if (casse_mot(remplace_accents($en_tete[$i]),'min') == casse_mot(remplace_accents($tabchamps[$k]), 'min')) {
+					$tabindice[$tabchamps[$k]] = $i;
+					//echo "\$tabindice[$tabchamps[$k]]=$i<br />";
+				}
+			}
+		}
+		if((!isset($tabindice['Nom']))||(!isset($tabindice['Prénom']))||(!isset($tabindice['Login']))||(!isset($tabindice['Mot de passe']))) {
+			echo "<p style='color:red'>La ligne d'entête ne comporte pas un des champs indispensables (<em>Nom, Prénom, Login, Mot de passe</em>).</p>";
+			require("../lib/footer.inc.php");
+			die();
+		}
+
+		echo "
+<hr class='noprint'/>";
+
+		$cpt=0;
+		//$classe_precedente="";
+		$tab_classe_parent=array();
+		while (!feof($fp)) {
+			$ligne = trim(fgets($fp, 4096));
+			if((substr($ligne,0,3) == "\xEF\xBB\xBF")) {
+				$ligne=substr($ligne,3);
+			}
+
+			if($ligne!='') {
+				$tab=explode(";", ensure_utf8($ligne));
+
+				$ligne_a_prendre_en_compte="y";
+				if(preg_match("/^Nom;Pr/i", trim($ligne))) {
+					$ligne_a_prendre_en_compte="n";
+				}
+				elseif((isset($tabindice['Classe enfant 1']))&&(preg_match("/^BASE20/",$tab[$tabindice['Classe enfant 1']]))) {
+					// On exclut l'année précédente
+					$ligne_a_prendre_en_compte="n";
+				}
+				elseif((isset($tabindice['Etat']))&&($tab[$tabindice['Etat']]!='Actif')) {
+					// On exclut les comptes "Désactivé"
+					$ligne_a_prendre_en_compte="n";
+				}
+
+				//if((!preg_match("/^Nom;Pr/i", trim($ligne)))&&(isset($tab[11]))&&(isset($tab[12]))&&(!preg_match("/^BASE20/",$tab[11]))&&($tab[12]=='Actif')) {
+				if($ligne_a_prendre_en_compte=="y") {
+					if(($_POST['toutes_les_classes']=="y")||
+						(!isset($tabindice['Classe enfant 1']))||
+						((isset($tabindice['Classe enfant 1']))&&(in_array($tab[$tabindice['Classe enfant 1']], $_POST['classe'])))) {
+
+						if(!isset($tabindice['Classe enfant 1'])) {
+							$classe_courante="classe_inconnue";
+						}
+						else {
+							$classe_courante=$tab[$tabindice['Classe enfant 1']];
+						}
+
+						if(!isset($tab_classe_parent[$classe_courante])) {
+							$cpt=0;
+						}
+						else {
+							$cpt=count($tab_classe_parent[$classe_courante]);
+						}
+
+						$tab_classe_parent[$classe_courante][$cpt]['nom_prenom']=$tab[$tabindice['Nom']]." ".$tab[$tabindice['Prénom']];
+						//echo "\$tab_classe_parent[$classe_courante][$cpt]['nom_prenom']=".$tab_classe_parent[$classe_courante][$cpt]['nom_prenom']."<br />";
+						$tab_classe_parent[$classe_courante][$cpt]['login_ent']=$tab[$tabindice['Login']];
+						$tab_classe_parent[$classe_courante][$cpt]['mdp_ent']=$tab[$tabindice['Mot de passe']];
+
+						if(isset($tabindice['Email'])) {
+							$tab_classe_parent[$classe_courante][$cpt]['email_ent']=$tab[$tabindice['Email']];
+						}
+
+						if((isset($tabindice['Adresse']))&&(isset($tabindice['Code postal']))&&(isset($tabindice['Ville']))) {
+							$tab_classe_parent[$classe_courante][$cpt]['adresse']=$tab[$tabindice['Adresse']]."<br />".$tab[$tabindice['Code postal']]." ".$tab[$tabindice['Ville']];
+						}
+
+						if((isset($tabindice['Nom enfant 1']))&&(isset($tabindice['Prénom enfant 1']))) {
+							$tab_classe_parent[$classe_courante][$cpt]['resp_de']=$tab[$tabindice['Nom enfant 1']]." ".$tab[$tabindice['Prénom enfant 1']];
+							if($classe_courante!='classe_inconnue') {
+								$tab_classe_parent[$classe_courante][$cpt]['resp_de'].=" (".$classe_courante.")";
+							}
+						}
+						//$cpt++;
+					}
+				}
+			}
+		}
+
+		$saut=1;
+		$nb_fiches=getSettingValue("ImpressionNombreParent");
+		foreach($tab_classe_parent as $classe => $tab_parent) {
+			/*
+			echo "<pre>";
+			print_r($tab_parent);
+			echo "</pre>";
+			*/
+			for($loop=0;$loop<count($tab_parent);$loop++) {
+				echo "<table>
+	<tr>
+		<th style='text-align:left;'>A l'attention de </th>
+		<th>: </th>
+		<td>".$tab_parent[$loop]['nom_prenom']."</td>
+	</tr>
+	<tr>
+		<th style='text-align:left;'>Login ENT</th>
+		<th>: </th>
+		<td>".$tab_parent[$loop]['login_ent']."</td>
+	</tr>
+	<tr>
+		<th style='text-align:left;'>Mot de passe ENT</th>
+		<th>: </th>
+		<td>".$tab_parent[$loop]['mdp_ent']."</td>
+	</tr>";
+
+				if(isset($tab_parent[$loop]['email_ent'])) {
+					echo "
+	<tr>
+		<th style='text-align:left;'>Email ENT</th>
+		<th>: </th>
+		<td>".$tab_parent[$loop]['email_ent']."</td>
+	</tr>";
+				}
+
+				if((isset($_POST['avec_adresse']))&&(isset($tab_parent[$loop]['adresse']))) {
+					echo "
+	<tr>
+		<th style='text-align:left; vertical-align:top;'>Adresse</th>
+		<th style='vertical-align:top;'>: </th>
+		<td>".$tab_parent[$loop]['adresse']."</td>
+	</tr>";
+				}
+
+				if(isset($tab_parent[$loop]['resp_de'])) {
+					echo "
+	<tr>
+		<th style='text-align:left;'>Responsable notamment de</th>
+		<th>: </th>
+		<td>".$tab_parent[$loop]['resp_de']."</td>
+	</tr>";
+				}
+
+				echo "
+</table>
+$impression";
+
+				// Saut de page toutes les $nb_fiches fiches
+				if ($saut == $nb_fiches) {
+					echo "<p class='saut'>&nbsp;</p>\n";
+					$saut = 1;
+				} else {
+					$saut++;
+				}
+
+				echo "
+<hr class='noprint'/>";
+					//}
+				flush();
+			}
+		}
+
+	}
+
+	require("../lib/footer.inc.php");
+	die();
+}
+
+//==================================================================================
+if($mode=="publipostage_personnels") {
+	echo "
+ | <a href='".$_SERVER['PHP_SELF']."'>Index rapprochement ENT ITOP</a>";
+
+	$csv_file = isset($_FILES["csv_file"]) ? $_FILES["csv_file"] : NULL;
+
+	if(!isset($csv_file)) {
+
+		echo "</p>
+
+<h2 class='noprint'>Fiches bienvenue professeurs</h2>";
+
+
+		echo "<form action='".$_SERVER['PHP_SELF']."' method='post' enctype='multipart/form-data'>
+	<fieldset style='border: 1px solid grey; background-image: url(\"../images/background/opacite50.png\");'>
+		".add_token_field()."
+		<input type='hidden' name='mode' value='publipostage_personnels' />
+		<input type=\"file\" size=\"65\" name=\"csv_file\" style='border: 1px solid grey; background-image: url(\"../images/background/opacite50.png\"); padding:5px; margin:5px;' /><br />
+		<input type='submit' value='Envoyer' />
+	</fieldset>
+</form>
+
+<p><br /></p>
+
+<p style='text-indent:-4em; margin-left:4em;'><em>NOTES&nbsp;:</em></p>
+<ul>
+	<li>Cette rubrique est destinée à générer des Fiches Bienvenue avec compte et mot de passe de l'ENT.<br />
+	<!--
+		Ne seront pris en compte que les comptes ENT pour lesquels le rapprochement avec un compte Gepi est effectué.
+		Ce n'est pas le cas.
+		Il faudrait enregistrer davantage d'informations dans sso_table_correspondance pour s'en assurer.
+	-->
+	</li>
+	<li>Modifier les <a href='../gestion/modify_impression.php'>Fiches Bienvenue professeurs</a></li>
+	<li>Le fichier CSV attendu doit avoir le format suivant&nbsp;:<br />
+	﻿Nom;Prénom;Login;Numéro de jointure;Mot de passe;Email;Classe(s);Etat;Date de désactivation<br />
+ZETOFREY;Melanie;melanie.zetofrey;MENESR$12345;azerty&*;Melanie.ZETOFREY@ent27.fr;4 B, 4 D, 5 B, 6 B, 6 D;Actif
+<br />
+	...</li>
+</ul>\n";
+	}
+	else {
+		echo " | <a href='".$_SERVER['PHP_SELF']."?mode=publipostage_personnels'>Fiches bienvenue personnels</a></p>
+
+<h2 class='noprint'>Fiches bienvenue personnels</h2>";
+
+		check_token(false);
+		$fp=fopen($csv_file['tmp_name'],"r");
+
+		$impression=getSettingValue('Impression');
+
+		if(!$fp){
+			echo "<p>Impossible d'ouvrir le fichier CSV !</p>";
+			echo "<p><a href='".$_SERVER['PHP_SELF']."'>Cliquer ici </a> pour recommencer !</center></p>\n";
+			require("../lib/footer.inc.php");
+			die();
+		}
+
+		$motif_nom_fichier="Miseajour_Motdepasse_Professeur_";
+		echo "<p class='noprint'>Le fichier fourni se nomme <strong>".$csv_file['name']."</strong>";
+		if(!preg_match("/$motif_nom_fichier/", $csv_file['name'])) {
+			echo "<br />
+<span style='color:red'>Le nom du fichier contient habituellement la chaine <strong>$motif_nom_fichier</strong>.<br />
+Vous seriez-vous trompé de fichier&nbsp;?</span>";
+		}
+		echo "</p>\n";
+
+		$saut=1;
+		$nb_fiches=getSettingValue("ImpressionNombre");
+		while (!feof($fp)) {
+			$ligne = trim(fgets($fp, 4096));
+			if((substr($ligne,0,3) == "\xEF\xBB\xBF")) {
+				$ligne=substr($ligne,3);
+			}
+
+			if($ligne!='') {
+				$tab=explode(";", ensure_utf8($ligne));
+				//if(!preg_match("/^Nom;Pr/i", trim($ligne))) {
+				//if((!preg_match("/^Nom;Pr/i", trim($ligne)))&&(!preg_match("/^BASE20/",$tab[11]))) {
+				// On exclut également les comptes "Désactivé"
+				if((!preg_match("/^Nom;Pr/i", trim($ligne)))&&(preg_match("/Actif$/", $ligne))) {
+					/*
+					$sql="SELECT e.* FROM eleves e, sso_table_correspondance stc WHERE stc.login_gepi=e.login AND ;";
+					$res_ele=mysql_query($sql);
+					if(mysql_fetch_object($res_ele)>0) {
+					*/
+						echo "<table>
+	<tr>
+		<th style='text-align:left;'>A l'attention de </th>
+		<th>: </th>
+		<td>".$tab[0]." ".$tab[1]."</td>
+	</tr>
+	<tr>
+		<th style='text-align:left;'>Login ENT</th>
+		<th>: </th>
+		<td>".$tab[2]."</td>
+	</tr>
+	<tr>
+		<th style='text-align:left;'>Mot de passe ENT</th>
+		<th>: </th>
+		<td>".$tab[4]."</td>
+	</tr>";
+						/*
+						echo "
+	<tr>
+		<th style='text-align:left;'>Email Gepi</th>
+		<th>: </th>
+		<td>".$tab[4]."</td>
+	</tr>";
+						*/
+						echo "
+	<tr>
+		<th style='text-align:left;'>Email ENT</th>
+		<th>: </th>
+		<td>".$tab[5]."</td>
+	</tr>
+	<tr>
+		<th style='text-align:left;'>Classe(s)</th>
+		<th>: </th>
+		<td>".$tab[6]."</td>
+	</tr>
+</table>
+$impression";
+
+						// Saut de page toutes les $nb_fiches fiches
+						if ($saut == $nb_fiches) {
+							echo "<p class='saut'>&nbsp;</p>\n";
+							$saut = 1;
+						} else {
+							$saut++;
+						}
+
+						echo "<hr class='noprint'/>";
+					//}
+
+				}
+			}
+		}
+
+	}
+
+	require("../lib/footer.inc.php");
+	die();
+}
+
+//==================================================================================
+if($mode=="forcer_logins_mdp_responsables") {
+	echo "
+ | <a href='".$_SERVER['PHP_SELF']."'>Index rapprochement ENT ITOP</a>
+</p>";
+
+	$csv_file = isset($_FILES["csv_file"]) ? $_FILES["csv_file"] : NULL;
+
+	echo "
+<h2>Création des comptes responsables</h2>";
+
+	if((!isset($csv_file))||($csv_file['tmp_name']=='')) {
+		echo "<p>Aucun fichier n'a été fourni.</p>";
+	}
+	else {
+		check_token(false);
+		$fp=fopen($csv_file['tmp_name'],"r");
+
+		$impression=getSettingValue('ImpressionFicheParent');
+
+		if(!$fp){
+			echo "<p>Impossible d'ouvrir le fichier CSV !</p>";
+			echo "<p><a href='".$_SERVER['PHP_SELF']."'>Cliquer ici </a> pour recommencer !</center></p>\n";
+			require("../lib/footer.inc.php");
+			die();
+		}
+
+
+		$motif_nom_fichier="Miseajour_Motdepasse_Parent_";
+		echo "<p class='noprint'>Le fichier fourni se nomme <strong>".$csv_file['name']."</strong>";
+		if(!preg_match("/$motif_nom_fichier/", $csv_file['name'])) {
+			echo "<br />
+<span style='color:red'>Le nom du fichier contient habituellement la chaine <strong>$motif_nom_fichier</strong>.<br />
+Vous seriez-vous trompé de fichier&nbsp;?</span>";
+		}
+		echo "</p>\n";
+
+		$sql="TRUNCATE tempo4;";
+		$menage=mysql_query($sql);
+
+		$cpt=0;
+		$cpt2=0;
+		//$classe_precedente="";
+		$tab_classe_parent=array();
+		while (!feof($fp)) {
+			$ligne = trim(fgets($fp, 4096));
+			if((substr($ligne,0,3) == "\xEF\xBB\xBF")) {
+				$ligne=substr($ligne,3);
+			}
+
+			if($ligne!='') {
+				$tab=explode(";", ensure_utf8($ligne));
+
+				// On exclut la ligne Nom;Prénom
+				//if(!preg_match("/^Nom;Pr/i", trim($ligne))) {
+				// On exclut aussi les classes BASE2012-2013
+				//if((!preg_match("/^Nom;Pr/i", trim($ligne)))&&(!preg_match("/^BASE20/",$tab[11]))) {
+				// On exclut également les comptes "Désactivé"
+				if((!preg_match("/^Nom;Pr/i", trim($ligne)))&&(isset($tab[11]))&&(isset($tab[12]))&&(!preg_match("/^BASE20/",$tab[11]))&&($tab[12]=='Actif')) {
+					/*
+					if($tab[11]!=$classe_precedente) {
+						$cpt=0;
+						$classe_precedente=$tab[11];
+					}
+					*/
+					if(!isset($tab_classe_parent[$tab[11]])) {
+						$cpt=0;
+					}
+					else {
+						$cpt=count($tab_classe_parent[$tab[11]]);
+					}
+					$tab_classe_parent[$tab[11]][$cpt]['nom']=$tab[0];
+					$tab_classe_parent[$tab[11]][$cpt]['prenom']=$tab[1];
+					$tab_classe_parent[$tab[11]][$cpt]['nom_prenom']=$tab[0]." ".$tab[1];
+					//echo "\$tab_classe_parent[$tab[11]][$cpt]['nom_prenom']=".$tab_classe_parent[$tab[11]][$cpt]['nom_prenom']."<br />";
+					$tab_classe_parent[$tab[11]][$cpt]['login_ent']=$tab[2];
+					$tab_classe_parent[$tab[11]][$cpt]['mdp_ent']=$tab[4];
+					$tab_classe_parent[$tab[11]][$cpt]['email_ent']=$tab[5];
+					$tab_classe_parent[$tab[11]][$cpt]['adresse']=$tab[6]."<br />".$tab[7]." ".$tab[8];
+					$tab_classe_parent[$tab[11]][$cpt]['enfant']=$tab[9]." ".$tab[10];
+					$tab_classe_parent[$tab[11]][$cpt]['classe']=$tab[11];
+					$tab_classe_parent[$tab[11]][$cpt]['resp_de']=$tab[9]." ".$tab[10]." (".$tab[11].")";
+
+					$tab_classe_parent[$tab[11]][$cpt]['cpt_tempo4']=$cpt2;
+
+					$sql="INSERT INTO tempo4 SET col1='$cpt2', col2='".$tab[2]."', col3=MD5('".$tab[4]."');";
+					$insert=mysql_query($sql);
+
+					$cpt2++;
+				}
+			}
+		}
+
+		echo "
+<form action='".$_SERVER['PHP_SELF']."' method='post' enctype='multipart/form-data'>
+	".add_token_field()."
+	<input type='hidden' name='temoin_suhosin_1' value='forcer_logins_mdp_responsables' />
+	<input type='hidden' name='mode' value='valider_forcer_logins_mdp_responsables' />
+	<input type='hidden' name='temoin_suhosin_1' value='forcer_logins_mdp_responsables' />
+
+<table class='boireaus boireaus_alt' summary='Tableau des responsables'>
+	<tr>
+		<th colspan='6'>Informations ENT</th>
+		<th colspan='4'>Informations Gepi</th>
+	</tr>
+	<tr>
+		<th>Nom prénom</th>
+		<th>Adresse</th>
+		<th>Enfant</th>
+		<th>Classe</th>
+		<th>Login</th>
+		<th>Mot de passe</th>
+
+		<th>
+			Cocher
+			<span id='tout_cocher_decocher' style='display:none;'>
+				<br />
+				<a href=\"javascript:tout_cocher()\" title='Cocher tous les parents pour lesquels un seul nom_prénom est trouvé.'><img src='../images/enabled.png' width='20' height='20' /></a>
+				/
+				<a href=\"javascript:tout_decocher()\" title='Tout décocher'><img src='../images/disabled.png' width='20' height='20' /></a>
+			</span>
+		</th>
+		<th>Nom prénom</th>
+		<th>Adresse</th>
+		<th>Enfants</th>
+	</tr>";
+		$cpt=0;
+		$ancre_doublon_ou_pas="";
+		$style_css="";
+		$nb_comptes_login_deja_ok=0;
+		foreach($tab_classe_parent as $classe => $tab_parent) {
+			/*
+			echo "<pre>";
+			print_r($tab_parent);
+			echo "</pre>";
+			*/
+			for($loop=0;$loop<count($tab_parent);$loop++) {
+				$rowspan="";
+				$sql="SELECT * FROM resp_pers WHERE nom='".mysql_real_escape_string($tab_parent[$loop]['nom'])."' AND prenom='".mysql_real_escape_string($tab_parent[$loop]['prenom'])."';";
+				$res_resp=mysql_query($sql);
+				$nb_resp=mysql_num_rows($res_resp);
+				if($nb_resp>1) {
+					$rowspan=" rowspan='".($nb_resp+1)."'";
+				}
+
+				//==============================================================
+				if($nb_resp==0) {
+					// Aucun nom prénom identique trouvé
+					echo "
+	<tr class='white_hover'".$style_css.">
+		<td$rowspan>".$tab_parent[$loop]['nom_prenom']."</td>
+		<td$rowspan>".$tab_parent[$loop]['adresse']."</td>
+		<td$rowspan>".$tab_parent[$loop]['enfant']."</td>
+		<td$rowspan>".$tab_parent[$loop]['classe']."</td>
+		<td$rowspan>".$tab_parent[$loop]['login_ent']."</td>
+		<td$rowspan>".$tab_parent[$loop]['mdp_ent']."</td>";
+
+					echo "
+		<td></td>
+		<td style='color:red' colspan='3'>Aucun nom prénom identique</td>
+	</tr>";
+					$cpt++;
+				}
+				//==============================================================
+				elseif($nb_resp==1) {
+					// Un seul nom prénom identique trouvé
+					$lig_resp=mysql_fetch_object($res_resp);
+
+					if($lig_resp->login==$tab_parent[$loop]['login_ent']) {
+						$nb_comptes_login_deja_ok++;
+					}
+					else {
+						echo "
+	<tr class='white_hover'".$style_css.">
+		<td$rowspan><label for='ligne_$cpt'>".$tab_parent[$loop]['nom_prenom']."</label></td>
+		<td$rowspan><label for='ligne_$cpt'>".$tab_parent[$loop]['adresse']."</label></td>
+		<td$rowspan><label for='ligne_$cpt'>".$tab_parent[$loop]['enfant']."</label></td>
+		<td$rowspan><label for='ligne_$cpt'>".$tab_parent[$loop]['classe']."</label></td>
+		<td$rowspan><label for='ligne_$cpt'>".$tab_parent[$loop]['login_ent']."</label></td>
+		<td$rowspan><label for='ligne_$cpt'>".$tab_parent[$loop]['mdp_ent']."</label></td>";
+
+						$tab_ele=get_enfants_from_pers_id($lig_resp->pers_id, 'avec_classe');
+						$chaine_ele="";
+						for($loop_ele=1;$loop_ele<count($tab_ele);$loop_ele+=2) {
+							if($loop_ele>1) {$chaine_ele.=",<br />";}
+							$chaine_ele.=$tab_ele[$loop_ele];
+						}
+
+						$tab_adresse=get_adresse_responsable($lig_resp->pers_id);
+						$chaine_adresse=$tab_adresse['en_ligne'];
+
+						echo "
+		<td><input type='checkbox' name='ligne[".$tab_parent[$loop]['cpt_tempo4']."]' id='ligne_$cpt' value='".$lig_resp->pers_id."' onchange=\"change_graisse($cpt)\" />$ancre_doublon_ou_pas</td>
+		<td><label for='ligne_$cpt'><span id='nom_prenom_$cpt'>$lig_resp->civilite $lig_resp->nom $lig_resp->prenom</span></label></td>
+		<td><label for='ligne_$cpt'>$chaine_adresse</label></td>
+		<td><label for='ligne_$cpt'>$chaine_ele</label></td>
+	</tr>";
+						$cpt++;
+					}
+				}
+				//==============================================================
+				else {
+					// Plusieurs nom prénom identiques trouvés
+					echo "
+	<tr class='white_hover'".$style_css.">
+		<td$rowspan>".$tab_parent[$loop]['nom_prenom']."</td>
+		<td$rowspan>".$tab_parent[$loop]['adresse']."</td>
+		<td$rowspan>".$tab_parent[$loop]['enfant']."</td>
+		<td$rowspan>".$tab_parent[$loop]['classe']."</td>
+		<td$rowspan>".$tab_parent[$loop]['login_ent']."</td>
+		<td$rowspan>".$tab_parent[$loop]['mdp_ent']."</td>";
+
+					$chaine_change_graisse="";
+					for($loop_resp=0;$loop_resp<=$nb_resp;$loop_resp++) {
+						if($loop_resp>0) {
+							$chaine_change_graisse.=";";
+						}
+						$chaine_change_graisse.="change_graisse(".($cpt+$loop_resp).")";
+					}
+
+					// Ne pas associer
+					echo "
+		<td><input type='radio' name='ligne[".$tab_parent[$loop]['cpt_tempo4']."]' id='ligne_$cpt' value='' ";
+					echo "onchange=\"$chaine_change_graisse\" ";
+					echo " />$ancre_doublon_ou_pas";
+					//echo $cpt;
+					echo "</td>
+		<td style='color:red'><label for='ligne_$cpt'>Ne pas associer</label></td>
+		<td></td>
+		<td></td>
+	</tr>";
+					$cpt++;
+					$cpt_resp=0;
+					while($lig_resp=mysql_fetch_object($res_resp)) {
+						/*
+						if($cpt_resp>0) {
+							echo "
+	<tr>";
+						}
+						*/
+						echo "
+	<tr>";
+						$tab_ele=get_enfants_from_pers_id($lig_resp->pers_id, 'avec_classe');
+						$chaine_ele="";
+						for($loop_ele=1;$loop_ele<count($tab_ele);$loop_ele+=2) {
+							if($loop_ele>1) {$chaine_ele.=",<br />";}
+							$chaine_ele.=$tab_ele[$loop_ele];
+						}
+
+						$tab_adresse=get_adresse_responsable($lig_resp->pers_id);
+						$chaine_adresse=$tab_adresse['en_ligne'];
+
+						// Responsable n°$cpt_resp trouvé pour le nom_prenom proposé dans le CSV
+						echo "
+		<td><input type='radio' name='ligne[".$tab_parent[$loop]['cpt_tempo4']."]' id='ligne_$cpt' value='".$lig_resp->pers_id."' ";
+						echo "onchange=\"$chaine_change_graisse\" ";
+						echo "/>$ancre_doublon_ou_pas";
+						//echo $cpt;
+						echo "</td>
+		<td><label for='ligne_$cpt'><span id='nom_prenom_$cpt'>$lig_resp->civilite $lig_resp->nom $lig_resp->prenom</span></label></td>
+		<td><label for='ligne_$cpt'>$chaine_adresse</label></td>
+		<td><label for='ligne_$cpt'>$chaine_ele</label></td>
+	</tr>";
+						$cpt_resp++;
+						$cpt++;
+					}
+				}
+				//==============================================================
+
+				//$cpt++;
+				flush();
+			}
+		}
+		echo "
+</table>
+
+	<p><input type='submit' value='Valider' /></p>
+	<input type='hidden' name='temoin_suhosin_2' value='forcer_logins_mdp_responsables' />
+	<p><br /></p>
+
+	<p><em>NOTES&nbsp;:</em></p>
+	<ul>
+		<li>Les comptes vont être créés dans Gepi d'après les login/mdp ENT pour les responsables sélectionnés.</li>
+		".(($nb_comptes_login_deja_ok>0) ? "<li><strong>$nb_comptes_login_deja_ok comptes parents ont déjà été créés d'après le login ENT</strong> (<em>ils peuvent en revanche avoir depuis modifié leur mot de passe</em>).</li>" : "")."
+		<li>Les nouveaux comptes créés sont inactifs.</li>
+		<li>Le changement de mot de passe n'est pas imposé pour les nouveaux comptes.<br />
+		Ce serait préférable, mais si l'accès via l'ENT est mis en place par la suite avec les comptes et mots de passe présentement mis en place, ne pas changer de mot de passe peut simplifier des choses.</li>
+	</ul>
+
+	<input type='hidden' name='temoin_suhosin_2' value='forcer_logins_mdp_responsables' />
+</form>
+
+<script type='text/javascript'>
+	document.getElementById('tout_cocher_decocher').style.display='';
+	/*
+	document.getElementById('bouton_button_import').style.display='';
+	document.getElementById('bouton_submit_import').style.display='none';
+	*/
+
+	function tout_cocher() {
+		var i;
+		for(i=0;i<$cpt;i++) {
+			if(document.getElementById('ligne_'+i)) {
+				if(document.getElementById('ligne_'+i).getAttribute('type')=='checkbox') {
+					document.getElementById('ligne_'+i).checked=true;
+					change_graisse(i);
+				}
+			}
+		}
+	}
+
+	function tout_decocher() {
+		var i;
+		for(i=0;i<$cpt;i++) {
+			if(document.getElementById('ligne_'+i)) {
+				document.getElementById('ligne_'+i).checked=false;
+				change_graisse(i);
+			}
+		}
+	}
+
+	function change_graisse(num) {
+		if((document.getElementById('ligne_'+num))&&(document.getElementById('nom_prenom_'+num))) {
+			//alert(num);
+			if(document.getElementById('ligne_'+num).checked==true) {
+				document.getElementById('nom_prenom_'+num).style.fontWeight='bold';
+			}
+			else {
+				document.getElementById('nom_prenom_'+num).style.fontWeight='';
+			}
+		}
+	}
+</script>
+\n";
+	}
+
+	require("../lib/footer.inc.php");
+	die();
+}
+
+//==================================================================================
+
+if($mode=="envoi_mail_logins_mdp") {
+	echo "
+ | <a href='".$_SERVER['PHP_SELF']."'>Index rapprochement ENT ITOP</a>";
+
+	$csv_file = isset($_FILES["csv_file"]) ? $_FILES["csv_file"] : NULL;
+
+	if(!isset($csv_file)) {
+	echo "</p>
+
+<h2 class='noprint'>Envoi par mail des fiches bienvenue responsables</h2>";
+
+		echo "<p><strong style='color:red'>ATTENTION&nbsp;:</strong> Cette démarche ne fonctionne que dans le cas où les logins Gepi des responsables et leurs logins ENT coïncident (<em>et si les adresses mail sont correctement renseignées dans votre table 'resp_pers'</em>).</p>";
+
+		// Liste des classes avec élève:
+		$sql="SELECT DISTINCT c.* FROM j_eleves_classes jec, classes c WHERE (c.id=jec.id_classe) ORDER BY c.classe;";
+		$call_classes=mysql_query($sql);
+
+		$nb_classes=mysql_num_rows($call_classes);
+		if($nb_classes==0){
+			echo "<p>Aucune classe avec élève affecté n'a été trouvée.</p>\n";
+			require("../lib/footer.inc.php");
+			die();
+		}
+		// Affichage sur 3 colonnes
+		$nb_classes_par_colonne=round($nb_classes/3);
+
+
+		echo "<form action='".$_SERVER['PHP_SELF']."' method='post' enctype='multipart/form-data'>
+	<fieldset style='border: 1px solid grey; background-image: url(\"../images/background/opacite50.png\");'>
+		".add_token_field()."
+
+		<p><input type='radio' name='toutes_les_classes' id='toutes_les_classes_y' value='y' checked /><label for='toutes_les_classes_y'> Générer les Fiches bienvenue pour les parents des élèves de toutes les classes</label><br />
+		ou<br />
+		<input type='radio' name='toutes_les_classes' id='toutes_les_classes_n' value='n' /><label for='toutes_les_classes_n'> Générer les Fiches bienvenue pour une sélection de classes<br />
+		(<em>si votre navigateur peine à effectuer l'impression pour un trop grand nombre de pages par exemple</em>)</label><br />
+		";
+		echo "<table width='100%' summary='Choix des classes'>\n";
+		echo "<tr valign='top' align='center'>\n";
+
+		$cpt = 0;
+
+		echo "<td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</td>\n";
+		echo "<td align='left'>\n";
+
+		while($lig_clas=mysql_fetch_object($call_classes)) {
+
+			//affichage 2 colonnes
+			if(($cpt>0)&&(round($cpt/$nb_classes_par_colonne)==$cpt/$nb_classes_par_colonne)){
+				echo "</td>\n";
+				echo "<td align='left'>\n";
+			}
+
+			//echo "<label id='label_tab_id_classe_$cpt' for='tab_id_classe_$cpt' style='cursor: pointer;'><input type='checkbox' name='id_classe[]' id='tab_id_classe_$cpt' value='$lig_clas->id' onchange=\"change_style_classe($cpt)\" /> $lig_clas->classe</label>";
+			echo "<label id='label_tab_id_classe_$cpt' for='tab_id_classe_$cpt' style='cursor: pointer;'><input type='checkbox' name='classe[]' id='tab_id_classe_$cpt' value='$lig_clas->classe' onchange=\"change_style_classe($cpt)\" /> $lig_clas->classe</label>";
+			echo "<br />\n";
+			$cpt++;
+		}
+
+		echo "</td>\n";
+		echo "</tr>\n";
+		echo "</table>\n";
+
+		echo "<p><a href='#' onClick='ModifCase(true)'>Tout cocher</a> / <a href='#' onClick='ModifCase(false)'>Tout décocher</a></p>\n";
+
+		echo "
+		<br />
+
+		<p>Veuillez fournir le fichier <strong>".getSettingValue("gepiSchoolRne")."_MiseaJour_Motdepasse_Parent_JJ_MM_AAAA_HH_MM_SS.csv</strong> généré par l'ENT.</p>
+		<input type='hidden' name='mode' value='envoi_mail_logins_mdp' />
+		<input type=\"file\" size=\"65\" name=\"csv_file\" style='border: 1px solid grey; background-image: url(\"../images/background/opacite50.png\"); padding:5px; margin:5px;' /><br />
+		<input type='submit' value='Envoyer' />
+	</fieldset>
+</form>
+
+<p><br /></p>
+
+<p style='text-indent:-4em; margin-left:4em;'><em>NOTES&nbsp;:</em></p>
+<ul>
+	<li>Cette rubrique est destinée à générer des Fiches Bienvenue avec compte et mot de passe de l'ENT et à les envoyer à l'adresse mail saisie pour le responsable dans <a href='../responsables/index.php'>Gestion des responsables</a>.</li>
+	<li>Modifier les <a href='../gestion/modify_impression.php?fiche=responsables'>Fiches Bienvenue responsables</a></li>
+	<li>Le fichier CSV attendu doit avoir le format suivant&nbsp;:<br />
+	﻿﻿Nom;Prénom;Login;Numéro de jointure;Mot de passe;Email;Adresse;Code postal;Ville;Nom enfant 1;Prénom enfant 1;Classe enfant 1;Etat;Date de désactivation<br />
+	DUPRE;Denis;denis.dupre1;MENESR$1234567;azerty&*;Denis.DUPRE1@ent27.fr;3 RUE DES PRIMEVERES;27300;BERNAY;DUPRE;Thomas;6 A;Actif<br />
+	...</li>
+	<li>
+		Le fichier demandé n'associe chaque parent qu'à un seul enfant.<br />
+		Un parent de plusieurs enfants dans l'établissement n'apparaitra que dans les fiches bienvenue de la classe de l'enfant auquel il est associé dans le fichier.
+	</li>
+</ul>
+
+
+<script type='text/javascript'>
+	function ModifCase(mode) {
+		for (var k=0;k<$cpt;k++) {
+			if(document.getElementById('tab_id_classe_'+k)){
+				document.getElementById('tab_id_classe_'+k).checked = mode;
+				change_style_classe(k);
+			}
+		}
+	}
+
+	function change_style_classe(num) {
+		if(document.getElementById('tab_id_classe_'+num)) {
+			if(document.getElementById('tab_id_classe_'+num).checked) {
+				document.getElementById('label_tab_id_classe_'+num).style.fontWeight='bold';
+				if(document.getElementById('toutes_les_classes_n')){
+					document.getElementById('toutes_les_classes_n').checked=true;
+				}
+			}
+			else {
+				document.getElementById('label_tab_id_classe_'+num).style.fontWeight='normal';
+			}
+		}
+	}
+
+</script>\n";
+	}
+	else {
+		echo " | <a href='".$_SERVER['PHP_SELF']."?mode=envoi_mail_logins_mdp'>Envoi par mail</a></p>
+
+<h2 class='noprint'>Envoi par mail des fiches bienvenue responsables</h2>";
+
+		check_token(false);
+		$fp=fopen($csv_file['tmp_name'],"r");
+
+		$impression=getSettingValue('ImpressionFicheParent');
+
+		if(!$fp){
+			echo "<p>Impossible d'ouvrir le fichier CSV !</p>";
+			echo "<p><a href='".$_SERVER['PHP_SELF']."'>Cliquer ici </a> pour recommencer !</center></p>\n";
+			require("../lib/footer.inc.php");
+			die();
+		}
+
+		$motif_nom_fichier="Miseajour_Motdepasse_Parent_";
+		echo "<p class='noprint'>Le fichier fourni se nomme <strong>".$csv_file['name']."</strong>";
+		if(!preg_match("/$motif_nom_fichier/", $csv_file['name'])) {
+			echo "<br />
+<span style='color:red'>Le nom du fichier contient habituellement la chaine <strong>$motif_nom_fichier</strong>.<br />
+Vous seriez-vous trompé de fichier&nbsp;?</span>";
+		}
+		echo "</p>\n";
+
+		echo "<br /><p class='noprint'>Les parents pour lesquels les fiches bienvenues n'auront pas pu être envoyées par mail, apparaitront dans la page (<em>pour que vous puissiez les imprimer et les remettre manuellement</em>).<br />
+		Les parents pour lesquels l'envoi aura réussi seront listés en bas de page.<br /></p><hr class='noprint'/>";
+
+		$cpt=0;
+		//$classe_precedente="";
+		$tab_classe_parent=array();
+		while (!feof($fp)) {
+			$ligne = trim(fgets($fp, 4096));
+			if((substr($ligne,0,3) == "\xEF\xBB\xBF")) {
+				$ligne=substr($ligne,3);
+			}
+
+			if($ligne!='') {
+				$tab=explode(";", ensure_utf8($ligne));
+				//if(!preg_match("/^Nom;Pr/i", trim($ligne))) {
+				//if((!preg_match("/^Nom;Pr/i", trim($ligne)))&&(!preg_match("/^BASE20/",$tab[11]))) {
+				// On exclut également les comptes "Désactivé"
+				//if((!preg_match("/^Nom;Pr/i", trim($ligne)))&&(!preg_match("/^BASE20/",$tab[11]))&&($tab[12]=='Actif')) {
+				if((!preg_match("/^Nom;Pr/i", trim($ligne)))&&(isset($tab[11]))&&(isset($tab[12]))&&(!preg_match("/^BASE20/",$tab[11]))&&($tab[12]=='Actif')) {
+					if(($_POST['toutes_les_classes']=="y")||(in_array($tab[11], $_POST['classe']))) {
+						/*
+						if($tab[11]!=$classe_precedente) {
+							$cpt=0;
+							$classe_precedente=$tab[11];
+						}
+						*/
+						if(!isset($tab_classe_parent[$tab[11]])) {
+							$cpt=0;
+						}
+						else {
+							$cpt=count($tab_classe_parent[$tab[11]]);
+						}
+						$tab_classe_parent[$tab[11]][$cpt]['nom_prenom']=$tab[0]." ".$tab[1];
+						//echo "\$tab_classe_parent[$tab[11]][$cpt]['nom_prenom']=".$tab_classe_parent[$tab[11]][$cpt]['nom_prenom']."<br />";
+						$tab_classe_parent[$tab[11]][$cpt]['login_ent']=$tab[2];
+						$tab_classe_parent[$tab[11]][$cpt]['mdp_ent']=$tab[4];
+						$tab_classe_parent[$tab[11]][$cpt]['email_ent']=$tab[5];
+						$tab_classe_parent[$tab[11]][$cpt]['adresse']=$tab[6]."<br />".$tab[7]." ".$tab[8];
+						$tab_classe_parent[$tab[11]][$cpt]['resp_de']=$tab[9]." ".$tab[10]." (".$tab[11].")";
+
+						$sql="SELECT mel FROM resp_pers WHERE login='".$tab[2]."' AND mel LIKE '%@%';";
+						$res_mel=mysql_query($sql);
+						if(mysql_num_rows($res_mel)>0) {
+							$mel=mysql_result($res_mel, 0, 'mel');
+							if(check_mail($mel, "", "y")) {
+								$tab_classe_parent[$tab[11]][$cpt]['email_gepi']=$mel;
+							}
+						}
+
+						//$cpt++;
+					}
+				}
+			}
+		}
+
+		$saut=1;
+		$nb_fiches=getSettingValue("ImpressionNombreParent");
+
+		$tab_envoi_reussi=array();
+		foreach($tab_classe_parent as $classe => $tab_parent) {
+			/*
+			echo "<pre>";
+			print_r($tab_parent);
+			echo "</pre>";
+			*/
+			for($loop=0;$loop<count($tab_parent);$loop++) {
+				$chaine="<table>
+	<tr>
+		<th style='text-align:left;'>A l'attention de </th>
+		<th>: </th>
+		<td>".$tab_parent[$loop]['nom_prenom']."</td>
+	</tr>
+	<tr>
+		<th style='text-align:left;'>Login ENT</th>
+		<th>: </th>
+		<td>".$tab_parent[$loop]['login_ent']."</td>
+	</tr>
+	<tr>
+		<th style='text-align:left;'>Mot de passe ENT</th>
+		<th>: </th>
+		<td>".$tab_parent[$loop]['mdp_ent']."</td>
+	</tr>
+	<tr>
+		<th style='text-align:left;'>Email ENT</th>
+		<th>: </th>
+		<td>".$tab_parent[$loop]['email_ent']."</td>
+	</tr>
+	<tr>
+		<th style='text-align:left; vertical-align:top;'>Adresse</th>
+		<th style='vertical-align:top;'>: </th>
+		<td>".$tab_parent[$loop]['adresse']."</td>
+	</tr>
+	<tr>
+		<th style='text-align:left;'>Responsable notamment de</th>
+		<th>: </th>
+		<td>".$tab_parent[$loop]['resp_de']."</td>
+	</tr>
+</table>
+$impression";
+
+				if((isset($tab_parent[$loop]['email_gepi']))&&($envoi=envoi_mail("Compte Gepi", "Bonjour(soir),\n".$chaine, $tab_parent[$loop]['email_gepi'], "", "html"))) {
+					$tab_envoi_reussi[]=$tab_parent[$loop]['nom_prenom']." (".$tab_parent[$loop]['email_gepi'].") parent de ".$tab_parent[$loop]['resp_de'];
+				}
+				else {
+					echo $chaine."";
+
+					// Saut de page toutes les $nb_fiches fiches
+					if ($saut == $nb_fiches) {
+						echo "<p class='saut'>&nbsp;</p>\n";
+						$saut = 1;
+					} else {
+						$saut++;
+					}
+
+					echo "<hr class='noprint'/>";
+				}
+				flush();
+			}
+		}
+
+
+		$nb_envois=count($tab_envoi_reussi);
+		echo "<hr class='noprint' /><p class='noprint'><strong>Récapitulatif&nbsp;:</strong> ".$nb_envois." mail ont été envoyés avec succès.</p>";
+		if($nb_envois>0) {
+			echo "<p class='noprint'>Liste des responsables contactés par mail&nbsp;:<br />";
+			for($loop=0;$loop<$nb_envois;$loop++) {
+				echo $tab_envoi_reussi[$loop]."<br />";
+			}
+		}
+	}
+
+	require("../lib/footer.inc.php");
+	die();
+}
+
 //==================================================================================
 
 echo "<p style='color:red'>Mode non encore développé</p>\n";

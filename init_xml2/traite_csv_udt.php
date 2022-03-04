@@ -53,9 +53,11 @@
 	$titre_page = "Outil d'initialisation de l'année : Importation CSV UDT";
 	require_once("../lib/header.inc.php");
 	//**************** FIN EN-TETE *****************
+	include("init_xml_lib.php");
 
 	//debug_var();
 
+	/*
 	function affiche_debug($texte) {
 		// Passer à 1 la variable pour générer l'affichage des infos de debug...
 		$debug=0;
@@ -64,6 +66,7 @@
 			flush();
 		}
 	}
+	*/
 
 	// Etape...
 	$step=isset($_POST['step']) ? $_POST['step'] : (isset($_GET['step']) ? $_GET['step'] : NULL);
@@ -149,12 +152,16 @@
 			echo "<p class='bold'>Upload du fichier d'export d'UDT.</p>\n";
 
 			echo "<form enctype='multipart/form-data' action='".$_SERVER['PHP_SELF']."' method='post'>\n";
+			echo "<fieldset style='border: 1px solid grey;";
+			echo "background-image: url(\"../images/background/opacite50.png\"); ";
+			echo "'>\n";
 			echo "<p>Veuillez fournir le fichier d'export CSV d'UDT&nbsp;:<br />\n";
-			echo "<input type=\"file\" size=\"65\" name=\"csv_file\" /><br />\n";
+			echo "<input type=\"file\" size=\"65\" name=\"csv_file\" style='border: 1px solid grey; background-image: url(\"../images/background/opacite50.png\"); padding:5px; margin:5px;' /><br />\n";
 			echo "<input type='hidden' name='step' value='0' />\n";
 			echo "<input type='hidden' name='is_posted' value='yes' />\n";
 			echo add_token_field();
 			echo "<p><input type='submit' value='Valider' /></p>\n";
+			echo "</fieldset>\n";
 			echo "</form>\n";
 
 			echo "<p><i>Remarques</i>&nbsp;:</p>\n";
@@ -609,6 +616,11 @@
 				$del = @mysql_query("DELETE FROM j_eleves_groupes;");
 				$del = @mysql_query("DELETE FROM j_groupes_classes;");
 				$del = @mysql_query("DELETE FROM j_groupes_professeurs;");
+				$del = @mysql_query("DELETE FROM j_groupes_matieres;");
+				$del = @mysql_query("DELETE FROM j_signalement;");
+				$del = @mysql_query("DELETE FROM j_groupes_visibilite;");
+				$del = @mysql_query("DELETE FROM acces_cdt_groupes;");
+				// On conserve les associations profs/matières
 				//$del = @mysql_query("DELETE FROM j_professeurs_matieres;");
 
 /*
@@ -1002,7 +1014,9 @@ $
 	
 												if($temoin_enseignement_suivi=="y") {
 													for($n_per=1;$n_per<=$tab_per[$tab_clas[$loop]];$n_per++) {$reg_eleves[$n_per][]=$value;}
+													if($debug_import=="y") {echo "<span style='color:green'>$value suit l'enseignement n°$id_groupe de $mat</span><br />";}
 												}
+												elseif($debug_import=="y") {echo "<span style='color:red'>$value ne suit pas l'enseignement n°$id_groupe de $mat</span><br />";}
 											}
 										}
 	

@@ -110,14 +110,15 @@ if(isset($_POST['is_posted'])) {
 	}
 
 	if($nb_err==0) {
-		$msg="$nb_reg enregistrements effectués.";
+		$msg="$nb_reg enregistrements effectués (".strftime("%d/%m/%Y à %H:%M:%S").").";
 	}
 	else {
-		$msg="ERREUR: $nb_err erreurs lors de l'enregistrement des classes futures,...";
+		$msg="ERREUR: $nb_err erreurs lors de l'enregistrement des classes futures,... (".strftime("%d/%m/%Y à %H:%M:%S").")";
 	}
 	$msg.=$complement_msg;
 }
 
+$style_specifique[]="mod_genese_classes/mod_genese_classes";
 $themessage  = 'Des informations ont été modifiées. Voulez-vous vraiment quitter sans enregistrer ?';
 //**************** EN-TETE *****************
 $titre_page = "Genèse classe: affectation des élèves";
@@ -664,7 +665,7 @@ function change_display(id) {
 		if(mysql_num_rows($res_test)>0) {
 			echo "<input type='checkbox' name='clas_fut[]' id='clas_fut_$cpt' value='$lig->classe' ";
 			if(in_array($lig->classe,$clas_fut)) {echo "checked ";}
-			echo "/><label for='clas_fut_$cpt'>$lig->classe</label><br />\n";
+			echo "/><label for='clas_fut_$cpt'>$lig->classe <span style='font-size:x-small'>(<em>".mysql_num_rows($res_test)."</em>)</span></label><br />\n";
 		}
 		else {
 			echo "_ $lig->classe<br />\n";
@@ -679,7 +680,9 @@ function change_display(id) {
 	$classe_fut[]=""; // Vide pour les Non Affectés
 
 
-	echo "<input type='checkbox' name='clas_fut[]' id='clas_fut_$cpt' value='' /><label for='clas_fut_$cpt'>Non encore affecté</label><br />\n";
+	echo "<input type='checkbox' name='clas_fut[]' id='clas_fut_$cpt' value='' ";
+	if(in_array("",$clas_fut)) {echo "checked ";}
+	echo "/><label for='clas_fut_$cpt'>Non encore affecté</label><br />\n";
 	$cpt++;
 	echo "</td>\n";
 
@@ -859,7 +862,15 @@ function change_display(id) {
 	echo "</ul>\n";
 }
 else {
+
+	// Pour utiliser des listes d'affichage
+	$requete_definie=isset($_POST['requete_definie']) ? $_POST['requete_definie'] : (isset($_GET['requete_definie']) ? $_GET['requete_definie'] : 'n');
+	$id_aff=isset($_POST['id_aff']) ? $_POST['id_aff'] : (isset($_GET['id_aff']) ? $_GET['id_aff'] : NULL);
+	$id_req=isset($_POST['id_req']) ? $_POST['id_req'] : (isset($_GET['id_req']) ? $_GET['id_req'] : NULL);
+
 	echo "<div class='noprint'>\n"; // Debut de l'entête à ne pas imprimer
+
+	echo "<form method=\"post\" action=\"".$_SERVER['PHP_SELF']."\" name=\"form_autre_requete\">\n";
 
 	echo "<p class='bold'><a href='index.php?projet=$projet'";
 	echo " onclick=\"return confirm_abandon (this, change, '$themessage')\"";
@@ -868,37 +879,74 @@ else {
 	echo " | <a href='".$_SERVER['PHP_SELF']."?projet=$projet'";
 	echo " onclick=\"return confirm_abandon (this, change, '$themessage')\"";
 	echo ">Autre sélection</a>";
+
+	$num_requete=0;
+	$indice_requete=0;
+	if(isset($id_aff)) {
+		$sql="SELECT DISTINCT id_req, nom_requete FROM gc_affichages WHERE projet='$projet' AND id_aff='$id_aff' AND nom_requete!='' ORDER BY nom_requete;";
+		$res_req_nommees=mysql_query($sql);
+		if(mysql_num_rows($res_req_nommees)>0) {
+			echo " | <select name='id_req' id='id_req_chg_requete'";
+			//echo " onchange=\"document.forms['form_autre_requete'].submit();\"";
+			echo " onchange=\"confirm_changement_requete(change, '$themessage');\"";
+			echo ">\n";
+			while($lig_req_nommee=mysql_fetch_object($res_req_nommees)) {
+				echo "<option value='".$lig_req_nommee->id_req."'";
+				if((isset($id_req))&&($lig_req_nommee->id_req==$id_req)) {
+					echo " selected='selected'";
+					$indice_requete=$num_requete;
+				}
+				echo ">".$lig_req_nommee->nom_requete."</option>\n";
+				$num_requete++;
+			}
+			echo "</select>\n";
+
+			echo "<input type='hidden' name='projet' value='$projet' />\n";
+			echo "<input type='hidden' name='id_aff' value='$id_aff' />\n";
+			echo "<input type='hidden' name='requete_definie' value='y' />\n";
+			echo "<input type='hidden' name='choix_affich' value='y' />\n";
+			echo "<input type='submit' name='changer_affect_eleves_classes' id='changer_affect_eleves_classes' value='Valider' />\n";
+		}
+	}
+
+	$sql="SELECT DISTINCT login FROM gc_eleves_options WHERE projet='$projet' AND classe_future!='Dep' AND classe_future!='Red' AND (classe_future='');";
+	//echo "$sql<br />";
+	$res_na=mysql_query($sql);
+	if(mysql_num_rows($res_na)>0) {
+		echo " | <a href='".$_SERVER['PHP_SELF']."?projet=$projet&amp;choix_affich=Valider&amp;clas_fut[0]='>Non affectés (<em>".mysql_num_rows($res_na)."</em>)</a>";
+	}
+
 	echo "</p>\n";
+	echo "</form>\n";
+
+	echo "<script type='text/javascript'>
+	if(document.getElementById('changer_affect_eleves_classes')) {
+		document.getElementById('changer_affect_eleves_classes').style.display='none';
+	}
+
+	// Initialisation
+	change='no';
+
+	function confirm_changement_requete(thechange, themessage)
+	{
+		if (!(thechange)) thechange='no';
+		if (thechange != 'yes') {
+			document.forms['form_autre_requete'].submit();
+		}
+		else{
+			var is_confirmed = confirm(themessage);
+			if(is_confirmed){
+				document.forms['form_autre_requete'].submit();
+			}
+			else{
+				document.getElementById('id_req_chg_requete').selectedIndex=$indice_requete;
+			}
+		}
+	}
+</script>\n";
 
 	echo "<h2>Projet $projet</h2>\n";
 
-	//echo "<p style='color:red'>A FAIRE ENCORE: rappeler la requete.</p>\n";
-
-	// Affichage...
-	//Construire la requête SQL et l'afficher
-
-	/*
-	$id_clas_act=isset($_POST['id_clas_act']) ? $_POST['id_clas_act'] : (isset($_GET['id_clas_act']) ? $_GET['id_clas_act'] : array());
-	$clas_fut=isset($_POST['clas_fut']) ? $_POST['clas_fut'] : (isset($_GET['clas_fut']) ? $_GET['clas_fut'] : array());
-	$avec_lv1=isset($_POST['avec_lv1']) ? $_POST['avec_lv1'] : (isset($_GET['avec_lv1']) ? $_GET['avec_lv1'] : array());
-	$sans_lv1=isset($_POST['sans_lv1']) ? $_POST['sans_lv1'] : (isset($_GET['sans_lv1']) ? $_GET['sans_lv1'] : array());
-	$avec_lv2=isset($_POST['avec_lv2']) ? $_POST['avec_lv2'] : (isset($_GET['avec_lv2']) ? $_GET['avec_lv2'] : array());
-	$sans_lv2=isset($_POST['sans_lv2']) ? $_POST['sans_lv2'] : (isset($_GET['sans_lv2']) ? $_GET['sans_lv2'] : array());
-	$avec_lv3=isset($_POST['avec_lv3']) ? $_POST['avec_lv3'] : (isset($_GET['avec_lv3']) ? $_GET['avec_lv3'] : array());
-	$sans_lv3=isset($_POST['sans_lv3']) ? $_POST['sans_lv3'] : (isset($_GET['sans_lv3']) ? $_GET['sans_lv3'] : array());
-	$avec_autre=isset($_POST['avec_autre']) ? $_POST['avec_autre'] : (isset($_GET['avec_autre']) ? $_GET['avec_autre'] : array());
-	$sans_autre=isset($_POST['sans_autre']) ? $_POST['sans_autre'] : (isset($_GET['sans_autre']) ? $_GET['sans_autre'] : array());
-
-	$avec_profil=isset($_POST['avec_profil']) ? $_POST['avec_profil'] : (isset($_GET['avec_profil']) ? $_GET['avec_profil'] : array());
-	$sans_profil=isset($_POST['sans_profil']) ? $_POST['sans_profil'] : (isset($_GET['sans_profil']) ? $_GET['sans_profil'] : array());
-	*/
-
-	//debug_var();
-
-	// Pour utiliser des listes d'affichage
-	$requete_definie=isset($_POST['requete_definie']) ? $_POST['requete_definie'] : (isset($_GET['requete_definie']) ? $_GET['requete_definie'] : 'n');
-	$id_aff=isset($_POST['id_aff']) ? $_POST['id_aff'] : (isset($_GET['id_aff']) ? $_GET['id_aff'] : NULL);
-	$id_req=isset($_POST['id_req']) ? $_POST['id_req'] : (isset($_GET['id_req']) ? $_GET['id_req'] : NULL);
 	if(($requete_definie=='y')&&(isset($id_aff))&&(isset($id_req))) {
 		$sql="SELECT * FROM gc_affichages WHERE projet='$projet' AND id_aff='$id_aff' AND id_req='$id_req' ORDER BY type;";
 		//echo "$sql<br />";
@@ -1101,7 +1149,7 @@ else {
 		$tab_ele[]=$lig_ele->login;
 	}
 
-	echo "<form method=\"post\" action=\"".$_SERVER['PHP_SELF']."\">\n";
+	echo "<form method=\"post\" action=\"".$_SERVER['PHP_SELF']."\" name='form_affect_eleves_classes'>\n";
 
 	if(!isset($nom_requete)) {$nom_requete="";}
 	echo "<p>Nom de la requête&nbsp;: <input type='text' name='nom_requete' value=\"$nom_requete\" ></p>\n";
@@ -1157,7 +1205,7 @@ $_POST['projet']=	4eme_vers_3eme
 			$sql="SELECT opt_exclue FROM gc_options_classes WHERE projet='$projet' AND classe_future='$lig->classe';";
 			$res_opt_exclues=mysql_query($sql);
 			while($lig_opt_exclue=mysql_fetch_object($res_opt_exclues)) {
-				$tab_opt_exclue["$lig->classe"][]=$lig_opt_exclue->opt_exclue;
+				$tab_opt_exclue["$lig->classe"][]=mb_strtoupper($lig_opt_exclue->opt_exclue);
 			}
 			//=========================
 
@@ -1287,11 +1335,28 @@ $_POST['projet']=	4eme_vers_3eme
 	<option value='lv1'>LV1</option>
 	<option value='lv2'>LV2</option>
 	<option value='profil'>Profil</option>
+	<option value='aucune'>Aucune</option>
 	</select>\n";
 	
 	echo "</p>\n";
 
+	if((isset($projet))&&(isset($choix_affich))&&(isset($requete_definie))&&(isset($id_aff))&&(isset($id_req))) {
+		echo "<p><a href='".$_SERVER['PHP_SELF']."?projet=$projet&amp;choix_affich=$choix_affich&amp;requete_definie=$requete_definie&amp;id_aff=$id_aff&amp;id_req=$id_req'";
+		echo " onclick=\"return confirm_abandon (this, change, '$themessage')\"";
+		echo ">Rafraichir sans enregistrer</a></p>\n";
+	}
+	//affect_eleves_classes.php?projet=futures_3emes&choix_affich=Valider&clas_fut[0]=
+	/*
 
+	$_POST['clas_fut']=	Array (*)
+		$_POST[clas_fut]['0']=	
+	$_POST['avec_lv1']=	Array (*)
+		$_POST[avec_lv1]['0']=	ALL1
+	$_POST['projet']=	futures_3emes
+	$_POST['choix_affich']=	Valider
+
+	Nombre de valeurs en POST: 4
+	*/
 
 	$eff_fut_classe_hors_selection=array();
 	$eff_fut_classe_hors_selection_F=array();
@@ -1577,20 +1642,24 @@ $_POST['projet']=	4eme_vers_3eme
 
 				}
 				else {
-		
+
 					//echo "<tr id='tr_eleve_$cpt' class='white_hover'>\n";
-					echo "<tr id='tr_eleve_$cpt' class='white_hover' onmouseover=\"document.getElementById('nom_prenom_eleve_numero_$cpt').style.color='red';\" onmouseout=\"document.getElementById('nom_prenom_eleve_numero_$cpt').style.color='';\">\n";
+					//echo "<tr id='tr_eleve_$cpt' class='white_hover white_survol' onmouseover=\"this.style.backgroundColor='white';\" onmouseout=\"this.style.backgroundColor='';\">\n";
+					//echo "<tr id='tr_eleve_$cpt' class='white_hover' onmouseover=\"document.getElementById('nom_prenom_eleve_numero_$cpt').style.color='red';\" onmouseout=\"document.getElementById('nom_prenom_eleve_numero_$cpt').style.color='';\">\n";
+
+					echo "<tr id='tr_eleve_$cpt' class='white_hover white_survol' onmouseover=\"this.style.backgroundColor='white';\" onmouseout=\"colorise_ligne2($cpt);\">\n";
+
 					echo "<td>\n";
 					echo "<a name='eleve$cpt'></a>\n";
 					if(nom_photo($lig->elenoet)) {
 						echo "<a href='#eleve$cpt' onclick=\"affiche_photo('".nom_photo($lig->elenoet)."','".addslashes(mb_strtoupper($lig->nom)." ".ucfirst(mb_strtolower($lig->prenom)))."');afficher_div('div_photo','y',100,100);return false;\">";
-						echo "<span id='nom_prenom_eleve_numero_$cpt'>";
+						echo "<span id='nom_prenom_eleve_numero_$cpt' class='col_nom_eleve'>";
 						echo mb_strtoupper($lig->nom)." ".ucfirst(mb_strtolower($lig->prenom));
 						echo "</span>";
 						echo "</a>\n";
 					}
 					else {
-						echo "<span id='nom_prenom_eleve_numero_$cpt'>";
+						echo "<span id='nom_prenom_eleve_numero_$cpt' class='col_nom_eleve'>";
 						echo mb_strtoupper($lig->nom)." ".ucfirst(mb_strtolower($lig->prenom));
 						echo "</span>";
 					}
@@ -1598,7 +1667,8 @@ $_POST['projet']=	4eme_vers_3eme
 					echo "</td>\n";
 					echo "<td>";
 					echo "<span style='display:none' id='eleve_sexe_$cpt'>".$lig->sexe."</span>";
-					echo image_sexe($lig->sexe);
+					//echo image_sexe($lig->sexe);
+					echo "<div id='div_sexe_$cpt' onclick=\"affiche_set_sexe($cpt, '$lig->login');changement();return false;\">".image_sexe($lig->sexe)."</div>\n";
 					echo "</td>\n";
 					echo "<td>$classe_actuelle[$j]</td>\n";
 
@@ -1697,12 +1767,12 @@ $_POST['projet']=	4eme_vers_3eme
 
 					//===================================
 					for($i=0;$i<count($classe_fut);$i++) {
-						echo "<td>\n";
+						echo "<td";
 
 						$coche_possible='y';
 						if(($classe_fut[$i]!='Red')&&($classe_fut[$i]!='Dep')&&($classe_fut[$i]!='')) {
 							for($loop=0;$loop<count($tab_ele_opt);$loop++) {
-								if(in_array($tab_ele_opt[$loop],$tab_opt_exclue["$classe_fut[$i]"])) {
+								if(in_array(mb_strtoupper($tab_ele_opt[$loop]),$tab_opt_exclue["$classe_fut[$i]"])) {
 									$coche_possible='n';
 									break;
 								}
@@ -1710,6 +1780,9 @@ $_POST['projet']=	4eme_vers_3eme
 						}
 
 						if($coche_possible=='y') {
+							echo " onclick=\"document.getElementById('classe_fut_".$i."_".$cpt."').checked=true;calcule_effectif('classe_fut',".count($classe_fut).");colorise_ligne('classe_fut',$cpt,$i);changement();\"";
+							echo ">\n";
+
 							echo "<input type='radio' name='classe_fut[$cpt]' id='classe_fut_".$i."_".$cpt."' value='$classe_fut[$i]' ";
 							if($fut_classe==mb_strtoupper($classe_fut[$i])) {
 								echo "checked ";
@@ -1729,6 +1802,7 @@ $_POST['projet']=	4eme_vers_3eme
 							echo "/>\n";
 						}
 						else {
+							echo ">\n";
 							echo "_";
 						}
 
@@ -1736,7 +1810,7 @@ $_POST['projet']=	4eme_vers_3eme
 					}
 		
 					for($i=0;$i<count($lv1);$i++) {
-						echo "<td>\n";
+						echo "<td title='$lv1[$i]'>\n";
 						if(in_array(mb_strtoupper($lv1[$i]),$tab_ele_opt)) {
 							echo "<div style='display:none;'><input type='checkbox' name='lv1[$cpt]' id='lv1_".$i."_".$cpt."' value='$lv1[$i]' checked /></div>\n";
 							echo "<span title='$lv1[$i]'>X</span>";
@@ -1757,7 +1831,7 @@ $_POST['projet']=	4eme_vers_3eme
 		
 		
 					for($i=0;$i<count($lv2);$i++) {
-						echo "<td>\n";
+						echo "<td title='$lv2[$i]'>\n";
 						if(in_array(mb_strtoupper($lv2[$i]),$tab_ele_opt)) {
 							echo "<div style='display:none;'><input type='checkbox' name='lv2[$cpt]' id='lv2_".$i."_".$cpt."' value='$lv2[$i]' checked /></div>\n";
 							echo "<span title='$lv2[$i]'>X</span>";
@@ -1777,7 +1851,7 @@ $_POST['projet']=	4eme_vers_3eme
 		
 		
 					for($i=0;$i<count($lv3);$i++) {
-						echo "<td>\n";
+						echo "<td title='$lv3[$i]'>\n";
 						if(in_array(mb_strtoupper($lv3[$i]),$tab_ele_opt)) {
 							echo "<div style='display:none;'><input type='checkbox' name='lv3[$cpt]' id='lv3_".$i."_".$cpt."' value='$lv3[$i]' checked /></div>\n";
 							echo "<span title='$lv3[$i]'>X</span>";
@@ -1796,7 +1870,7 @@ $_POST['projet']=	4eme_vers_3eme
 					}
 		
 					for($i=0;$i<count($autre_opt);$i++) {
-						echo "<td>\n";
+						echo "<td title='$autre_opt[$i]'>\n";
 						if(in_array(mb_strtoupper($autre_opt[$i]),$tab_ele_opt)) {
 							echo "<div style='display:none;'><input type='checkbox' name='autre_opt[$cpt]' id='autre_opt_".$i."_".$cpt."' value='$autre_opt[$i]' checked /></div>\n";
 							echo "<span title='$autre_opt[$i]'>X</span>";
@@ -1973,7 +2047,18 @@ $_POST['projet']=	4eme_vers_3eme
 	$texte.="</p>\n";
 	$tabdiv_infobulle[]=creer_div_infobulle('div_set_profil',$titre,"",$texte,"",14,0,'y','y','n','n');
 
+	$titre="Sélection du sexe";
+	$texte="<p style='text-align:center;'>";
+	for($loop=0;$loop<count($tab_sexe);$loop++) {
+		if($loop>0) {$texte.=" - ";}
+		$texte.="<a href='#' onclick=\"set_sexe('".$tab_sexe[$loop]."');return false;\">$tab_sexe[$loop]</a>";
+	}
+	$texte.="</p>\n";
+	$tabdiv_infobulle[]=creer_div_infobulle('div_set_sexe',$titre,"",$texte,"",14,0,'y','y','n','n');
+
 	echo "<input type='hidden' name='profil_courant' id='profil_courant' value='-1' />\n";
+	echo "<input type='hidden' name='sexe_courant' id='sexe_courant' value='' />\n";
+	echo "<input type='hidden' name='login_eleve_courant' id='login_eleve_courant' value='' />\n";
 
 	echo "<script type='text/javascript'>
 
@@ -1993,10 +2078,29 @@ $_POST['projet']=	4eme_vers_3eme
 		document.getElementById('div_profil_'+cpt).innerHTML=profil;
 		cacher_div('div_set_profil');
 	}
-	
+
 	function affiche_set_profil(cpt) {
 		document.getElementById('profil_courant').value=cpt;
 		afficher_div('div_set_profil','y',100,100);
+	}
+
+	function set_sexe(sexe) {
+		var cpt=document.getElementById('sexe_courant').value;
+		var login_eleve_courant=document.getElementById('login_eleve_courant').value;
+		//document.getElementById('sexe_'+cpt).value=sexe;
+
+		new Ajax.Updater($('div_sexe_'+cpt),'../eleves/modif_sexe.php?login_eleve='+login_eleve_courant+'&sexe='+sexe+'&mode_retour=image".add_token_in_url(false)."',{method: 'get'});
+
+		document.getElementById('eleve_sexe_'+cpt).innerHTML=sexe;
+
+		calcule_effectif('classe_fut',".count($classe_fut).");
+		cacher_div('div_set_sexe');
+	}
+
+	function affiche_set_sexe(cpt, login) {
+		document.getElementById('sexe_courant').value=cpt;
+		document.getElementById('login_eleve_courant').value=login;
+		afficher_div('div_set_sexe','y',100,100);
 	}
 
 	for(i=0;i<$cpt;i++) {
@@ -2006,6 +2110,61 @@ $_POST['projet']=	4eme_vers_3eme
 			for(m=0;m<couleur_profil.length;m++) {
 				if(document.getElementById('profil_'+i).value==tab_profil[m]) {
 					document.getElementById('div_profil_'+i).style.color=couleur_profil[m];
+				}
+			}
+		}
+	}
+
+
+	function colorise_ligne2(cpt) {
+		// On va coloriser d'après ce qui est sélectionné dans le champ de colorisation.
+		cat=document.forms['form_affect_eleves_classes'].elements['colorisation'].options[document.forms['form_affect_eleves_classes'].elements['colorisation'].selectedIndex].value;
+
+
+		if(cat=='classe_fut') {
+			var n=".count($classe_fut).";
+		}
+		if(cat=='lv1') {
+			var n=".count($lv1).";
+		}
+		if(cat=='lv2') {
+			var n=".count($lv2).";
+		}
+		if(cat=='lv3') {
+			var n=".count($lv3).";
+		}
+		if(cat=='profil') {
+			var n=".count($tab_profil).";
+		}
+
+		for(k=0;k<n;k++) {
+			i=cpt;
+			mode=cat;
+
+			if(mode!='profil') {
+				// Le champ peut ne pas exister pour les classes futures (à cause des options exclues sur certaines classes)
+				if(document.getElementById(mode+'_'+k+'_'+i)) {
+					if(document.getElementById(mode+'_'+k+'_'+i).checked) {
+						if(mode=='classe_fut') {
+							document.getElementById('tr_eleve_'+i).style.backgroundColor=couleur_classe_fut[k];
+						}
+						if(mode=='lv1') {
+							document.getElementById('tr_eleve_'+i).style.backgroundColor=couleur_lv1[k];
+						}
+						if(mode=='lv2') {
+							document.getElementById('tr_eleve_'+i).style.backgroundColor=couleur_lv2[k];
+						}
+						if(mode=='lv3') {
+							document.getElementById('tr_eleve_'+i).style.backgroundColor=couleur_lv3[k];
+						}
+					}
+				}
+			}
+			else {
+				for(m=0;m<couleur_profil.length;m++) {
+					if(document.getElementById('profil_'+i).value==tab_profil[m]) {
+						document.getElementById('tr_eleve_'+i).style.backgroundColor=couleur_profil[m];
+					}
 				}
 			}
 		}
@@ -2092,21 +2251,26 @@ echo "
 		for(k=0;k<n;k++) {
 			for(i=0;i<$cpt;i++) {
 				if(mode!='profil') {
-					if(document.getElementById(mode+'_'+k+'_'+i)) {
-						if(document.getElementById(mode+'_'+k+'_'+i).checked) {
-							if(mode=='classe_fut') {
-								document.getElementById('tr_eleve_'+i).style.backgroundColor=couleur_classe_fut[k];
-							}
-							if(mode=='lv1') {
-								document.getElementById('tr_eleve_'+i).style.backgroundColor=couleur_lv1[k];
-							}
-							if(mode=='lv2') {
-								document.getElementById('tr_eleve_'+i).style.backgroundColor=couleur_lv2[k];
-							}
-							if(mode=='lv3') {
-								document.getElementById('tr_eleve_'+i).style.backgroundColor=couleur_lv3[k];
+					if(mode!='aucune') {
+						if(document.getElementById(mode+'_'+k+'_'+i)) {
+							if(document.getElementById(mode+'_'+k+'_'+i).checked) {
+								if(mode=='classe_fut') {
+									document.getElementById('tr_eleve_'+i).style.backgroundColor=couleur_classe_fut[k];
+								}
+								if(mode=='lv1') {
+									document.getElementById('tr_eleve_'+i).style.backgroundColor=couleur_lv1[k];
+								}
+								if(mode=='lv2') {
+									document.getElementById('tr_eleve_'+i).style.backgroundColor=couleur_lv2[k];
+								}
+								if(mode=='lv3') {
+									document.getElementById('tr_eleve_'+i).style.backgroundColor=couleur_lv3[k];
+								}
 							}
 						}
+					}
+					else {
+						document.getElementById('tr_eleve_'+i).style.backgroundColor='white';
 					}
 				}
 				else {
@@ -2125,8 +2289,8 @@ echo "
 	function colorise_ligne(cat,cpt,i) {
 		// On ne traite qu'une ligne contrairement à colorise()
 		//alert('couleur_classe_fut[0]='+couleur_classe_fut[0]);
-		//alert(document.forms[0].elements['colorisation'].options[document.forms[0].elements['colorisation'].selectedIndex].value);
-		if(document.forms[0].elements['colorisation'].options[document.forms[0].elements['colorisation'].selectedIndex].value==cat) {
+		//alert(document.forms['form_affect_eleves_classes'].elements['colorisation'].options[document.forms['form_affect_eleves_classes'].elements['colorisation'].selectedIndex].value);
+		if(document.forms['form_affect_eleves_classes'].elements['colorisation'].options[document.forms['form_affect_eleves_classes'].elements['colorisation'].selectedIndex].value==cat) {
 			if(cat=='classe_fut') {
 				//alert(cat);
 				//alert(i);
@@ -2149,7 +2313,7 @@ echo "
 	}
 	
 	function lance_colorisation() {
-		cat=document.forms[0].elements['colorisation'].options[document.forms[0].elements['colorisation'].selectedIndex].value;
+		cat=document.forms['form_affect_eleves_classes'].elements['colorisation'].options[document.forms['form_affect_eleves_classes'].elements['colorisation'].selectedIndex].value;
 		//alert(cat);
 		if(cat=='classe_fut') {
 			colorise(cat,".count($classe_fut).");
@@ -2166,6 +2330,10 @@ echo "
 		if(cat=='profil') {
 			colorise(cat,".count($tab_profil).");
 		}
+		if(cat=='aucune') {
+			// Il faut au moins 1 pour faire un tour dans colorise()
+			colorise(cat,1);
+		}
 	}
 
 	function modif_colonne(col,mode) {
@@ -2175,7 +2343,7 @@ echo "
 			}
 		}
 	
-		cat=document.forms[0].elements['colorisation'].options[document.forms[0].elements['colorisation'].selectedIndex].value;
+		cat=document.forms['form_affect_eleves_classes'].elements['colorisation'].options[document.forms['form_affect_eleves_classes'].elements['colorisation'].selectedIndex].value;
 		if(col.substr(0,cat.length)==cat) {lance_colorisation();}
 
 		// Lancer un recalcul des effectifs

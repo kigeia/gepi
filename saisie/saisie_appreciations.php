@@ -1,7 +1,7 @@
 <?php
 /*
 *
-* Copyright 2001, 2012 Thomas Belliard, Laurent Delineau, Edouard Hue, Eric Lebrun
+* Copyright 2001, 2013 Thomas Belliard, Laurent Delineau, Edouard Hue, Eric Lebrun
 *
 * This file is part of GEPI.
 *
@@ -305,7 +305,7 @@ elseif((isset($_POST['correction_login_eleve']))&&(isset($_POST['correction_peri
 								if (!$register) {$msg = $msg."Erreur lors de l'enregistrement des corrections pour $correction_nom_prenom_eleve sur la période $correction_periode.<br />";} 
 								else {
 									$msg.="Enregistrement de la proposition de correction pour $correction_nom_prenom_eleve sur la période $correction_periode effectué.<br />";
-									$texte_mail.="Une correction proposée a été mise à jour par ".casse_mot($_SESSION['prenom'],'majf2')." ".casse_mot($_SESSION['nom'],'maj')."\r\npour l'élève ".$correction_nom_prenom_eleve." sur la période $correction_periode\r\nen ".$current_group['name']." (".$current_group["description"]." en ".$current_group["classlist_string"].").\n";
+									$texte_mail.="Une correction proposée a été mise à jour par ".casse_mot($_SESSION['prenom'],'majf2')." ".casse_mot($_SESSION['nom'],'maj')."\r\npour l'élève ".$correction_nom_prenom_eleve." sur la période $correction_periode\r\nen ".$current_group['name']." (".$current_group["description"]." en ".$current_group["classlist_string"].").\r\n\r\nVous pouvez valider ou rejeter la proposition en vous connectant avec un compte de statut scolarité ou secours.\r\nVous trouverez en page d'accueil, dans la rubrique Saisie, un message en rouge concernant la Correction de bulletins.\r\n";
 								}
 							} else {
 								$sql="DELETE FROM matieres_app_corrections WHERE (login='$correction_login_eleve' AND id_groupe='$id_groupe' AND periode='$correction_periode');";
@@ -325,7 +325,7 @@ elseif((isset($_POST['correction_login_eleve']))&&(isset($_POST['correction_peri
 								if (!$register) {$msg = $msg."Erreur lors de l'enregistrement de la proposition de correction pour $correction_nom_prenom_eleve sur la période $correction_periode.<br />";}
 								else {
 									$msg.="Enregistrement de la proposition de correction pour $correction_nom_prenom_eleve sur la période $correction_periode effectué.<br />";
-									$texte_mail.="Une correction a été proposée par ".casse_mot($_SESSION['prenom'],'majf2')." ".casse_mot($_SESSION['nom'],'maj')."\r\npour l'élève $correction_nom_prenom_eleve sur la période $correction_periode\r\nen ".$current_group['name']." (".$current_group["description"]." en ".$current_group["classlist_string"].").\n";
+									$texte_mail.="Une correction a été proposée par ".casse_mot($_SESSION['prenom'],'majf2')." ".casse_mot($_SESSION['nom'],'maj')."\r\npour l'élève $correction_nom_prenom_eleve sur la période $correction_periode\r\nen ".$current_group['name']." (".$current_group["description"]." en ".$current_group["classlist_string"].").\r\n\r\nVous pouvez valider ou rejeter la proposition en vous connectant avec un compte de statut scolarité ou secours.\r\nVous trouverez en page d'accueil, dans la rubrique Saisie, un message en rouge concernant la Correction de bulletins.\r\n";
 								}
 							}
 						}
@@ -339,7 +339,19 @@ elseif((isset($_POST['correction_login_eleve']))&&(isset($_POST['correction_peri
 				
 							if($envoi_mail_actif=='y') {
 								$email_destinataires="";
-								$sql="select email from utilisateurs where statut='secours' AND email!='';";
+
+								$sql="SELECT id_classe FROM j_eleves_classes WHERE (login='$correction_login_eleve' AND periode='$correction_periode');";
+								$req=mysql_query($sql);
+								if(mysql_num_rows($req)>0) {
+									$correction_id_classe=mysql_result($req,0,"id_classe");
+									$sql="(SELECT DISTINCT email FROM utilisateurs WHERE statut='secours' AND email!='')
+									UNION (SELECT DISTINCT email FROM utilisateurs u, j_scol_classes jsc WHERE u.login=jsc.login AND id_classe='$correction_id_classe');";
+								}
+								else {
+									//$sql="select email from utilisateurs where statut='secours' AND email!='';";
+									$sql="select email from utilisateurs where (statut='secours' OR statut='scolarite') AND email!='';";
+								}
+								//echo "$sql<br />";
 								$req=mysql_query($sql);
 								if(mysql_num_rows($req)>0) {
 									$lig_u=mysql_fetch_object($req);
@@ -369,10 +381,7 @@ elseif((isset($_POST['correction_login_eleve']))&&(isset($_POST['correction_peri
 										while($lig_u=mysql_fetch_object($req)) {$email_autres_profs_grp.=",".$lig_u->email;}
 									}
 				
-									$sujet_mail="[GEPI] Demande de validation de correction d'appréciation";
-					
-									$gepiPrefixeSujetMail=getSettingValue("gepiPrefixeSujetMail") ? getSettingValue("gepiPrefixeSujetMail") : "";
-									if($gepiPrefixeSujetMail!='') {$gepiPrefixeSujetMail.=" ";}
+									$sujet_mail="Demande de validation de correction d'appréciation";
 						
 									$ajout_header="";
 									if($email_declarant!="") {
@@ -393,7 +402,10 @@ elseif((isset($_POST['correction_login_eleve']))&&(isset($_POST['correction_peri
 		
 									$envoi = envoi_mail($sujet_mail, $texte_mail, $email_destinataires, $ajout_header);
 								}
-							}	
+								else {
+									$msg.="Aucun compte scolarité avec adresse mail n'est associé à cet(te) élève.<br />Pas de compte secours avec adresse mail non plus.<br />La correction a été soumise, mais elle n'a pas fait l'objet d'un envoi de mail.<br />";
+								}
+							}
 						}
 					}
 				}
@@ -474,7 +486,7 @@ elseif((isset($_POST['correction_periode']))&&(isset($_POST['no_anti_inject_corr
 						if (!$register) {$msg = $msg."Erreur lors de l'enregistrement des corrections pour $correction_nom_prenom_eleve sur la période $correction_periode.<br />";} 
 						else {
 							$msg.="Enregistrement de la proposition de correction pour l'appréciation de groupe sur la période $correction_periode effectué.<br />";
-							$texte_mail.="Une correction proposée a été mise à jour par ".casse_mot($_SESSION['prenom'],'majf2')." ".casse_mot($_SESSION['nom'],'maj')."\r\npour l'appréciation de groupe sur la période $correction_periode\r\nen ".$current_group['name']." (".$current_group["description"]." en ".$current_group["classlist_string"].").\n";
+							$texte_mail.="Une correction proposée a été mise à jour par ".casse_mot($_SESSION['prenom'],'majf2')." ".casse_mot($_SESSION['nom'],'maj')."\r\npour l'appréciation de groupe sur la période $correction_periode\r\nen ".$current_group['name']." (".$current_group["description"]." en ".$current_group["classlist_string"].").\r\n\r\nVous pouvez valider ou rejeter la proposition en vous connectant avec un compte de statut scolarité ou secours.\r\nVous trouverez en page d'accueil, dans la rubrique Saisie, un message en rouge concernant la Correction de bulletins.\r\n";
 						}
 					} else {
 						$sql="DELETE FROM matieres_app_corrections WHERE (login='' AND id_groupe='$id_groupe' AND periode='$correction_periode');";
@@ -482,7 +494,7 @@ elseif((isset($_POST['correction_periode']))&&(isset($_POST['no_anti_inject_corr
 						if (!$register) {$msg = $msg."Erreur lors de la suppression de la proposition de correction pour l'appréciation de groupe sur la période $correction_periode.<br />";} 
 						else {
 							$msg.="Suppression de la proposition de correction pour l'appréciation de groupe sur la période $correction_periode effectuée.<br />";
-							$texte_mail.="Suppression de la proposition de correction pour l'appréciation de groupe\r\nsur la période $correction_periode en ".$current_group['name']." (".$current_group["description"]." en ".$current_group["classlist_string"].")\r\npar ".casse_mot($_SESSION['prenom'],'majf2')." ".casse_mot($_SESSION['nom'],'maj').".\n";
+							$texte_mail.="Suppression de la proposition de correction pour l'appréciation de groupe\r\nsur la période $correction_periode en ".$current_group['name']." (".$current_group["description"]." en ".$current_group["classlist_string"].")\r\npar ".casse_mot($_SESSION['prenom'],'majf2')." ".casse_mot($_SESSION['nom'],'maj').".\r\n";
 						}
 					}
 		
@@ -494,7 +506,7 @@ elseif((isset($_POST['correction_periode']))&&(isset($_POST['no_anti_inject_corr
 						if (!$register) {$msg = $msg."Erreur lors de l'enregistrement de la proposition de correction pour l'appréciation de groupe sur la période $correction_periode.<br />";}
 						else {
 							$msg.="Enregistrement de la proposition de correction pour l'appréciation de groupe sur la période $correction_periode effectué.<br />";
-							$texte_mail.="Une correction a été proposée par ".casse_mot($_SESSION['prenom'],'majf2')." ".casse_mot($_SESSION['nom'],'maj')."\r\npour l'appréciation de groupe sur la période $correction_periode\r\nen ".$current_group['name']." (".$current_group["description"]." en ".$current_group["classlist_string"].").\n";
+							$texte_mail.="Une correction a été proposée par ".casse_mot($_SESSION['prenom'],'majf2')." ".casse_mot($_SESSION['nom'],'maj')."\r\npour l'appréciation de groupe sur la période $correction_periode\r\nen ".$current_group['name']." (".$current_group["description"]." en ".$current_group["classlist_string"].").\r\n\r\nVous pouvez valider ou rejeter la proposition en vous connectant avec un compte de statut scolarité ou secours.\r\nVous trouverez en page d'accueil, dans la rubrique Saisie, un message en rouge concernant la Correction de bulletins.\r\n";
 						}
 					}
 				}
@@ -541,11 +553,8 @@ elseif((isset($_POST['correction_periode']))&&(isset($_POST['no_anti_inject_corr
 								while($lig_u=mysql_fetch_object($req)) {$email_autres_profs_grp.=",".$lig_u->email;}
 							}
 		
-							$sujet_mail="[GEPI] Demande de validation de correction d'appréciation";
-			
-							$gepiPrefixeSujetMail=getSettingValue("gepiPrefixeSujetMail") ? getSettingValue("gepiPrefixeSujetMail") : "";
-							if($gepiPrefixeSujetMail!='') {$gepiPrefixeSujetMail.=" ";}
-				
+							$sujet_mail="Demande de validation de correction d'appréciation";
+
 							$ajout_header="";
 							if($email_declarant!="") {
 								$ajout_header.="Cc: $nom_declarant <".$email_declarant.">";
@@ -595,6 +604,34 @@ change = 'no';
 <?php
 
 $matiere_nom = $current_group["matiere"]["nom_complet"];
+
+
+$proposer_liens_enregistrement="n";
+$i=1;
+while ($i < $nb_periode) {
+	if($_SESSION['statut']=='professeur') {
+		if($current_group["classe"]["ver_periode"]["all"][$i] > 1) {
+			// 0 : Toutes les classes sont closes
+			// 1 : Toutes les classes sont partiellement closes
+			// 2 : Au moins une classe est ouverte
+			// 3 : Toutes les classes sont ouvertes
+			$proposer_liens_enregistrement="y";
+			break;
+		}
+	}
+	elseif($_SESSION['statut']=='secours') {
+		if($current_group["classe"]["ver_periode"]["all"][$i] > 0) {
+			// 0 : Toutes les classes sont closes
+			// 1 : Toutes les classes sont partiellement closes
+			// 2 : Au moins une classe est ouverte
+			// 3 : Toutes les classes sont ouvertes
+			$proposer_liens_enregistrement="y";
+			break;
+		}
+	}
+	$i++;
+}
+
 
 echo "<form enctype=\"multipart/form-data\" action=\"saisie_appreciations.php\" name='form1' method=\"post\">\n";
 
@@ -742,37 +779,40 @@ $saisie_app_nb_cols_textarea=getPref($_SESSION["login"],'saisie_app_nb_cols_text
 echo add_token_field(true);
 
 //=========================
-// AJOUT: boireaus 20090126
-$insert_mass_appreciation_type=getSettingValue("insert_mass_appreciation_type");
-if ($insert_mass_appreciation_type=="y") {
-	// INSERT INTO setting SET name='insert_mass_appreciation_type', value='y';
+if($proposer_liens_enregistrement=="y") {
+	$insert_mass_appreciation_type=getSettingValue("insert_mass_appreciation_type");
+	if ($insert_mass_appreciation_type=="y") {
+		// INSERT INTO setting SET name='insert_mass_appreciation_type', value='y';
 
-	$sql="CREATE TABLE IF NOT EXISTS b_droits_divers (login varchar(50) NOT NULL default '', nom_droit varchar(50) NOT NULL default '', valeur_droit varchar(50) NOT NULL default '') ENGINE=MyISAM CHARACTER SET utf8 COLLATE utf8_general_ci;";
-	$create_table=mysql_query($sql);
+		$sql="CREATE TABLE IF NOT EXISTS b_droits_divers (login varchar(50) NOT NULL default '', nom_droit varchar(50) NOT NULL default '', valeur_droit varchar(50) NOT NULL default '') ENGINE=MyISAM CHARACTER SET utf8 COLLATE utf8_general_ci;";
+		$create_table=mysql_query($sql);
 
-	// Pour tester:
-	// INSERT INTO b_droits_divers SET login='toto', nom_droit='insert_mass_appreciation_type', valeur_droit='y';
+		// Pour tester:
+		// INSERT INTO b_droits_divers SET login='toto', nom_droit='insert_mass_appreciation_type', valeur_droit='y';
 
-	$sql="SELECT 1=1 FROM b_droits_divers WHERE login='".$_SESSION['login']."' AND nom_droit='insert_mass_appreciation_type' AND valeur_droit='y';";
-	$res_droit=mysql_query($sql);
-	if(mysql_num_rows($res_droit)>0) {
-		$droit_insert_mass_appreciation_type="y";
-	}
-	else {
-		$droit_insert_mass_appreciation_type="n";
-	}
+		$sql="SELECT 1=1 FROM b_droits_divers WHERE login='".$_SESSION['login']."' AND nom_droit='insert_mass_appreciation_type' AND valeur_droit='y';";
+		$res_droit=mysql_query($sql);
+		if(mysql_num_rows($res_droit)>0) {
+			$droit_insert_mass_appreciation_type="y";
+		}
+		else {
+			$droit_insert_mass_appreciation_type="n";
+		}
 
-	if($droit_insert_mass_appreciation_type=="y") {
-		echo "<div style='float:right; width:150px; border: 1px solid black; background-color: white; font-size: small; text-align:center;'>\n";
-		echo "Insérer l'appréciation-type suivante pour toutes les appréciations vides: ";
-		echo "<input type='text' name='ajout_a_textarea_vide' id='ajout_a_textarea_vide' value='-' size='10' /><br />\n";
-		echo "<input type='button' name='ajouter_a_textarea_vide' value='Ajouter' onclick='ajoute_a_textarea_vide()' /><br />\n";
-		echo "</div>\n";
+		if($droit_insert_mass_appreciation_type=="y") {
+			echo "<div style='float:right; width:150px; border: 1px solid black; background-color: white; font-size: small; text-align:center;'>\n";
+			echo "Insérer l'appréciation-type suivante pour toutes les appréciations vides: ";
+			echo "<input type='text' name='ajout_a_textarea_vide' id='ajout_a_textarea_vide' value='-' size='10' /><br />\n";
+			echo "<input type='button' name='ajouter_a_textarea_vide' value='Ajouter' onclick='ajoute_a_textarea_vide()' /><br />\n";
+			echo "</div>\n";
+		}
 	}
 }
 //=========================
 
-echo "<p align='center'><input type='submit' value='Enregistrer' /></p>\n";
+if($proposer_liens_enregistrement=="y") {
+	echo "<p align='center'><input type='submit' value='Enregistrer' /></p>\n";
+}
 
 //===========================================================
 echo "<div id='div_photo_eleve' class='infobulle_corps' style='position: fixed; top: 220px; right: 20px; text-align:center; border:1px solid black; display:none;'></div>\n";
@@ -800,7 +840,9 @@ echo "</div>\n";
 
 echo "<h2 class='gepi'>Bulletin scolaire - Saisie des appréciations</h2>\n";
 
-echo "<p>Vous pouvez faire apparaître dans votre appréciation la liste des notes de l'élève pour la période en insérant la chaine de caractères <b>@@Notes</b><br />(<i>les notes apparaîtront alors lors de la visualisation/impression du bulletin</i>)<br />Insérer d'un clic @@Notes <a href=\"javascript:inserer_notes_dans_app('debut');changement()\">au début</a> ou <a href=\"javascript:inserer_notes_dans_app('fin');changement()\">à la fin</a> de toutes les appréciations.</p>\n";
+if($proposer_liens_enregistrement=="y") {
+	echo "<p>Vous pouvez faire apparaître dans votre appréciation la liste des notes de l'élève pour la période en insérant la chaine de caractères <b>@@Notes</b><br />(<i>les notes apparaîtront alors lors de la visualisation/impression du bulletin</i>)<br />Insérer d'un clic @@Notes <a href=\"javascript:inserer_notes_dans_app('debut');changement()\">au début</a> ou <a href=\"javascript:inserer_notes_dans_app('fin');changement()\">à la fin</a> de toutes les appréciations.</p>\n";
+}
 
 //echo "<p><b>Groupe : " . $current_group["description"] ." | Matière : $matiere_nom</b></p>\n";
 echo "<p><b>Groupe : " . htmlspecialchars($current_group["description"]) ." (".$current_group["classlist_string"].")</b></p>\n";
@@ -1033,8 +1075,33 @@ echo "<tr>\n";
 echo "<th width=\"200\"><div align=\"center\">&nbsp;</div></th>\n";
 echo "<th width=\"30\"><div align=\"center\"><b>Moy.</b></div></th>\n";
 echo "<th>\n";
-echo "<div style='float:right; width:16;'><a href='javascript:affichage_div_photo();'><img src='../images/icons/wizard.png' width='16' height='16' alt='Afficher les quartiles et éventuellement la photo élève' title='Afficher la photo élève pendant la saisie' /></a></div>\n";
+
+echo "<div style='float:right; width:16px;'><a href='javascript:affichage_div_photo();'><img src='../images/icons/wizard.png' width='16' height='16' alt='Afficher les quartiles et éventuellement la photo élève' title='Afficher la photo élève pendant la saisie' /></a></div>\n";
+
+
+if(getSettingAOui('GepiAccesBulletinSimpleClasseEleve')) {
+	echo "<div style='float:right; width:16px;margin-right:5px;'><img src='../images/icons/trombinoscope.png' width='16' height='16' title=\"L'appréciation sur le groupe-classe est visible des élèves\" alt=\"Appréciation sur le groupe-classe visible des élèves\" /></div>\n";
+}
+if(getSettingAOui('GepiAccesBulletinSimpleClasseResp')) {
+	echo "<div style='float:right; width:16px;margin-right:5px;'><img src='../images/group16.png' width='16' height='16' title=\"L'appréciation sur le groupe-classe est visible des parents\" /></div>\n";
+}
+
 echo "<div align=\"center\"><b>Appréciation sur le groupe/classe</b>\n";
+
+//===============================================
+$tabdiv_infobulle[]=creer_div_infobulle('div_explication_cnil',"Saisies et CNIL","",$message_cnil_bons_usages,"",30,0,'y','y','n','n');
+// Paramètres concernant le délais avant affichage d'une infobulle via delais_afficher_div()
+// Hauteur de la bande testée pour la position de la souris:
+$hauteur_survol_infobulle=20;
+// Largeur de la bande testée pour la position de la souris:
+$largeur_survol_infobulle=100;
+// Délais en ms avant affichage:
+$delais_affichage_infobulle=500;
+//===============================================
+
+// 20121101: Mettre une infobulle CNIL
+echo " <a href='#' onclick=\"afficher_div('div_explication_cnil','y',10,-40);return false;\" onmouseover=\"delais_afficher_div('div_explication_cnil','y',10,-40, $delais_affichage_infobulle, $largeur_survol_infobulle, $hauteur_survol_infobulle);\"><img src='../images/info.png' width='20' height='20' title='CNIL : Règles de bon usage' /></a>";
+
 echo "</div></th>\n";
 echo "</tr>\n";
 //=================================================
@@ -1046,9 +1113,9 @@ $alt=1;
 while ($k < $nb_periode) {
 	$alt=$alt*(-1);
 	if ($current_group["classe"]["ver_periode"]["all"][$k] == 0) {
-		echo "<tr class='lig$alt'><td><span title=\"$gepiClosedPeriodLabel\">$nom_periode[$k]</span></td>\n";
+		echo "<tr class='lig$alt'><td><span title=\"$gepiClosedPeriodLabel\">$nom_periode[$k]</span><span id='span_repartition_notes_$k'></span></td>\n";
 	} else {
-		echo "<tr class='lig$alt'><td>$nom_periode[$k]</td>\n";
+		echo "<tr class='lig$alt'><td>$nom_periode[$k]<span id='span_repartition_notes_$k'></span></td>\n";
 	}
 	echo $mess[$k];
 	$k++;
@@ -1077,6 +1144,47 @@ if($_SESSION['statut']=="secours") {
 */
 //=================================
 
+//=================================
+// 20121118
+$date_du_jour=strftime("%d/%m/%Y");
+// Si les parents ont accès aux bulletins ou graphes,... on va afficher un témoin
+$tab_acces_app_classe=array();
+foreach($current_group["classes"]["list"] as $key => $value) {
+	// L'accès est donné à la même date pour parents et responsables.
+	// On teste seulement pour les parents
+	$date_ouverture_acces_app_classe=array();
+	$tab_acces_app_classe[$value]=acces_appreciations(1, count($current_group["periodes"]), $value, 'responsable');
+}
+
+
+$acces_app_ele_resp=getSettingValue('acces_app_ele_resp');
+if($acces_app_ele_resp=='manuel') {
+	$msg_acces_app_ele_resp="Les appréciations seront visibles après une intervention manuelle d'un compte de statut 'scolarité'.";
+}
+elseif($acces_app_ele_resp=='date') {
+	$chaine_date_ouverture_acces_app_classe="";
+	for($loop=0;$loop<count($date_ouverture_acces_app_classe);$loop++) {
+		if($loop>0) {
+			$chaine_date_ouverture_acces_app_classe.=", ";
+		}
+		$chaine_date_ouverture_acces_app_classe.=$date_ouverture_acces_app_classe[$loop];
+	}
+	if($chaine_date_ouverture_acces_app_classe=="") {$chaine_date_ouverture_acces_app_classe="Aucune date n'est encore précisée.
+Peut-être devriez-vous en poser la question à l'administration de l'établissement.";}
+	$msg_acces_app_ele_resp="Les appréciations seront visibles soit à une date donnée (".$chaine_date_ouverture_acces_app_classe.").";
+}
+elseif($acces_app_ele_resp=='periode_close') {
+	$delais_apres_cloture=getSettingValue('delais_apres_cloture');
+	$msg_acces_app_ele_resp="Les appréciations seront visibles ".$delais_apres_cloture." jour(s) après la clôture de la période.";
+}
+else{
+	$msg_acces_app_ele_resp="???";
+}
+//=================================
+
+// Tableau des notes pour chaque période
+$tab_per_notes=array();
+
 $prev_classe = null;
 //=========================
 // Compteur pour les élèves
@@ -1102,6 +1210,7 @@ foreach ($liste_eleves as $eleve_login) {
 			//
 			$eleve_nom = $current_group["eleves"][$k]["users"][$eleve_login]["nom"];
 			$eleve_prenom = $current_group["eleves"][$k]["users"][$eleve_login]["prenom"];
+			$eleve_sexe = $current_group["eleves"][$k]["users"][$eleve_login]["sexe"];
 			$eleve_classe = $current_group["classes"]["classes"][$current_group["eleves"]["all"]["users"][$eleve_login]["classe"]]["classe"];
 			$eleve_id_classe = $current_group["classes"]["classes"][$current_group["eleves"][$k]["users"][$eleve_login]["classe"]]["id"];
 
@@ -1218,6 +1327,7 @@ foreach ($liste_eleves as $eleve_login) {
 			} else {
 				if ($eleve_note != '') {
 					$note .= $eleve_note;
+					$tab_per_notes[$k][]=$eleve_note;
 				} else {
 					$note .= "&nbsp;";
 				}
@@ -1322,17 +1432,17 @@ foreach ($liste_eleves as $eleve_login) {
 						}
 
 						if($conteneur_precedent!=$snnote['nom_court_conteneur']) {
-							$liste_notes_detaillees.="<p><b>".$snnote['nom_court_conteneur']."&nbsp;:</b> <br />";
+							$liste_notes_detaillees.="<p><strong>".$snnote['nom_court_conteneur']."&nbsp;:</strong> <br />";
 							$conteneur_precedent=$snnote['nom_court_conteneur'];
 						}
 
 						//if ($liste_notes_detaillees!='') {$liste_notes_detaillees.=", ";}
 						$liste_notes_detaillees.=$snnote['nom_court']."&nbsp;: ";
-						$liste_notes_detaillees.=$snnote['note'];
+						$liste_notes_detaillees.="<strong>".$snnote['note'];
 						if(getSettingValue("note_autre_que_sur_referentiel")=="V" || $snnote['note_sur']!=getSettingValue("referentiel_note")) {
 							$liste_notes_detaillees.= "/".$snnote['note_sur'];
 						}
-						$liste_notes_detaillees.=" (coef&nbsp;".$snnote['coef'].")";
+						$liste_notes_detaillees.="</strong> (coef&nbsp;".$snnote['coef'].")";
 						$liste_notes_detaillees.=" (".formate_date($snnote['date']).")<br />";
 					}
 				}
@@ -1351,7 +1461,7 @@ foreach ($liste_eleves as $eleve_login) {
 					$tabdiv_infobulle[]=creer_div_infobulle('notes_'.$eleve_login.'_'.$k,$titre,"",$texte,"",30,0,'y','y','n','n');
 
 					$mess[$k].="<a name='".$eleve_login."_".$k."'></a>";
-					$mess[$k].="<a href='#".$eleve_login."_".$k."' onclick=\"afficher_div('notes_".$eleve_login."_".$k."','y',-100,-10);return false;\">";
+					$mess[$k].="<a href='#".$eleve_login."_".$k."' onclick=\"fermer_div_notes();afficher_div('notes_".$eleve_login."_".$k."','y',-100,-10);return false;\" title=\"Afficher le détail des notes\">";
 					$mess[$k].=$liste_notes;
 					$mess[$k].="</a>";
 				}
@@ -1370,7 +1480,8 @@ foreach ($liste_eleves as $eleve_login) {
 
 				$mess[$k].="<textarea id=\"n".$k.$num_id."\" class='wrap' onKeyDown=\"clavier(this.id,event);\" name=\"no_anti_inject_app_eleve_".$k."_".$i."\" rows='2' cols='$saisie_app_nb_cols_textarea' onchange=\"changement();";
 				$mess[$k].="ajaxAppreciations('".$eleve_login_t[$k]."', '".$id_groupe."', 'n".$k.$num_id."');";
-				$mess[$k].="ajaxVerifAppreciations('".$eleve_login_t[$k]."', '".$id_groupe."', 'n".$k.$num_id."');";
+				// La vérification de fautes de frappe est maintenant faite dans la même requête ajax
+				//$mess[$k].="ajaxVerifAppreciations('".$eleve_login_t[$k]."', '".$id_groupe."', 'n".$k.$num_id."');";
 				$chaine_test_vocabulaire.="ajaxVerifAppreciations('".$eleve_login_t[$k]."', '".$id_groupe."', 'n".$k.$num_id."');\n";
 				$mess[$k].="\"";
 
@@ -1380,6 +1491,7 @@ foreach ($liste_eleves as $eleve_login) {
 				// MODIF: boireaus 20080520
 				//$mess[$k].=" onfocus=\"focus_suivant(".$k.$num_id.");\"";
 				$mess[$k].=" onfocus=\"focus_suivant(".$k.$num_id.");document.getElementById('focus_courant').value='".$k.$num_id."';";
+				$mess[$k].="repositionner_commtype(); afficher_positionner_div_notes('notes_".$eleve_login."_".$k."');";
 				//================================================
 				if(getSettingValue("gepi_pmv")!="n"){
 					$sql="SELECT elenoet FROM eleves WHERE login='".$eleve_login."';";
@@ -1422,7 +1534,7 @@ foreach ($liste_eleves as $eleve_login) {
 			// si l'élève n'appartient pas au groupe pour cette période.
 			//
 			$suit_option[$k] = 'no';
-			$mess[$k] = "<td>&nbsp;</td><td><p class='small'>non suivie</p></td>\n";
+			$mess[$k] = "<td>&nbsp;</td><td><p class='small' title=\"Enseignement non suivi sur cette période.\">non suivi</p></td>\n";
 		}
 		$k++;
 	}
@@ -1455,6 +1567,7 @@ foreach ($liste_eleves as $eleve_login) {
 		echo "</tr>\n";
 		*/
 
+		echo "<a name='saisie_app_$eleve_login'></a>";
 		echo "<table width=\"750\" class='boireaus' cellspacing=\"2\" cellpadding=\"5\" summary=\"Tableau de $eleve_nom $eleve_prenom\">\n";
 		echo "<tr>\n";
 		//echo "<th width=\"200\">\n";
@@ -1490,7 +1603,7 @@ foreach ($liste_eleves as $eleve_login) {
 		echo "<th width=\"30\"><div align=\"center\"><b>Moy.</b></div></th>\n";
 		echo "<th>\n";
 
-		echo "<div align=\"center\"><b>$eleve_nom $eleve_prenom</b>\n";
+		echo "<div align=\"center\"><b><a href='../eleves/visu_eleve.php?ele_login=$eleve_login' target='_blank' title=\"Voir (dans un nouvel onglet) la fiche élève avec les onglets Élève, Enseignements, Bulletins, CDT, Absences,...\">$eleve_nom $eleve_prenom</a></b>\n";
 
 		//==========================
 		// AJOUT: boireaus 20071115
@@ -1498,9 +1611,17 @@ foreach ($liste_eleves as $eleve_login) {
 		if($temoin_photo=="y"){
 			//echo " <a href='#' onmouseover=\"afficher_div('photo_$eleve_login','y',-100,20);\"";
 			echo " <a href='#' onmouseover=\"delais_afficher_div('photo_$eleve_login','y',-100,20,1000,10,10);\"";
-			echo " onclick=\"afficher_div('photo_$eleve_login','y',-100,20); return false;\"";
+			echo " onclick=\"afficher_div('photo_$eleve_login','y',-100,20); return false;\" title=\"Afficher la photo de l'élève.\"";
 			echo ">";
-			echo "<img src='../images/icons/buddy.png' alt='$eleve_nom $eleve_prenom' />";
+			//echo "<img src='../images/icons/buddy.png' alt='$eleve_nom $eleve_prenom' />";
+			echo "<img src='../mod_trombinoscopes/images/";
+			if($eleve_sexe=="F") {
+				echo "photo_f.png";
+			}
+			else{
+				echo "photo_g.png";
+			}
+			echo "' class='icone20' alt='$eleve_nom $eleve_prenom' />";
 			echo "</a>";
 		}
 		//==========================
@@ -1536,6 +1657,26 @@ foreach ($liste_eleves as $eleve_login) {
 				//	echo $nom_periode[$k];
 				//}
 				echo "</span>\n";
+
+				// 20121118
+				// Si les parents ont l'accès aux bulletins, graphes,... on affiche s'ils ont l'accès aux appréciations à ce jour
+				if((getSettingAOui('GepiAccesBulletinSimpleParent'))||
+				(getSettingAOui('GepiAccesGraphParent'))||
+				(getSettingAOui('GepiAccesBulletinSimpleEleve'))||
+				(getSettingAOui('GepiAccesGraphEleve'))) {
+					if($tab_acces_app_classe[$eleve_id_classe][$k]=="y") {
+						echo " <img src='../images/icons/visible.png' width='19' height='16' alt='Appréciations visibles des parents/élèves.' title='A la date du jour (".$date_du_jour."), les appréciations de la période ".$k." sont visibles des parents/élèves.' />";
+					}
+					else {
+						/*
+						echo "<img src='../images/icons/invisible.png' width='19' height='16' alt='Appréciations non encore visibles des parents/élèves.' title=\"A la date du jour (".$date_du_jour.") les appréciations de la période ".$k." ne sont pas encore visibles des parents/élèves.
+Les appréciations seront visibles soit à une date donnée, soit N jours après la clôture de la période $k, soit après une intervention manuelle d'un compte de statut 'scolarité' selon le paramétrage choisi.\" />";
+						*/
+						echo " <img src='../images/icons/invisible.png' width='19' height='16' alt='Appréciations non encore visibles des parents/élèves.' title=\"A la date du jour (".$date_du_jour."), les appréciations de la période ".$k." ne sont pas encore visibles des parents/élèves.
+$msg_acces_app_ele_resp\" />";
+					}
+				}
+
 				echo "</td>\n";
 			}
 			else {
@@ -1555,6 +1696,25 @@ foreach ($liste_eleves as $eleve_login) {
 				//else {
 				//	echo $nom_periode[$k];
 				//}
+
+				// 20121118
+				// Si les parents ont l'accès aux bulletins, graphes,... on affiche s'ils ont l'accès aux appréciations à ce jour
+				if((getSettingAOui('GepiAccesBulletinSimpleParent'))||
+				(getSettingAOui('GepiAccesGraphParent'))||
+				(getSettingAOui('GepiAccesBulletinSimpleEleve'))||
+				(getSettingAOui('GepiAccesGraphEleve'))) {
+					if($tab_acces_app_classe[$eleve_id_classe][$k]=="y") {
+						echo "<img src='../images/icons/visible.png' width='19' height='16' alt='Appréciations visibles des parents/élèves.' title='A la date du jour (".$date_du_jour."), les appréciations de la période ".$k." sont visibles des parents/élèves.' />";
+					}
+					else {
+						/*
+						echo "<img src='../images/icons/invisible.png' width='19' height='16' alt='Appréciations non encore visibles des parents/élèves.' title=\"A la date du jour (".$date_du_jour.") les appréciations de la période ".$k." ne sont pas encore visibles des parents/élèves.
+Les appréciations seront visibles soit à une date donnée, soit N jours après la clôture de la période $k, soit après une intervention manuelle d'un compte de statut 'scolarité' selon le paramétrage choisi.\" />";
+						*/
+						echo "<img src='../images/icons/invisible.png' width='19' height='16' alt='Appréciations non encore visibles des parents/élèves.' title=\"A la date du jour (".$date_du_jour."), les appréciations de la période ".$k." ne sont pas encore visibles des parents/élèves.
+$msg_acces_app_ele_resp\" />";
+					}
+				}
 
 				echo "</td>\n";
 			}
@@ -1577,39 +1737,172 @@ echo "<input type='hidden' name='indice_max_log_eleve' value='$i' />\n";
 <input type="hidden" name="is_posted" value="yes" />
 <input type="hidden" name="id_groupe" value="<?php echo "$id_groupe";?>" />
 <input type="hidden" name="periode_cn" value="<?php echo "$periode_cn";?>" />
-<center><div id="fixe"><input type="submit" value="Enregistrer" /><br />
+<center>
+	<div id="fixe">
+	<?php
+		if($proposer_liens_enregistrement=='y') {
+			echo "
+		<input type='submit' value='Enregistrer' /><br />
 
-<!-- DIV destiné à afficher un décompte du temps restant pour ne pas se faire piéger par la fin de session -->
-<div id='decompte'></div>
+		<!-- DIV destiné à afficher un décompte du temps restant pour ne pas se faire piéger par la fin de session -->
+		<div id='decompte'></div>\n";
+		}
 
-<?php
-	//============================================
-	// AJOUT: boireaus 20080520
-	// Dispositif spécifique: décommenter la ligne pour l'activer
-	if(getSettingValue('appreciations_types_profs')=='y' || getSettingValue('appreciations_types_profs')=='yes') {include('ctp.php');}
-	//============================================
+		//============================================
+		if(getSettingValue('appreciations_types_profs')=='y' || getSettingValue('appreciations_types_profs')=='yes') {include('ctp.php');}
+		//============================================
 
+		if($proposer_liens_enregistrement=="y") {
+			echo "<a href='#' onClick=\"insere_notes();return false;\">";
+			echo "<img src='../images/icons/wizard.png' width='16' height='16' alt='Insérer les notes des devoirs' title='Insérer les notes des devoirs' />";
+			echo "</a>\n";
+			}
+	?>
 
-	echo "<a href='#' onClick=\"insere_notes();return false;\">";
-	echo "<img src='../images/icons/wizard.png' width='16' height='16' alt='Insérer les notes des devoirs' title='Insérer les notes des devoirs' />";
-	echo "</a>\n";
-
-?>
-
-<!-- Champ destiné à recevoir la valeur du champ suivant celui qui a le focus pour redonner le focus à ce champ après une validation -->
-<input type='hidden' id='info_focus' name='champ_info_focus' value='' />
-<input type='hidden' id='focus_courant' name='focus_courant' value='' />
-</div></center>
+		<!-- Champ destiné à recevoir la valeur du champ suivant celui qui a le focus pour redonner le focus à ce champ après une validation -->
+		<input type='hidden' id='info_focus' name='champ_info_focus' value='' />
+		<input type='hidden' id='focus_courant' name='focus_courant' value='' />
+	</div>
+</center>
 </form>
 
 <?php
+	for($loop=1;$loop<$nb_periode;$loop++) {
+		$histogramme="";
 
+		if((isset($tab_per_notes[$loop]))&&(count($tab_per_notes[$loop])>0)) {
+			$histogramme=retourne_html_histogramme_svg($tab_per_notes[$loop], "Repartition P$loop", "repartition_p$loop");
 
+			if($histogramme!="") {
+				//echo $histogramme;
+				echo "<script type='text/javascript'>
+	if(document.getElementById('span_repartition_notes_$loop')) {document.getElementById('span_repartition_notes_$loop').innerHTML='<br />".addslashes($histogramme)."';}
+</script>\n";
+			}
+		}
+	}
 
-echo "<script type='text/javascript'>\n";
+echo "<script type='text/javascript'>
 
-if((isset($chaine_test_vocabulaire))&&($chaine_test_vocabulaire!="")) {
-	echo $chaine_test_vocabulaire;
+	function repositionner_commtype() {
+		if(document.getElementById('div_commtype')) {
+			if(document.getElementById('div_commtype').style.display!='none') {
+				x=document.getElementById('div_commtype').style.left;
+				afficher_div('div_commtype','y',20,20);
+				document.getElementById('div_commtype').style.left=x;
+			}
+		}
+	}
+
+	function afficher_positionner_div_notes(id_div_notes) {
+		if(document.getElementById(id_div_notes)) {
+			div_note_aff='n';
+
+			tab_div=document.getElementsByTagName('div');
+			for(i=0;i<tab_div.length;i++) {
+				tmp_div=tab_div[i];
+				tmp_id=tmp_div.getAttribute('id');
+				if(tmp_id) {
+					if((tmp_id.substr(0,6)=='notes_')&&(tmp_id.substr(tmp_id.length-14,14)!='_contenu_corps')) {
+						if(tmp_div.style.display!='none') {
+							div_note_aff='y';
+							//alert(tmp_id);
+							break;
+						}
+					}
+				}
+			}
+
+			if(div_note_aff=='y') {
+				afficher_div(id_div_notes,'y',20,20);
+			}
+		}
+	}
+
+	function signaler_une_faute(eleve_login, id_eleve, id_groupe, liste_profs_du_groupe, num_periode) {
+
+		info_eleve=eleve_login;
+		if(document.getElementById('nom_prenom_eleve_'+id_eleve)) {
+			info_eleve=document.getElementById('nom_prenom_eleve_'+id_eleve).value;
+		}
+
+		document.getElementById('titre_entete_signaler_faute').innerHTML='Signaler un problème/faute pour '+info_eleve+' période '+num_periode;
+
+		document.getElementById('signalement_login_eleve').value=eleve_login;
+		document.getElementById('signalement_id_groupe').value=id_groupe;
+
+		document.getElementById('signalement_id_eleve').value=id_eleve;
+		document.getElementById('signalement_num_periode').value=num_periode;
+
+		info_groupe=''
+		if(document.getElementById('signalement_id_groupe_'+id_groupe)) {
+			info_groupe=document.getElementById('signalement_id_groupe_'+id_groupe).value;
+		}
+
+		message='Bonjour,\\n\\nL\'appréciation de l\'élève '+info_eleve+' sur l\'enseignement n°'+id_groupe+' ('+info_groupe+') en période n°'+num_periode+' présente un problème ou une faute:\\n';
+		message=message+'================================\\n';
+		// Le champ textarea n'existe que si une appréciation a été enregistrée
+		if(document.getElementById('appreciation_'+id_eleve+'_'+id_groupe+'_'+num_periode)) {
+			//message=message+addslashes(document.getElementById('appreciation_'+id_eleve+'_'+id_groupe+'_'+num_periode).innerHTML);
+			message=message+document.getElementById('appreciation_'+id_eleve+'_'+id_groupe+'_'+num_periode).innerHTML;
+		}
+		//alert('document.getElementById(\'appreciation_'+id_eleve+'_'+id_groupe+'_'+num_periode+').innerHTML');
+
+		message=message+'\\n================================\\n'
+";
+		if(getSettingValue('url_racine_gepi')!="") {
+			echo "		message=message+'Après connexion dans Gepi, l\'adresse pour corriger est \\n".getSettingValue('url_racine_gepi')."/saisie/saisie_appreciations.php?id_groupe='+id_groupe+'#saisie_app_'+eleve_login;\n";
+			echo "		message=message+'\\n'";
+		}
+		echo "
+		message=message+'\\n\\nCordialement\\n-- \\n".casse_mot($_SESSION['prenom'],'majf2')." ".$_SESSION['nom']."'
+
+		//alert('message='+message);
+
+		document.getElementById('div_signalement_message').innerHTML='<textarea name=\'signalement_message\' id=\'signalement_message\' cols=\'50\' rows=\'11\'></textarea>';
+
+		document.getElementById('signalement_message').innerHTML=message;
+		//afficher_div('div_signaler_faute','n',0,0);
+		afficher_div('div_signaler_faute','n',0,-50);
+		//afficher_div('div_signaler_faute','y',100,100);
+	}
+
+	function valider_signalement_faute() {
+		signalement_id_groupe=document.getElementById('signalement_id_groupe').value;
+		signalement_login_eleve=document.getElementById('signalement_login_eleve').value;
+
+		//signalement_message=escape(document.getElementById('signalement_message').value);
+		signalement_message=document.getElementById('signalement_message').value;
+
+		//signalement_message=encodeURIComponent(document.getElementById('signalement_message').value);
+
+		signalement_id_eleve=document.getElementById('signalement_id_eleve').value;
+		signalement_num_periode=document.getElementById('signalement_num_periode').value;
+		signalement_id_classe=document.getElementById('signalement_id_classe').value;
+
+		//alert(signalement_message);
+
+		//new Ajax.Updater($('signalement_effectue_'+signalement_id_eleve+'_'+signalement_id_groupe+'_'+signalement_num_periode),'../lib/ajax_signaler_faute.php?signalement_login_eleve='+signalement_login_eleve+'&signalement_id_groupe='+signalement_id_groupe+'&signalement_id_classe='+signalement_id_classe+'&signalement_num_periode='+signalement_num_periode+'&signalement_message='+signalement_message+'".add_token_in_url(false)."',{method: 'get'});
+
+		new Ajax.Updater($('signalement_effectue_'+signalement_id_eleve+'_'+signalement_id_groupe+'_'+signalement_num_periode),'../lib/ajax_signaler_faute.php?a=a&".add_token_in_url(false)."',{method: 'post',
+		parameters: {
+			signalement_login_eleve: signalement_login_eleve,
+			signalement_id_groupe: signalement_id_groupe,
+			signalement_id_classe: signalement_id_classe,
+			signalement_num_periode: signalement_num_periode,
+			no_anti_inject_signalement_message: signalement_message,
+		}});
+
+		cacher_div('div_signaler_faute');
+		//document.getElementById('signalement_message').innerHTML='';
+
+	}
+\n";
+
+if(getSettingValue('active_recherche_lapsus')!='n') {
+	if((isset($chaine_test_vocabulaire))&&($chaine_test_vocabulaire!="")) {
+		echo $chaine_test_vocabulaire;
+	}
 }
 
 echo "
@@ -1639,6 +1932,28 @@ echo "
 			document.getElementById('n'+id_focus_courant).value=app1;
 			document.getElementById('n'+id_focus_courant).focus();
 		}
+	}
+
+	function fermer_div_notes() {
+		//var exp = new RegExp(\"^[0-9-.]*$\",\"g\");
+		var exp = new RegExp(\"[0-9]$\",\"g\");
+
+		chaine=''
+		champs_div=document.getElementsByTagName('div');
+		for(i=0;i<champs_div.length;i++) {
+			if(champs_div[i].getAttribute('id')) {
+				id_courant=champs_div[i].getAttribute('id');
+				if(id_courant.substr(0,6)=='notes_') {
+					// On teste si le id_courant se termine par un chiffre (numero de periode)
+					// et ne pas recuperer les sous-div inclus dans les conteneurs de notes
+					if(exp.test(id_courant)) {
+						chaine=chaine+' '+id_courant;
+						cacher_div(id_courant);
+					}
+				}
+			}
+		}
+		//alert(chaine);
 	}
 
 </script>\n";
@@ -1790,8 +2105,9 @@ function decompte(cpt){
 	}
 }
 
-decompte(cpt);
-
+if(document.getElementById('decompte')) {
+	decompte(cpt);
+}
 ";
 
 // Après validation, on donne le focus au champ qui suivait celui qui vient d'être rempli
@@ -1810,8 +2126,7 @@ if(document.getElementById('focus_courant')) {document.getElementById('focus_cou
 echo "</script>\n";
 
 //=========================
-// AJOUT: boireaus 20090126
-if (($insert_mass_appreciation_type=="y")&&($droit_insert_mass_appreciation_type=="y")) {
+if ((isset($insert_mass_appreciation_type))&&($insert_mass_appreciation_type=="y")&&(isset($droit_insert_mass_appreciation_type))&&($droit_insert_mass_appreciation_type=="y")) {
 	echo "<script type='text/javascript'>
 	function ajoute_a_textarea_vide() {
 		champs_textarea=document.getElementsByTagName('textarea');

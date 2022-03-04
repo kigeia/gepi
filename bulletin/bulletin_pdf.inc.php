@@ -11,7 +11,12 @@
 	$champ_bull_pdf[]="active_bloc_datation";
 	$champ_bull_pdf[]="active_bloc_eleve";
 	$champ_bull_pdf[]="active_bloc_adresse_parent";
+
 	$champ_bull_pdf[]="active_bloc_absence";
+	$champ_bull_pdf[]="afficher_abs_tot";
+	$champ_bull_pdf[]="afficher_abs_nj";
+	$champ_bull_pdf[]="afficher_abs_ret";
+
 	$champ_bull_pdf[]="active_bloc_note_appreciation";
 	$champ_bull_pdf[]="active_bloc_avis_conseil";
 	$champ_bull_pdf[]="active_bloc_chef";
@@ -97,6 +102,8 @@
 	$champ_bull_pdf[]="moyennes_periodes_precedentes";
 	$champ_bull_pdf[]="evolution_moyenne_periode_precedente";
 
+	$champ_bull_pdf[]="moyennes_annee";
+
 	$champ_bull_pdf[]="active_reperage_eleve";
 	$champ_bull_pdf[]="couleur_reperage_eleve1";
 	$champ_bull_pdf[]="couleur_reperage_eleve2";
@@ -136,6 +143,7 @@
 	$champ_bull_pdf[]="titre_bloc_avis_conseil";
 	$champ_bull_pdf[]="taille_titre_bloc_avis_conseil";
 	$champ_bull_pdf[]="taille_profprincipal_bloc_avis_conseil";
+	$champ_bull_pdf[]="afficher_tous_profprincipaux";
 	$champ_bull_pdf[]="affiche_fonction_chef";
 	$champ_bull_pdf[]="taille_texte_fonction_chef";
 	$champ_bull_pdf[]="taille_texte_identitee_chef";
@@ -182,6 +190,14 @@
 	$champ_bull_pdf[]="affiche_adresse_etab";
 	//=========================
 
+	//$champ_bull_pdf[]="signature_img";
+
+	//$champ_bull_pdf[]="adresse_resp_fontsize_ligne_1";
+	$champ_bull_pdf[]="adresse_resp_fontsize";
+
+	$champ_bull_pdf[]="cell_ajustee_texte_matiere";
+	$champ_bull_pdf[]="cell_ajustee_texte_matiere_ratio_min_max";
+
 	/*
 		mysql> show fields from modele_bulletin;
 		+--------------------+--------------+------+-----+---------+-------+
@@ -208,7 +224,12 @@
 	$val_defaut_champ_bull_pdf["active_bloc_datation"]=1;
 	$val_defaut_champ_bull_pdf["active_bloc_eleve"]=1;
 	$val_defaut_champ_bull_pdf["active_bloc_adresse_parent"]=1;
+
 	$val_defaut_champ_bull_pdf["active_bloc_absence"]=1;
+	$val_defaut_champ_bull_pdf["afficher_abs_tot"]=1;
+	$val_defaut_champ_bull_pdf["afficher_abs_nj"]=1;
+	$val_defaut_champ_bull_pdf["afficher_abs_ret"]=1;
+
 	$val_defaut_champ_bull_pdf["active_bloc_note_appreciation"]=1;
 	$val_defaut_champ_bull_pdf["active_bloc_avis_conseil"]=1;
 	$val_defaut_champ_bull_pdf["active_bloc_chef"]=1;
@@ -294,6 +315,8 @@
 	$val_defaut_champ_bull_pdf["moyennes_periodes_precedentes"]='n';
 	$val_defaut_champ_bull_pdf["evolution_moyenne_periode_precedente"]='n';
 
+	$val_defaut_champ_bull_pdf["moyennes_annee"]='n';
+
 	$val_defaut_champ_bull_pdf["active_reperage_eleve"]=1;
 	$val_defaut_champ_bull_pdf["couleur_reperage_eleve1"]=255;
 	$val_defaut_champ_bull_pdf["couleur_reperage_eleve2"]=255;
@@ -333,6 +356,7 @@
 	$val_defaut_champ_bull_pdf["titre_bloc_avis_conseil"]="";
 	$val_defaut_champ_bull_pdf["taille_titre_bloc_avis_conseil"]=0;
 	$val_defaut_champ_bull_pdf["taille_profprincipal_bloc_avis_conseil"]=0;
+	$val_defaut_champ_bull_pdf["afficher_tous_profprincipaux"]=0;
 	$val_defaut_champ_bull_pdf["affiche_fonction_chef"]=0;
 	$val_defaut_champ_bull_pdf["taille_texte_fonction_chef"]=0;
 	$val_defaut_champ_bull_pdf["taille_texte_identitee_chef"]=0;
@@ -379,6 +403,13 @@
 	$val_defaut_champ_bull_pdf["affiche_adresse_etab"]=1;
 	//=========================
 
+	//$val_defaut_champ_bull_pdf["signature_img"]=0;
+
+	//$val_defaut_champ_bull_pdf["adresse_resp_fontsize_ligne_1"]=12;
+	$val_defaut_champ_bull_pdf["adresse_resp_fontsize"]=10;
+
+	$val_defaut_champ_bull_pdf["cell_ajustee_texte_matiere"]=0;
+	$val_defaut_champ_bull_pdf["cell_ajustee_texte_matiere_ratio_min_max"]=3;
 
 	for($loop_champs=0;$loop_champs<count($champ_bull_pdf);$loop_champs++) {
 		$type_champ_pdf["$champ_bull_pdf[$loop_champs]"]="numerique";

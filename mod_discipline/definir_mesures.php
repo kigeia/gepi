@@ -2,7 +2,7 @@
 
 /*
  *
- * Copyright 2001, 2011 Thomas Belliard, Laurent Delineau, Edouard Hue, Eric Lebrun
+ * Copyright 2001, 2013 Thomas Belliard, Laurent Delineau, Edouard Hue, Eric Lebrun
  *
  * This file is part of GEPI.
  *
@@ -48,6 +48,18 @@ if(mb_strtolower(mb_substr(getSettingValue('active_mod_discipline'),0,1))!='y') 
 	die();
 }
 
+$acces_ok="n";
+if(($_SESSION['statut']=='administrateur')||
+(($_SESSION['statut']=='cpe')&&(getSettingAOui('GepiDiscDefinirMesuresCpe')))||
+(($_SESSION['statut']=='scolarite')&&(getSettingAOui('GepiDiscDefinirMesuresScol')))) {
+	$acces_ok="y";
+}
+else {
+	$msg="Vous n'avez pas le droit de définir les mesures.";
+	header("Location: ./index.php?msg=$msg");
+	die();
+}
+
 require('sanctions_func_lib.php');
 
 $suppr_mesure=isset($_POST['suppr_mesure']) ? $_POST['suppr_mesure'] : NULL;
@@ -66,7 +78,7 @@ if(isset($suppr_mesure)) {
 			$sql="SELECT 1=1 FROM s_traitement_incident sti WHERE sti.id_mesure='".$suppr_mesure[$i]."';";
 			$test=mysql_query($sql);
 			if(mysql_num_rows($test)>0) {
-				$msg.="Suppression de la mesure n°".$suppr_mesure[$i]." impossible car associée à ".mysql_num_rows($test)." incidents.<br />\n";
+				$msg.="Suppression de la mesure n°".$suppr_mesure[$i]." impossible car associée à ".mysql_num_rows($test)." ".$mod_disc_terme_incident."s.<br />\n";
 			}
 			else {
 				//$sql="DELETE FROM s_mesures WHERE mesure='$suppr_mesure[$i]';";
@@ -98,11 +110,9 @@ if(isset($mesure)) {
 			//echo "Id_mesure: $lig->id<br />";
 			if(isset($NON_PROTECT["commentaire_".$lig->id])) {
 				$commentaire=traitement_magic_quotes(corriger_caracteres($NON_PROTECT["commentaire_".$lig->id]));
-				$commentaire=preg_replace('/(\\\r\\\n)+/',"\r\n",$commentaire);
-				$commentaire=preg_replace('/(\\\r)+/',"\r",$commentaire);
-				$commentaire=preg_replace('/(\\\n)+/',"\n",$commentaire);
+				$commentaire=suppression_sauts_de_lignes_surnumeraires($commentaire);
 
-				$sql="UPDATE s_mesures SET commentaire='$commentaire' WHERE id='".$lig->id."';";
+				$sql="UPDATE s_mesures SET commentaire='".$commentaire."' WHERE id='".$lig->id."';";
 				//echo "$sql<br />\n";
 				$update=mysql_query($sql);
 				if(!$update) {
@@ -112,7 +122,7 @@ if(isset($mesure)) {
 		}
 
 		if($msg=="") {
-			$msg.="Mise à jour des commentaires des mesures précédemment saisies effectué.<br />";
+			$msg.="Mise à jour des commentaires des mesures précédemment saisies effectuée.<br />";
 		}
 		//if(in_array($mesure,$tab_mesure)) {$a_enregistrer='n';}
 	}
@@ -124,9 +134,7 @@ if(isset($mesure)) {
 
 		if($a_enregistrer=='y') {
 			//$mesure=addslashes(preg_replace('/(\\\r\\\n)+/',"\r\n",preg_replace("/&#039;/","'",html_entity_decode($mesure))));
-			$mesure=preg_replace('/(\\\r\\\n)+/',"\r\n",$mesure);
-			$mesure=preg_replace('/(\\\r)+/',"\r",$mesure);
-			$mesure=preg_replace('/(\\\n)+/',"\n",$mesure);
+			$mesure=suppression_sauts_de_lignes_surnumeraires($mesure);
 
 			if(isset($NON_PROTECT["commentaire"])) {
 				$commentaire=traitement_magic_quotes(corriger_caracteres($NON_PROTECT["commentaire"]));
@@ -134,9 +142,7 @@ if(isset($mesure)) {
 			else {
 				$commentaire="";
 			}
-			$commentaire=preg_replace('/(\\\r\\\n)+/',"\r\n",$commentaire);
-			$commentaire=preg_replace('/(\\\r)+/',"\r",$commentaire);
-			$commentaire=preg_replace('/(\\\n)+/',"\n",$commentaire);
+			$commentaire=suppression_sauts_de_lignes_surnumeraires($commentaire);
 
 			$sql="INSERT INTO s_mesures SET mesure='".$mesure."', commentaire='$commentaire', type='".$type."';";
 			//echo "$sql<br />\n";
@@ -166,7 +172,7 @@ echo "</p>\n";
 echo "<form enctype='multipart/form-data' action='".$_SERVER['PHP_SELF']."' method='post' name='formulaire'>\n";
 echo add_token_field();
 
-echo "<p class='bold'>Saisie des mesures prises ou demandées suite à un incident&nbsp;:</p>\n";
+echo "<p class='bold'>Saisie des mesures prises ou demandées suite à un ".$mod_disc_terme_incident."&nbsp;:</p>\n";
 echo "<blockquote>\n";
 
 $cpt=0;
@@ -265,7 +271,7 @@ echo "<p><br /></p>\n";
 echo "<p><em>NOTES&nbsp;:</em></p>\n";
 echo "<ul>\n";
 echo "<li><p>Une mesure demandée (<em>par un professeur</em>) doit être validée par un CPE/scol.</p></li>\n";
-echo "<li><p>Le commentaire est affiché en infobulle dans la page de saisie d'incident.</p></li>\n";
+echo "<li><p>Le commentaire est affiché en infobulle dans la page de saisie d'".$mod_disc_terme_incident.".</p></li>\n";
 echo "</ul>\n";
 echo "<p><br /></p>\n";
 

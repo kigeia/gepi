@@ -115,39 +115,12 @@ if (isset($_POST['is_posted'])) {
 	elseif ($_POST['is_posted']=='2') {
 		check_token();
 
-		if (isset($_POST['log_day']) and isset($_POST['log_month']) and isset($_POST['log_year'])) {
-			//$log_clean_date = mktime(0,0,0,$_POST['log_month'],$_POST['log_day'],$_POST['log_year']);
-			//echo $log_clean_date;
+		if (isset($_POST['clean_log']) and isset($_POST['log_day']) and isset($_POST['log_month']) and isset($_POST['log_year'])) {
+			$msg.="Nettoyage des logs de connexion antérieurs à ".$_POST['log_day']."/".$_POST['log_month']."/".$_POST['log_year']." : ".clean_table_log($_POST['log_day']."/".$_POST['log_month']."/".$_POST['log_year'])."<br />";
+		}
 
-			unset($log_year);
-			unset($log_month);
-			unset($log_day);
-			if(preg_match('/^[0-9]+$/',$_POST['log_year'])) {$log_year=$_POST['log_year'];}
-			if(preg_match('/^[0-9]+$/',$_POST['log_month'])) {$log_month=$_POST['log_month'];}
-			if(preg_match('/^[0-9]+$/',$_POST['log_day'])) {$log_day=$_POST['log_day'];}
-
-			if((isset($log_year))&&(isset($log_month))&&(isset($log_day))) {
-				// Pour éviter de flinguer la session en cours
-				$hier_day=date('d', mktime() - 24*3600);
-				$hier_month=date('m', mktime() - 24*3600);
-				$hier_year=date('Y', mktime() - 24*3600);
-
-				//$sql="SELECT * FROM log WHERE start<'$log_year-$log_month-$log_day 00:00:00' AND start<'".date('Y')."-".date('m')."-".$hier." 00:00:00';";
-				$sql="DELETE FROM log WHERE start<'$log_year-$log_month-$log_day 00:00:00' AND start<'".$hier_year."-".$hier_month."-".$hier_day." 00:00:00';";
-				//echo "$sql<br />\n";
-				$del=mysql_query($sql);
-				if(!$del) {
-					$msg.="Echec du nettoyage.<br />\n";
-				}
-				else {
-					$msg.="Nettoyage effectué.<br />\n";
-				}
-			}
-			else {
-				$msg .= "La date proposée est invalide.<br />";
-			}
-			//if (!)
-			//		$msg .= "Erreur lors de l'enregistrement de log_bookings !";
+		if (isset($_POST['clean_tentative_intrusion']) and isset($_POST['ti_day']) and isset($_POST['ti_month']) and isset($_POST['ti_year'])) {
+			$msg.="Nettoyage des logs de tentatives d'intrusion antérieurs à ".$_POST['ti_day']."/".$_POST['ti_month']."/".$_POST['ti_year']." : ".clean_table_tentative_intrusion($_POST['ti_day']."/".$_POST['ti_month']."/".$_POST['ti_year'])."<br />";
 		}
 	}
 }
@@ -215,7 +188,9 @@ echo "<p class='bold'><a href='index.php#chgt_annee' ".insert_confirm_abandon().
 echo "<p>Au changement d'année, avant d'initialiser la nouvelle année scolaire, il convient d'effectuer quelques opérations.<br />Elles sont en principe détaillées (<i>peut-être même plus à jour si des ajouts y ont été apportés après la sortie de votre version de GEPI</i>) sur le <a href='https://www.sylogix.org/projects/gepi/wiki/GuideAdministrateur' target='_blank'>Wiki</a>.</p>\n";
 
 echo "<form action='".$_SERVER['PHP_SELF']."' method='post' name='form1' style='width: 100%;'>\n";
-echo "<fieldset>\n";
+echo "<fieldset style='border: 1px solid grey;";
+echo "background-image: url(\"../images/background/opacite50.png\"); ";
+echo "'>\n";
 echo add_token_field();
 
 $msg_svg="Il est recommandé de faire une copie de sauvegarde sur un périphérique externe (à stocker au coffre par exemple)";
@@ -398,37 +373,52 @@ echo "</form>\n";
 
 echo "<br />\n";
 
-echo "<form action='".$_SERVER['PHP_SELF']."' method='post' name='form1' style='width: 100%;'>\n";
-echo "<fieldset>\n";
-echo add_token_field();
-echo "<p><em>Optionnel&nbsp;:</em> Nettoyer la table 'log'.<br />\n";
-echo "Cette table contient les dates de connexion/déconnexion des utilisateurs.<br />\n";
-echo "Conserver ces informations au-delà d'une année n'a pas vraiment d'intérêt.<br >\n";
-echo "Au besoin, si vous avez pris soin d'effectuer une sauvegarde de la base, les informations y sont.</p>\n";
 $lday = strftime("%d", getSettingValue("end_bookings"));
 $lmonth = strftime("%m", getSettingValue("end_bookings"));
 $lyear = date('Y')-1;
-echo "<p>Nettoyer les logs antérieurs au&nbsp;:&nbsp;\n";
+
+echo "<form action='".$_SERVER['PHP_SELF']."' method='post' name='form1' style='width: 100%;'>
+	<fieldset style='border: 1px solid grey; background-image: url(\"../images/background/opacite50.png\"); '>
+		".add_token_field()."
+		<p>
+			<em>Optionnel&nbsp;:</em> Nettoyer les tables 'log' et 'tentative_intrusion'.<br />
+			Cette table contient les dates de connexion/déconnexion des utilisateurs.<br />
+			Conserver ces informations au-delà d'une année n'a pas vraiment d'intérêt.<br >
+			Au besoin, si vous avez pris soin d'effectuer une sauvegarde de la base, les informations y sont.
+		</p>
+		<p><input type='checkbox' id='clean_log' name='clean_log' value='y' checked /><label for='clean_log'>Nettoyer les logs de connexion antérieurs au</label>&nbsp;:&nbsp;";
 genDateSelector("log_",$lday,$lmonth,$lyear,"more_years");
-echo "<input type='hidden' name='is_posted' value='2' />\n";
-echo "<input type='submit' name='Valider' value='Valider' />\n";
-echo "</p>\n";
-echo "</fieldset>\n";
-echo "</form>\n";
+echo "<br />
+			<input type='checkbox' id='clean_tentative_intrusion' name='clean_tentative_intrusion' value='y' checked /><label for='clean_tentative_intrusion'>Nettoyer les logs de tentatives d'intrusion antérieurs au</label>&nbsp;:&nbsp;";
+genDateSelector("ti_",$lday,$lmonth,$lyear,"more_years");
+echo "</p>
+		<input type='hidden' name='is_posted' value='2' />
+		<input type='submit' name='Valider' value='Valider' />
+
+		<p><em>NOTE&nbsp;:</em> La CNIL recommande de ne pas conserver plus de 6 mois de journaux de connexion.</p>
+	</fieldset>
+</form>\n";
 
 echo "<p><br /></p>\n";
 
+echo "<p style='text-indent:-11em; margin-left:11em;'><em>Optionnel également&nbsp;:</em> Vous pouvez vider les absences de l'année passée, l'emploi du temps, les incidents/sanctions du module discipline en consultant la page de <a href='../utilitaires/clean_tables.php#nettoyage_par_le_vide'>Nettoyage de la base</a>.</p>\n";
+
+echo "<p><br /></p>\n";
+
+echo "<a name='svg_ext'></a>";
+echo "<p><em>NOTES&nbsp;:</em></p>\n";
+echo "<ul>\n";
+echo "<li>\n";
+echo "<p>La sauvegarde sur périphérique externe permet de remettre en place un GEPI si jamais votre GEPI en ligne subit des dégats (<em>crash du disque dur hébergeant votre GEPI, incendie du local serveur,...</em>).<br />Vous n'aurez normalement jamais besoin de ces sauvegardes, mais mieux vaut prendre des précautions.</p>\n";
+echo "</li>\n";
+echo "<li>\n";
 echo "<p>Lors de l'initialisation de l'année, la date à laquelle une période a été close pour telle classe sera réinitialisée.<br />Ce n'était pas le cas pour une initialisation faite avant le 17/09/2012.<br />Pour forcer cette réinitialisation, <a href='".$_SERVER['PHP_SELF']."?reinit_dates_verrouillage_periode=y".add_token_in_url()."'>cliquer ici</a>.<br />Cette date de verrouillage présente un intérêt pour l'accès des responsables et élèves aux appréciations des bulletins dans le cas où vous avez choisi un accès automatique N jours après la clôture de la période.</p>\n";
 if(getSettingValue("active_module_absence")=="2"){
 	echo "<p>Ces dates de verrouillage, indiquant à quelle date la période de notes a été close, n'ont rien à voir avec les dates déclarées pour les fins de périodes d'absences dans la page de Verrouillage.<br />
 	Les dates de fin de période affichées dans la page de Verrouillage concernent la liste des élèves qui seront présentés dans vos groupes/classes pour la saisie des absences (<em>tel élève arrivé au 2è trimestre ou ayant changé de classe,... doit ou ne doit pas apparaître sur telle période dans tel groupe/classe</em>).</p>\n";
 }
-echo "<p><br /></p>\n";
-
-echo "<a name='svg_ext'></a>";
-echo "<p><em>NOTES&nbsp;:</em></p>\n";
-echo "<p style='margin-left:3em;'>La sauvegarde sur périphérique externe permet de remettre en place un GEPI si jamais votre GEPI en ligne subit des dégats (<em>crash du disque dur hébergeant votre GEPI, incendie du local serveur,...</em>).<br />Vous n'aurez normalement jamais besoin de ces sauvegardes, mais mieux vaut prendre des précautions.</p>\n";
-
+echo "</li>\n";
+echo "</ul>\n";
 echo "<p><br /></p>\n";
 
 require("../lib/footer.inc.php");

@@ -245,6 +245,15 @@ if (isset($_POST['is_posted'])) {
 			}
 		}
 
+		if (isset($_POST['abs2_jouer_sound_erreur'])) {
+			if (!saveSetting("abs2_jouer_sound_erreur", $_POST['abs2_jouer_sound_erreur'])) {
+				$msg = "Erreur lors de l'enregistrement du paramètre abs2_jouer_sound_erreur !";
+			}
+		} else {
+			if (!saveSetting("abs2_jouer_sound_erreur", 'n')) {
+				$msg = "Erreur lors de l'enregistrement du paramètre abs2_jouer_sound_erreur !";
+			}
+		}
 	}
 }
 
@@ -378,6 +387,12 @@ Normalement, ce module ne devrait être activé que si le module ci-dessus est l
 <?php if ((getSettingValue("abs2_montrer_creneaux_precedents")=='y') or (getSettingValue("abs2_afficher_saisies_creneau_courant")=='y')) echo "<p style='color:red'> VOUS AVEZ COCHÉ UNE DES DEUX CASES CI-DESSUS : l'affichage de ces informations au moment de l'appel professeur est susceptible de fausser son jugement. Il est possible que l'enseignant se fie uniquement à ces informations (sans effectuer un contrôle visuel effectif) et que son appel soit erroné. Sa responsabilité pourrait être engagée. Vous pouvez-vous rapprocher de votre chef d'établissement afin de convenir de ce réglage.";?></p>
 </p>
 
+<p>
+	<input type="checkbox" name="abs2_jouer_sound_erreur" id="abs2_jouer_sound_erreur" value="y"
+	<?php if (getSettingAOui("abs2_jouer_sound_erreur")) echo " checked='checked'"; ?> />
+	<label for="abs2_jouer_sound_erreur">&nbsp;Jouer un son en cas d'erreur d'enregistrement de la saisie sur le groupe</label>
+</p>
+
 <h2>Envoi des SMS</h2>
 <p>
 	<input type="checkbox" id="abs2_sms" name="abs2_sms" value="y"
@@ -401,6 +416,10 @@ Normalement, ce module ne devrait être activé que si le module ci-dessus est l
 	</select><br/>
 	Nom d'utilisateur du service <input type="text" name="abs2_sms_username" size="20" value="<?php echo(getSettingValue("abs2_sms_username")); ?>"/><br/>
 	Mot de passe <input type="text" name="abs2_sms_password" size="20" value="<?php echo(getSettingValue("abs2_sms_password")); ?>"/><br/>
+</p>
+
+<p style='text-indent:-4em;margin-left:4em;margin-top:1em;'>
+	<em>NOTE&nbsp;:</em> Le fichier modèle de SMS, comme les fichiers modèles OpenOffice.org générés par ce module peuvent être modifiés/remplacés dans la rubrique <a href="../../mod_ooo/gerer_modeles_ooo.php#MODULE_ABSENCE">Gérer ses propres modèles de documents du module</a>.
 </p>
 
 <h2>Configuration des saisies</h2>
@@ -482,10 +501,13 @@ echo "<p style='color:red'>* Le responsable de l'absence, c'est l'élève (et se
 <blockquote>
 	<a href="admin_types_absences.php?action=visualiser">Définir les types d'absence</a><br />
 	<a href="admin_motifs_absences.php?action=visualiser">Définir les motifs des absences</a><br />
-    <a href="admin_lieux_absences.php?action=visualiser">Définir les lieux des absences</a><br />
+	<a href="admin_lieux_absences.php?action=visualiser">Définir les lieux des absences</a><br />
 	<a href="admin_justifications_absences.php?action=visualiser">Définir les justifications</a><br />
-	<a href="../../mod_ooo/gerer_modeles_ooo.php">Gérer ses propres modèles de documents du module</a><br />
-    <a href="admin_table_agregation.php">Gérér la table d'agrégation des demi-journées d'absences</a>
+	<a href="../../mod_ooo/gerer_modeles_ooo.php#MODULE_ABSENCE">Gérer ses propres modèles de documents du module</a><br />
+	<a href="admin_table_agregation.php">Gérér la table d'agrégation des demi-journées d'absences</a><br />
+	<?php
+		if(acces("/mod_abs2/admin/admin_table_totaux_absences.php", $_SESSION['statut'])) {echo '<a href="admin_table_totaux_absences.php">Gérér la table des totaux d\'absences</a>';}
+	?>
 </blockquote>
 
 <?PHP

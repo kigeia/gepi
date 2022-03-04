@@ -1,8 +1,6 @@
 <?php
 /*
- * $Id: index.php 2554 2008-10-12 14:49:29Z crob $
- *
- * Copyright 2001, 2011 Thomas Belliard, Laurent Delineau, Edouard Hue, Eric Lebrun
+ * Copyright 2001, 2013 Thomas Belliard, Laurent Delineau, Edouard Hue, Eric Lebrun
  *
  * This file is part of GEPI.
  *
@@ -34,8 +32,6 @@ if ($resultat_session == 'c') {
 	die();
 }
 
-// SQL : INSERT INTO droits VALUES ( '/mod_ooo/gerer_modeles_ooo.php', 'V', 'F', 'F', 'F', 'F', 'F', 'F', 'F', 'Modèle Ooo : Index', '');
-// maj : $tab_req[] = "INSERT INTO droits VALUES ( '/mod_ooo/gerer_modeles_ooo.php', 'V', 'F', 'F', 'F', 'F', 'F', 'F', 'F', 'Modèle Ooo : Index', '');;";
 if (!checkAccess()) {
     header("Location: ../logout.php?auto=1");
 	die();
@@ -50,97 +46,176 @@ include_once('./lib/chemin.inc.php'); // le chemin des dossiers contenant les  m
     // L'entête de la section pour le 1er fichier de la section sinon "" (vide)
     //Le nom du fichier en minuscule avec son extension
 	//La description du document
-	
+
+if(($_SESSION['statut']=='administrateur')||
+(($_SESSION['statut']=='cpe')&&(getSettingAOui('OOoUploadCpeDiscipline')))||
+(($_SESSION['statut']=='scolarite')&&(getSettingAOui('OOoUploadScolDiscipline')))) {
     //Retenue
+    $lien_wiki[]='';
     $entete_section[]="MODULE DISCIPLINE";
 	$fich[]="retenue.odt";
-    $utilisation[]="Formulaire de retenue";	
+    $utilisation[]="Formulaire de retenue";
+	$special[]="";
+
     //rapport incident
+    $lien_wiki[]='';
     $entete_section[]="";
 	$fich[]="rapport_incident.odt";
     $utilisation[]="Formulaire de rapport d'incident";
+	$special[]="";
+
 	//Exclusion temporaire
+    $lien_wiki[]='';
     $entete_section[]="";
 	$fich[]="discipline_exclusion.odt";
     $utilisation[]="Exclusion temporaire de l'établissement";
+	$special[]="";
 
+	// Travail
+    $lien_wiki[]='';
+    $entete_section[]="";
+	$fich[]="discipline_travail.odt";
+    $utilisation[]="Travail à rendre";
+	$special[]="";
+
+	// Autre sanction
+    $lien_wiki[]='';
+    $entete_section[]="";
+	$fich[]="discipline_autre.odt";
+    $utilisation[]="Autre sanction";
+	$special[]="";
+}
+
+if(($_SESSION['statut']=='administrateur')||
+(($_SESSION['statut']=='cpe')&&(getSettingAOui('OOoUploadCpeAbs2')))||
+(($_SESSION['statut']=='scolarite')&&(getSettingAOui('OOoUploadScolAbs2')))) {
     //modèle ABS2
+    $lien_wiki[]='';
 	$entete_section[]="MODULE ABSENCE";
     $fich[]="absence_extraction_demi-journees.ods";
     $utilisation[]="ABS2 : Tableau des demi-journées d'absences";
+	$special[]="";
 	
+    $lien_wiki[]='';
 	$entete_section[]="";
     $fich[]="absence_extraction_saisies.ods";
     $utilisation[]="ABS2 : Tableau des saisies d'absences";
+	$special[]="";
 	
+    $lien_wiki[]='';
 	$entete_section[]="";
     $fich[]="absence_extraction_traitements.ods";
     $utilisation[]="ABS2 : Tableau des traitements d'absences";
+	$special[]="";
     
+    $lien_wiki[]='';
     $entete_section[]="";
     $fich[]="absence_taux_absenteisme.ods";
     $utilisation[]="ABS2 : Tableau des taux d'absentéisme";
+	$special[]="";
 
+    $lien_wiki[]='';
     $entete_section[]="";
     $fich[]="absence_extraction_bilan.ods";
     $utilisation[]="ABS2 : Tableau bilan par jour par élève au format tableur";
+	$special[]="";
 
+    $lien_wiki[]='';
     $entete_section[]="";
     $fich[]="absence_extraction_bilan.odt";
     $utilisation[]="ABS2 : Tableau bilan par jour par élève au format traitement de textes";
+	$special[]="";
 
+    $lien_wiki[]='';
 	$entete_section[]="";
     $fich[]="absence_modele_lettre_parents.odt";
     $utilisation[]="ABS2 : Modèle de lettre aux parents";
+	$special[]="";
 	
+    $lien_wiki[]='';
 	$entete_section[]="";
     $fich[]="absence_email.txt";
     $utilisation[]="ABS2 : Modèle du courriel envoyé aux parents";
+	$special[]="";
 	
+    $lien_wiki[]='';
 	$entete_section[]="";
     $fich[]="absence_sms.txt";
     $utilisation[]="ABS2 : Modèle de SMS envoyé aux parents";
+	$special[]="";
+}
 
-
+if(($_SESSION['statut']=='administrateur')||
+(($_SESSION['statut']=='cpe')&&(getSettingAOui('OOoUploadCpeNotanet')))||
+(($_SESSION['statut']=='scolarite')&&(getSettingAOui('OOoUploadScolNotanet')))) {
     //Fiches brevet
+    $lien_wiki[]='http://www.sylogix.org/projects/gepi/wiki/GepiDoc_fbOooCalc#Gabarits-de-fiches-brevets-dautres-acad%C3%A9mies';
 	$entete_section[]="MODULE NOTANET";
+    $fich[]="fb_serie_generale.ods";
+    $utilisation[]="Fiche brevet série générale";
+	$special[]="";
+
+    $lien_wiki[]='';
+	$entete_section[]="";
     $fich[]="fb_CLG_lv2.ods";
     $utilisation[]="Fiche brevet série collège LV2";
+	$special[]="obsolete";
 	
+    $lien_wiki[]='';
 	$entete_section[]="";
     $fich[]="fb_CLG_dp6.ods";
     $utilisation[]="Fiche brevet série collège ODP 6 heures";
-	
+	$special[]="obsolete";
+
+    $lien_wiki[]='';
 	$entete_section[]="";
     $fich[]="fb_PRO.ods";
-    $utilisation[]="Fiche brevet série professionnelle sans ODP";
-	
+    //$utilisation[]="Fiche brevet série professionnelle sans ODP";
+    $utilisation[]="Fiche brevet série professionnelle";
+	$special[]="";
+
+    $lien_wiki[]='';
 	$entete_section[]="";
     $fich[]="fb_PRO_dp6.ods";
     $utilisation[]="Fiche brevet série professionnelle ODP 6 heures";
+	$special[]="obsolete";
 	
+    $lien_wiki[]='';
 	$entete_section[]="";
     $fich[]="fb_PRO_agri.ods";
     $utilisation[]="Fiche brevet série professionnelle option agricole";
-	
+	$special[]="";
+
+    $lien_wiki[]='';
 	$entete_section[]="";
     $fich[]="fb_TECHNO.ods";
     $utilisation[]="Fiche brevet série technologique sans ODP";
+	$special[]="obsolete";
 	
+    $lien_wiki[]='';
 	$entete_section[]="";
     $fich[]="fb_TECHNO_dp6.ods";
     $utilisation[]="Fiche brevet série technologique ODP 6 heures";
+	$special[]="obsolete";
 	
+    $lien_wiki[]='';
 	$entete_section[]="";
     $fich[]="fb_TECHNO_agri.ods";
     $utilisation[]="Fiche brevet série technologique option agricole";
+	$special[]="obsolete";
+}
 
-    //rapport incident
+if(($_SESSION['statut']=='administrateur')||
+(($_SESSION['statut']=='cpe')&&(getSettingAOui('OOoUploadCpeEcts')))||
+(($_SESSION['statut']=='scolarite')&&(getSettingAOui('OOoUploadScolEcts')))) {
+    // Module ECTS
+    $lien_wiki[]='';
 	$entete_section[]="MODULE ECTS";
     $fich[]="documents_ects.odt";
     $utilisation[]="Documents ECTS (pour BTS, prépas...)";
-	
-	
+	$special[]="";
+}
+
     $nbfich=sizeof($fich);
 // Fin liste des fichiers
 
@@ -214,10 +289,18 @@ if (!isset($btn)) { //premier passage : formulaire
       //paire ou impaire	  
 	  if ($entete_section[$i] != "") { // Cas d'un entête
 	      echo "<tr>";
-	      echo "<td colspan=\"6\"></br></br><b>$entete_section[$i]</br></br></b></br></br></td>";
+	      echo "<td colspan=\"6\"></br></br><b>$entete_section[$i]";
+	      echo "<a name='".remplace_accents($entete_section[$i], "all")."'></a>";
+	      if($lien_wiki[$i] != "") {echo " <a href='".$lien_wiki[$i]."' target='_blank'><img src='../images/icons/ico_ampoule.png' width='15' height='25' title='Documentation/ressources' /></a>";}
+	      echo "</br></br></b></br></br></td>";
 		  echo "</tr>";
 	  }
-	  echo "<tr class='lig$alt'>\n<form name=\"form$i\" method='post' ENCTYPE='multipart/form-data' action='$PHP_SELF' onsubmit=\"return bonfich('$i')\" >\n";
+	  if($special[$i]!='obsolete') {
+		echo "<tr class='lig$alt'>\n<form name=\"form$i\" method='post' ENCTYPE='multipart/form-data' action='$PHP_SELF' onsubmit=\"return bonfich('$i')\" >\n";
+	  }
+	  else {
+		echo "<tr style='background-color:grey;' title=\"Modèle obsolète\">\n<form name=\"form$i\" method='post' ENCTYPE='multipart/form-data' action='$PHP_SELF' onsubmit=\"return bonfich('$i')\" >\n";
+	  }
 	echo add_token_field();
 	  echo "<input type=\"hidden\" name=fich_cible value=$fich[$i] >\n";
 		 $type_ext = renvoi_nom_image(extension_nom_fichier($fich[$i]));

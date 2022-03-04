@@ -38,22 +38,25 @@ if (!checkAccess()) {
     die();
 }
 
+//debug_var();
 
 if (isset($_POST['isposted'])) {
 	check_token();
     $ok = 'yes';
+    $ok_categorie = 'yes';
     if (isset($_POST['reg_current_matiere'])) {
         // On vérifie d'abord que l'identifiant est constitué uniquement de lettres et de chiffres :
         $matiere_name = $_POST['reg_current_matiere'];
-        if (!is_numeric($_POST['matiere_categorie'])) {
+        if ((!isset($_POST['matiere_categorie']))||(!is_numeric($_POST['matiere_categorie']))) {
             // On empêche les mise à jour globale automatiques, car on n'est pas sûr de ce qui s'est passé si l'ID n'est pas numérique...
-            $ok = "no";
+            //$ok = "no";
+            $ok_categorie = 'no';
             $matiere_categorie = "0";
         } else {
             $matiere_categorie = $_POST['matiere_categorie'];
         }
         //if (ereg ("^[a-zA-Z_]{1}[a-zA-Z0-9_]{1,19}$", $matiere_name)) {
-        if (preg_match("/^[a-zA-Z_]{1}[a-zA-Z0-9_]{1,19}$/", $matiere_name)) {
+        if (preg_match("/^[a-zA-Z_]{1}[a-zA-Z0-9_-]{1,19}$/", $matiere_name)) {
             $verify_query = mysql_query("SELECT * from matieres WHERE matiere='$matiere_name'");
             $verify = mysql_num_rows($verify_query);
             if ($verify == 0) {
@@ -89,8 +92,9 @@ if (isset($_POST['isposted'])) {
 		$matiere_nom_complet = html_entity_decode($_POST['matiere_nom_complet']);
         $matiere_priorite = $_POST['matiere_priorite'];
         $matiere_name = $_POST['matiere_name'];
-        if (!is_numeric($_POST['matiere_categorie'])) {
+        if ((!isset($_POST['matiere_categorie']))||(!is_numeric($_POST['matiere_categorie']))) {
             $matiere_categorie = "0";
+            $ok_categorie = 'no';
         } else {
             $matiere_categorie = $_POST['matiere_categorie'];
         }
@@ -106,6 +110,7 @@ if (isset($_POST['isposted'])) {
             $msg = "Les modifications ont été enregistrées ! <br />";
         }
     }
+
     if ((isset($_POST['force_defaut'])) and ($ok == 'yes')) {
         $sql="UPDATE j_groupes_matieres jgm, j_groupes_classes jgc SET jgc.priorite='".$matiere_priorite."'
         WHERE (jgc.id_groupe = jgm.id_groupe AND jgm.id_matiere='".$matiere_name."')";
@@ -113,7 +118,8 @@ if (isset($_POST['isposted'])) {
         //$msg = rawurlencode($sql);
         $req = mysql_query($sql);
     }
-    if ((isset($_POST['force_defaut_categorie'])) and ($ok == 'yes')) {
+
+    if ((isset($_POST['force_defaut_categorie'])) and ($ok == 'yes') and ($ok_categorie == 'yes')) {
         $sql="UPDATE j_groupes_classes jgc, j_groupes_matieres jgm SET jgc.categorie_id='".$matiere_categorie."'
         WHERE (jgc.id_groupe = jgm.id_groupe AND jgm.id_matiere='".$matiere_name."')";
         //echo "$sql<br />";
@@ -121,13 +127,13 @@ if (isset($_POST['isposted'])) {
         $req = mysql_query($sql);
     }
 
-
 	if($ok=='yes') {
 		$login_prof=isset($_POST['login_prof']) ? $_POST['login_prof'] : NULL;
 		if(isset($login_prof)) {
 			// Récupérer la liste des profs actuellement associés
 			$tab_profs_associes=array();
 			$sql="SELECT u.login FROM j_professeurs_matieres jpm, utilisateurs u WHERE jpm.id_professeur=u.login and id_matiere='$matiere_name' ORDER BY u.nom, u.prenom;";
+			//echo "$sql<br />\n";
 			$res_profs=mysql_query($sql);
 			if(mysql_num_rows($res_profs)>0) {
 				while($lig=mysql_fetch_object($res_profs)) {
@@ -140,6 +146,7 @@ if (isset($_POST['isposted'])) {
 				if(!in_array($login_prof[$loop], $tab_profs_associes)) {
 					// Recherche de l'ordre matière le plus élevé pour ce prof
 					$sql="SELECT MAX(ordre_matieres) max_ordre FROM j_professeurs_matieres WHERE id_professeur='".$login_prof[$loop]."';";
+					//echo "$sql<br />\n";
 					$res=mysql_query($sql);
 					if(mysql_num_rows($res)==0) {
 						$ordre_matieres=1;
@@ -150,6 +157,7 @@ if (isset($_POST['isposted'])) {
 	
 					// On ajoute le prof
 					$sql="INSERT INTO j_professeurs_matieres SET id_professeur='$login_prof[$loop]', id_matiere='$matiere_name', ordre_matieres='$ordre_matieres';";
+					//echo "$sql<br />\n";
 					$insert=mysql_query($sql);
 					if(!$insert) {
 						$msg.="Erreur lors de l'association de ".$login_prof[$loop]." avec la matière $matiere_name<br />";
@@ -178,6 +186,7 @@ if (isset($_POST['isposted'])) {
 						*/
 	
 						$sql="DELETE FROM j_professeurs_matieres WHERE id_professeur='".$tab_profs_associes[$loop]."' AND id_matiere='$matiere_name';";
+						//echo "$sql<br />\n";
 						$suppr=mysql_query($sql);
 						if(!$suppr) {
 							$msg.="Erreur lors de la suppression de l'association de ".$tab_profs_associes[$loop]." avec la matière $matiere_name<br />";
@@ -322,7 +331,8 @@ $k = '0';
 echo "<option value=0>0</option>\n";
 $k='11';
 $j = '1';
-while ($k < '51'){
+//while ($k < '51'){
+while ($k < 110){
     echo "<option value=$k"; if ($matiere_priorite == $k) {echo " SELECTED";} echo ">$j</option>\n";
     $k++;
     $j = $k - 10;
@@ -363,6 +373,59 @@ echo "</select>";
 </form>
 <!-- ============================================================================ -->
 <hr />
+
+<?php
+if((isset($current_matiere))&&($current_matiere!="")) {
+	$sql="SELECT DISTINCT g.id, g.name, g.description FROM groupes g, j_groupes_matieres jgm, j_groupes_classes jgc, classes c WHERE jgm.id_matiere='".$current_matiere."' AND jgm.id_groupe=g.id AND jgc.id_groupe=g.id AND jgc.id_classe=c.id ORDER BY c.classe, c.nom_complet";
+	//echo "$sql<br />";
+	$res_ens=mysql_query($sql);
+	$nb_ens=mysql_num_rows($res_ens);
+	if($nb_ens==0) {
+		echo "<p>Aucun enseignement n'est associé à la matière $current_matiere.</p>\n";
+	}
+	else {
+		echo "<p>$nb_ens enseignement(s) associé(s) à la matière $current_matiere&nbsp;:<br />";
+		while($lig_ens=mysql_fetch_object($res_ens)) {
+
+			$sql="SELECT c.id, c.classe FROM j_groupes_classes jgc, classes c WHERE jgc.id_classe=c.id AND jgc.id_groupe='$lig_ens->id' ORDER BY c.classe, c.nom_complet;";
+			$res_clas=mysql_query($sql);
+			$chaine_clas="";
+			if(mysql_num_rows($res_clas)>0) {
+				$cpt_clas=0;
+				while($lig_clas=mysql_fetch_object($res_clas)) {
+					if($cpt_clas>0) {$chaine_clas.=", ";}
+					$chaine_clas.="<a href='../groupes/edit_class.php?id_classe=$lig_clas->id'>$lig_clas->classe</a>";
+					$cpt_clas++;
+				}
+			}
+
+			$sql="SELECT u.login, u.civilite, u.nom, u.prenom FROM utilisateurs u, j_groupes_professeurs jgp WHERE jgp.login=u.login AND jgp.id_groupe='$lig_ens->id' ORDER BY u.nom, u.prenom;";
+			$res_prof=mysql_query($sql);
+			$chaine_prof="";
+			if(mysql_num_rows($res_prof)>0) {
+				$cpt_prof=0;
+				while($lig_prof=mysql_fetch_object($res_prof)) {
+					if($cpt_prof>0) {$chaine_prof.=", ";}
+					$chaine_prof.="<a href='../utilisateurs/modify_user.php?user_login=$lig_prof->login'>$lig_prof->civilite $lig_prof->nom ".mb_substr($lig_prof->prenom,0,1)."</a>";
+					$cpt_prof++;
+				}
+			}
+
+			echo "<a href='../groupes/edit_group.php?id_groupe=$lig_ens->id'>$lig_ens->name (<em>$lig_ens->description</em>)</a>";
+			if($chaine_clas!="") {
+				echo " en $chaine_clas";
+			}
+			if($chaine_prof!="") {
+				echo " avec $chaine_prof";
+			}
+			echo "<br />";
+		}
+		echo "</p>\n";
+	}
+	echo "<hr />\n";
+}
+?>
+
 <p><b>Aide :</b></p>
 <ul>
 <li><b>Nom de matière</b>

@@ -1,7 +1,7 @@
 <?php
 /*
 *
-* Copyright 2001, 2012 Thomas Belliard, Laurent Delineau, Edouard Hue, Eric Lebrun, Gabriel Fischer
+* Copyright 2001, 2013 Thomas Belliard, Laurent Delineau, Edouard Hue, Eric Lebrun, Gabriel Fischer
 *
 * This file is part of GEPI.
 *
@@ -151,6 +151,11 @@ else {
 	$largeur = "5%";
 }
 
+$style_specifique[] = "lib/DHTMLcalendar/calendarstyle";
+$javascript_specifique[] = "lib/DHTMLcalendar/calendar";
+$javascript_specifique[] = "lib/DHTMLcalendar/lang/calendar-fr";
+$javascript_specifique[] = "lib/DHTMLcalendar/calendar-setup";
+
 //**************** EN-TETE *****************
 if ($current_imprime=='n') $titre_page = "Cahier de textes - Vue d'ensemble";
 require_once("../lib/header.inc.php");
@@ -169,7 +174,71 @@ if (getSettingValue("active_cahiers_texte")!='y') {
 	die("<p class='grand centre_texte'>Le cahier de textes n'est pas accessible pour le moment.</p>");
 }
 
+$content="";
+
 echo "<div class='centre_table'>\n";
+
+	$infos_generales="";
+	if((isset($id_groupe))&&($id_groupe=='Toutes_matieres')) {
+		// Informations générales
+		if (($_SESSION['statut'] == 'responsable')&&(isset($selected_eleve_login))) {
+			// A VOIR: Cas des élèves qui changent de classe...
+
+			//if((!isset($id_classe))||($id_classe<1)) {
+				$sql="SELECT id_classe FROM j_eleves_classes WHERE login='$selected_eleve_login' ORDER BY periode DESC LIMIT 1;";
+				//echo "$sql<br />";
+				$res_classe=mysql_query($sql);
+				if(mysql_num_rows($res_classe)>0) {
+					//$id_classe = mysql_result($res_classe, 0, 'id_classe');
+					$tmp_id_classe = mysql_result($res_classe, 0, 'id_classe');
+				}
+			//}
+
+			//if(isset($id_classe)) {
+			if(isset($tmp_id_classe)) {
+				//$tab_grp=get_groups_for_eleve($selected_eleve_login, $id_classe);
+				$tab_grp=get_groups_for_eleve($selected_eleve_login, $tmp_id_classe);
+				//echo "get_groups_for_eleve($selected_eleve_login, $id_classe)<br />";
+
+				foreach($tab_grp as $tmp_current_group) {
+					$tmp_id_groupe=$tmp_current_group['id'];
+
+					// Affichage des informations générales
+					//$sql="SELECT contenu, id_ct  FROM ct_entry WHERE (id_groupe='$id_groupe' and (date_ct='' OR date_ct='0'));";
+					$sql="SELECT contenu, id_ct  FROM ct_entry WHERE (id_groupe='$tmp_id_groupe' and date_ct='');";
+					//echo "$sql<br />";
+					$appel_info_cahier_texte = mysql_query($sql);
+					$nb_cahier_texte = mysql_num_rows($appel_info_cahier_texte);
+					$content .= @mysql_result($appel_info_cahier_texte, 0, 'contenu');
+					$id_ct = @mysql_result($appel_info_cahier_texte, 0, 'id_ct');
+
+					$content .= affiche_docs_joints($id_ct,"c");
+
+					if($content!="") {
+						$infos_generales.="<div class='see_all_general couleur_bord_tableau_notice color_fond_notices_i' style='width:98%;'>";
+						$infos_generales.="<h3>".$tmp_current_group['name']." (<em>".$tmp_current_group['description']." en ".$tmp_current_group['classlist_string']."</em>)"."</h3>";
+						$infos_generales.=$content;
+						$infos_generales.="</div>";
+					}
+				}
+
+				if ($infos_generales != '') {
+					$titre_infobulle="Informations générales";
+					$texte_infobulle="<div style='padding:1em;'>\n";
+					$texte_infobulle.="<h2 class='grande_ligne couleur_bord_tableau_notice'>\n<strong>INFORMATIONS GENERALES</strong>\n</h2>\n";
+					$texte_infobulle.=$infos_generales;
+					$texte_infobulle.="</div>\n";
+
+					$tabdiv_infobulle[]=creer_div_infobulle("div_informations_generales",$titre_infobulle,"",$texte_infobulle,"pink",30,0,'y','y','n','n');
+
+					echo "<div class='color_fond_notices_i' style='float:right; width:10em; text-align:center;'><a href='#informations_generales' onclick=\"afficher_div('div_informations_generales','y',10,10);return false;\">Informations générales</a></div>";
+				}
+			}
+		}
+		
+
+	}
+
 	// Choix classe et matière
 	echo "<div class='ct_col_gauche'>\n";
 		if ($current_imprime=='n') {
@@ -262,6 +331,24 @@ if ($current_group) {
 	echo "</div>\n";
 }
 
+//================================================
+// 20130727
+$afficher_compte_rendus_seulement=isset($_GET['afficher_compte_rendus_seulement']) ? $_GET['afficher_compte_rendus_seulement'] : "n";
+$afficher_travail_a_faire_seulement=isset($_GET['afficher_travail_a_faire_seulement']) ? $_GET['afficher_travail_a_faire_seulement'] : "n";
+
+$class_notice_dev_fait="see_all_notice couleur_bord_tableau_notice color_fond_notices_t_fait";
+$class_notice_dev_non_fait="see_all_notice couleur_bord_tableau_notice color_fond_notices_t";
+
+$CDTPeutPointerTravailFait=getSettingAOui('CDTPeutPointerTravailFait'.ucfirst($_SESSION['statut']));
+
+if(($afficher_compte_rendus_seulement!='y')&&($CDTPeutPointerTravailFait)) {
+	if($selected_eleve_login!='') {
+		$tab_etat_travail_fait=get_tab_etat_travail_fait($selected_eleve_login);
+		echo js_cdt_modif_etat_travail();
+	}
+}
+//================================================
+
 //echo "\$id_classe=$id_classe<br />";
 //if(($id_groupe=='Toutes_matieres')&&($id_classe!=-1)) {
 if(($id_groupe=='Toutes_matieres')&&
@@ -293,94 +380,178 @@ if(($id_groupe=='Toutes_matieres')&&
 		}
 		echo "<a href='see_all.php?id_classe=$id_classe&amp;login_eleve=$selected_eleve_login&amp;id_groupe=$id_groupe&amp;ordre=$current_ordre&amp;imprime=$imprime'>\n$text_imprime\n</a>\n";
 		// } retour ne s'affichait pas sur la page imprimable
-	echo "</div>\n";
+
+		//$afficher_compte_rendus_seulement=isset($_GET['afficher_compte_rendus_seulement']) ? $_GET['afficher_compte_rendus_seulement'] : "n";
+		//$afficher_travail_a_faire_seulement=isset($_GET['afficher_travail_a_faire_seulement']) ? $_GET['afficher_travail_a_faire_seulement'] : "n";
+
+		if($afficher_travail_a_faire_seulement=='n') {
+			echo "- ";
+			echo "<a href='see_all.php?id_classe=$id_classe&amp;login_eleve=$selected_eleve_login&amp;id_groupe=$id_groupe&amp;ordre=$current_ordre&amp;imprime=$current_imprime&amp;afficher_travail_a_faire_seulement=y'>\nN'afficher que le Travail à faire\n</a>\n";
+		}
+
+		if($afficher_compte_rendus_seulement=='n') {
+			echo "- ";
+			echo "<a href='see_all.php?id_classe=$id_classe&amp;login_eleve=$selected_eleve_login&amp;id_groupe=$id_groupe&amp;ordre=$current_ordre&amp;imprime=$current_imprime&amp;afficher_compte_rendus_seulement=y'>\nN'afficher que les Compte-rendus de séance\n</a>\n";
+		}
+
+		if(($afficher_travail_a_faire_seulement!='n')||($afficher_compte_rendus_seulement!='n')) {
+			echo "- ";
+			echo "<a href='see_all.php?id_classe=$id_classe&amp;login_eleve=$selected_eleve_login&amp;id_groupe=$id_groupe&amp;ordre=$current_ordre&amp;imprime=$current_imprime'>\nAfficher les Compte-rendus de séance et Travaux à faire\n</a>\n";
+		}
+
+		//================================================
+		$date_debut_cdt_mail=isset($_POST['date_debut_cdt_mail']) ? $_POST['date_debut_cdt_mail'] : strftime("%d/%m/%Y");
+		$mail_dest=isset($_POST['mail_dest']) ? $_POST['mail_dest'] : NULL;
+		$envoi_mail=isset($_POST['envoi_mail']) ? $_POST['envoi_mail'] : "n";
+
+		$timestamp_date_debut_cdt_mail=getSettingValue("begin_bookings");
+		if(isset($date_debut_cdt_mail)) {
+			$tmp_tab_date=explode("/", $date_debut_cdt_mail);
+			if(isset($tmp_tab_date[2])) {
+				$timestamp_date_debut_cdt_mail=mktime(0,0,0,$tmp_tab_date[1],$tmp_tab_date[0],$tmp_tab_date[2]);
+			}
+		}
+
+		//include("../lib/calendrier/calendrier.class.php");
+		//$cal1 = new Calendrier("form_envoi_cdt_mail", "date_debut_cdt_mail");
+
+		// Choisir qui a le droit
+		if(($_SESSION['statut']!='eleve')&&($_SESSION['statut']!='responsable')) {
+			//echo "<span id='lien_mail' style='display:none'> - <a href='see_all.php?id_classe=$id_classe&amp;login_eleve=$selected_eleve_login&amp;id_groupe=$id_groupe&amp;ordre=$current_ordre&amp;imprime=$current_imprime' onclick=\"\" title=\"Envoyer par mail une partie du cahier de textes (par exemple pour envoyer à un parent d'élève qui a oublié ses compte et mot de passe).\">Mail</a></span>\n";
+			echo "<span id='lien_mail' style='display:none'> - <a href=\"javascript:afficher_div('div_envoi_cdt_par_mail','y',10,10)\" title=\"Envoyer par mail une partie du cahier de textes (par exemple pour envoyer à un parent d'élève qui a oublié ses compte et mot de passe).\">Mail</a></span>
+			<script type='text/javascript'>document.getElementById('lien_mail').style.display=''</script>\n";
+		echo "</div>\n";
+
+		$titre_infobulle="Envoi du CDT par mail";
+		$texte_infobulle="<form action='".$_SERVER['PHP_SELF']."' name='form_envoi_cdt_mail' method='post'>
+	<input type='hidden' name='envoi_mail' value='y' />
+	<input type='hidden' name='id_classe' value='$id_classe' />
+	<input type='hidden' name='login_eleve' value='$login_eleve' />
+	<input type='hidden' name='id_groupe' value='$id_groupe' />
+	<input type='hidden' name='current_ordre' value='$current_ordre' />
+	<input type='hidden' name='imprime' value='$current_imprime' />
+	<p>Précisez à quelle adresse vous souhaitez envoyer le contenu du cahier de textes&nbsp;:<br />
+	Mail&nbsp;:&nbsp;<input type='text' name='mail_dest' value='' /><br />
+	Indiquez également, quelle partie du cahier de textes vous souhaitez envoyer&nbsp;:<br />
+	A partir du&nbsp;:&nbsp;<input type='text' name='date_debut_cdt_mail' id='date_debut_cdt_mail' size='10' value='".$date_debut_cdt_mail."' onKeyDown=\"clavier_date(this.id,event);\" AutoComplete=\"off\" />";
+	$texte_infobulle.=img_calendrier_js("date_debut_cdt_mail", "img_bouton_date_debut_cdt_mail");
+	//$texte_infobulle.="<a href=\"#calend\" onClick=\"".$cal1->get_strPopup('../lib/calendrier/pop.calendrier.php', 350, 170)."\"><img src=\"../lib/calendrier/petit_calendrier.gif\" alt=\"Calendrier\" border=\"0\" /></a>";
+		$texte_infobulle.="<input type='submit' value='Envoyer' />
+</form>";
+		$tabdiv_infobulle[]=creer_div_infobulle('div_envoi_cdt_par_mail',$titre_infobulle,"",$texte_infobulle,"",30,0,'y','y','n','n');
+		}
+		//================================================
 
 	echo "<hr />\n";
+
+	echo "<div id='div_compte_rendu_envoi_mail' style='text-align:center;'></div>";
 
 	$tab_id_grp=array();
 	$tab_grp=array();
 	$tab_dates=array();
 	$tab_dates2=array();
+
+	$tab_timestamp_dates=array();
+	//$tab_notices_exclues_mail=array();
+
 	$sql="SELECT DISTINCT id_groupe FROM j_groupes_classes WHERE id_classe='$id_classe' ORDER BY priorite;";
 	$res=mysql_query($sql);
 	while($lig=mysql_fetch_object($res)) {
 		$tab_id_grp[]=$lig->id_groupe;
 	}
-	$sql="SELECT cte.* FROM ct_entry cte, j_groupes_classes jgc WHERE (contenu != ''
-		AND date_ct != ''
-		AND date_ct >= '".getSettingValue("begin_bookings")."'
-		AND date_ct <= '".getSettingValue("end_bookings")."'
-		AND jgc.id_groupe=cte.id_groupe
-		AND jgc.id_classe='$id_classe'
-		) ORDER BY date_ct DESC, heure_entry DESC, jgc.priorite DESC;";
-		//) ORDER BY date_ct ".$current_ordre.", heure_entry ".$current_ordre.", jgc.priorite;";
-	//echo "$sql<br />";
-	$res=mysql_query($sql);
-	$cpt=0;
-	while($lig=mysql_fetch_object($res)) {
-		$notice_visible="y";
-		if($lig->date_ct>time()) {
-			if(($_SESSION['statut']=='eleve')||($_SESSION['statut']=='responsable')) {
-				$notice_visible="n";
-			}
-		}
 
-		if($notice_visible=="y") {
-			//echo "$lig->date_ct<br />";
+	if($afficher_travail_a_faire_seulement=='n') {
+		$sql="SELECT cte.* FROM ct_entry cte, j_groupes_classes jgc WHERE (contenu != ''
+			AND date_ct != ''
+			AND date_ct >= '".getSettingValue("begin_bookings")."'
+			AND date_ct <= '".getSettingValue("end_bookings")."'
+			AND jgc.id_groupe=cte.id_groupe
+			AND jgc.id_classe='$id_classe'
+			) ORDER BY date_ct DESC, heure_entry DESC, jgc.priorite DESC;";
+			//) ORDER BY date_ct ".$current_ordre.", heure_entry ".$current_ordre.", jgc.priorite;";
+		//echo "$sql<br />";
+		$res=mysql_query($sql);
+		$cpt=0;
+		while($lig=mysql_fetch_object($res)) {
 			$date_notice=strftime("%a %d %b %y", $lig->date_ct);
-			if(!in_array($date_notice,$tab_dates)) {
-				$tab_dates[]=$date_notice;
-				$tab_dates2[]=$lig->date_ct;
+			$tab_timestamp_dates[$date_notice]=$lig->date_ct;
+
+			$notice_visible="y";
+			if($lig->date_ct>time()) {
+				// Les élèves et parents ne voient pas les comptes-rendus dans le futur (saisis à l'avance)
+				if(($_SESSION['statut']=='eleve')||($_SESSION['statut']=='responsable')||($envoi_mail=='y')) {
+					$notice_visible="n";
+				}
+				//$tab_notices_exclues_mail[]=$lig->id_ct;
 			}
-			$tab_notices[$date_notice][$lig->id_groupe][$cpt]['id_ct']=$lig->id_ct;
-			$tab_notices[$date_notice][$lig->id_groupe][$cpt]['id_login']=$lig->id_login;
-			$tab_notices[$date_notice][$lig->id_groupe][$cpt]['contenu']=$lig->contenu;
-			//echo " <span style='color:red'>\$tab_notices[$date_notice][$lig->id_groupe][$cpt]['contenu']=$lig->contenu</span><br />";
-			$cpt++;
+
+			if($notice_visible=="y") {
+				//echo "$lig->date_ct<br />";
+				//$date_notice=strftime("%a %d %b %y", $lig->date_ct);
+				if(!in_array($date_notice,$tab_dates)) {
+					$tab_dates[]=$date_notice;
+					$tab_dates2[]=$lig->date_ct;
+				}
+				$tab_notices[$date_notice][$lig->id_groupe][$cpt]['id_ct']=$lig->id_ct;
+				$tab_notices[$date_notice][$lig->id_groupe][$cpt]['id_login']=$lig->id_login;
+				$tab_notices[$date_notice][$lig->id_groupe][$cpt]['contenu']=$lig->contenu;
+				//echo " <span style='color:red'>\$tab_notices[$date_notice][$lig->id_groupe][$cpt]['contenu']=$lig->contenu</span><br />";
+				$cpt++;
+			}
 		}
 	}
 
 	$ts_limite_visibilite_devoirs_pour_eleves=time()+getSettingValue('delai_devoirs')*24*3600;
 
-	$sql="SELECT ctd.* FROM ct_devoirs_entry ctd, j_groupes_classes jgc WHERE (contenu != ''
-		AND date_ct != ''
-		AND date_ct >= '".getSettingValue("begin_bookings")."'
-		AND date_ct <= '".getSettingValue("end_bookings")."'
-		AND jgc.id_groupe=ctd.id_groupe
-		AND jgc.id_classe='$id_classe'
-		) ORDER BY date_ct DESC, jgc.priorite DESC;";
-		//) ORDER BY date_ct ".$current_ordre.", jgc.priorite;";
-	//echo "$sql<br />";
-	$res=mysql_query($sql);
-	$cpt=0;
-	$timestamp_courant=time();
-	while($lig=mysql_fetch_object($res)) {
-		$notice_visible="y";
-		if($lig->date_ct>$ts_limite_visibilite_devoirs_pour_eleves) {
-			if(($_SESSION['statut']=='eleve')||($_SESSION['statut']=='responsable')) {
-				$notice_visible="n";
-			}
-		}
+	if($afficher_compte_rendus_seulement=='n') {
+		$sql="SELECT ctd.* FROM ct_devoirs_entry ctd, j_groupes_classes jgc WHERE (contenu != ''
+			AND date_ct != ''
+			AND date_ct >= '".getSettingValue("begin_bookings")."'
+			AND date_ct <= '".getSettingValue("end_bookings")."'
+			AND jgc.id_groupe=ctd.id_groupe
+			AND jgc.id_classe='$id_classe'
+			) ORDER BY date_ct DESC, jgc.priorite DESC;";
+			//) ORDER BY date_ct ".$current_ordre.", jgc.priorite;";
+		//echo "$sql<br />";
+		$res=mysql_query($sql);
+		$cpt=0;
+		$timestamp_courant=time();
+		while($lig=mysql_fetch_object($res)) {
+			$date_dev=strftime("%a %d %b %y", $lig->date_ct);
+			$tab_timestamp_dates[$date_dev]=$lig->date_ct;
 
-		if($notice_visible=="y") {
-			if(($lig->date_visibilite_eleve=="")||
-				(($lig->date_visibilite_eleve!="")&&(mysql_date_to_unix_timestamp($lig->date_visibilite_eleve)<=$timestamp_courant))||
-				(verif_groupe_appartient_prof($lig->id_groupe)==1)) {
-				//echo "$lig->date_ct<br />";
-				$date_dev=strftime("%a %d %b %y", $lig->date_ct);
-				if(!in_array($date_dev,$tab_dates)) {
-					$tab_dates[]=$date_dev;
-					$tab_dates2[]=$lig->date_ct;
+			$notice_visible="y";
+			//$notice_visible_mail="y";
+			if($lig->date_ct>$ts_limite_visibilite_devoirs_pour_eleves) {
+				// Les élèves et parents ne voient pas les notices de travaux à faire dans le futur au-delà de 'delai_devoirs'
+				if(($_SESSION['statut']=='eleve')||($_SESSION['statut']=='responsable')||($envoi_mail=='y')) {
+					$notice_visible="n";
 				}
-				$tab_dev[$date_dev][$lig->id_groupe][$cpt]['id_ct']=$lig->id_ct;
-				$tab_dev[$date_dev][$lig->id_groupe][$cpt]['id_login']=$lig->id_login;
-				$tab_dev[$date_dev][$lig->id_groupe][$cpt]['contenu']=$lig->contenu;
-				$tab_dev[$date_dev][$lig->id_groupe][$cpt]['date_visibilite_eleve']=$lig->date_visibilite_eleve;
-				//echo " <span style='color:green'>\$tab_dev[$date_notice][$lig->id_groupe][$cpt]['contenu']=$lig->contenu</span><br />";
-				$cpt++;
+				//$notice_visible_mail="n";
+				$tab_notices_exclues_mail[]=$lig->id_ct;
+			}
+
+			if($notice_visible=="y") {
+				if(($lig->date_visibilite_eleve=="")||
+					(($lig->date_visibilite_eleve!="")&&(mysql_date_to_unix_timestamp($lig->date_visibilite_eleve)<=$timestamp_courant))||
+					((verif_groupe_appartient_prof($lig->id_groupe)==1)&&($envoi_mail=="n"))) {
+					//echo "$lig->date_ct<br />";
+					//$date_dev=strftime("%a %d %b %y", $lig->date_ct);
+					if(!in_array($date_dev,$tab_dates)) {
+						$tab_dates[]=$date_dev;
+						$tab_dates2[]=$lig->date_ct;
+					}
+					$tab_dev[$date_dev][$lig->id_groupe][$cpt]['id_ct']=$lig->id_ct;
+					$tab_dev[$date_dev][$lig->id_groupe][$cpt]['id_login']=$lig->id_login;
+					$tab_dev[$date_dev][$lig->id_groupe][$cpt]['contenu']=$lig->contenu;
+					$tab_dev[$date_dev][$lig->id_groupe][$cpt]['date_visibilite_eleve']=$lig->date_visibilite_eleve;
+					//echo " <span style='color:green'>\$tab_dev[$date_notice][$lig->id_groupe][$cpt]['contenu']=$lig->contenu</span><br />";
+					$cpt++;
+				}
 			}
 		}
 	}
+
 	//echo "\$current_ordre=$current_ordre<br />";
 	//sort($tab_dates);
 	if($current_ordre=='ASC') {
@@ -390,16 +561,35 @@ if(($id_groupe=='Toutes_matieres')&&
 		array_multisort ($tab_dates, SORT_ASC, SORT_NUMERIC, $tab_dates2, SORT_DESC, SORT_NUMERIC);
 	}
 
+	if(($afficher_compte_rendus_seulement=='n')&&($afficher_travail_a_faire_seulement=='n')) {
+		$perc_col1=20;
+		$perc_col_suivantes=39;
+	}
+	else {
+		$perc_col1=20;
+		$perc_col_suivantes=78;
+	}
+
+
+	//$lignes_cdt="";
+	$lignes_cdt_mail="";
+	//$chaine_travail_a_faire_futur="";
 	for($i=0;$i<count($tab_dates);$i++) {
-		echo "<div class='infobulle_corps' style='border:1px solid black; margin:3px; padding: 3px;'>\n";
-		echo "<h3 class='see_all_h3'>$tab_dates[$i]</h3>\n";
+		$lignes_date_courante="";
+
+		$lignes_date_courante.="<div class='infobulle_corps' style='border:1px solid black; margin:3px; padding: 3px;'>\n";
+		$lignes_date_courante.="<h3 class='see_all_h3'>$tab_dates[$i]</h3>\n";
 		$alt=1;
-		echo "<table class='boireaus' summary='' width='100%'>\n";
-		echo "<tr>\n";
-		echo "<th>Enseignement</th>\n";
-		echo "<th>Travail à faire</th>\n";
-		echo "<th>Compte-rendu de séance</th>\n";
-		echo "</tr>\n";
+		$lignes_date_courante.="<table class='boireaus' border='1' summary='' width='100%'>\n";
+		$lignes_date_courante.="<tr>\n";
+		$lignes_date_courante.="<th>Enseignement</th>\n";
+		if($afficher_compte_rendus_seulement=='n') {
+			$lignes_date_courante.="<th>Travail à faire</th>\n";
+		}
+		if($afficher_travail_a_faire_seulement=='n') {
+			$lignes_date_courante.="<th>Compte-rendu de séance</th>\n";
+		}
+		$lignes_date_courante.="</tr>\n";
 		for($j=0;$j<count($tab_id_grp);$j++) {
 			if((isset($tab_dev[$tab_dates[$i]][$tab_id_grp[$j]]))||(isset($tab_notices[$tab_dates[$i]][$tab_id_grp[$j]]))) {
 				if(!isset($tab_grp[$tab_id_grp[$j]])) {
@@ -408,63 +598,170 @@ if(($id_groupe=='Toutes_matieres')&&
 				}
 	
 				$alt=$alt*(-1);
-				echo "<tr class='lig$alt'>\n";
-				echo "<td width='20%'><span style='font-size:x-small'>".$tab_grp[$tab_id_grp[$j]]['name']."</span><br /><span style='font-weight:bold'>".$tab_grp[$tab_id_grp[$j]]['matiere']['nom_complet']."</span><br />";
+				$lignes_date_courante.="<tr class='lig$alt'>\n";
+				$lignes_date_courante.="<td width='".$perc_col1."%'><span style='font-size:x-small'>".$tab_grp[$tab_id_grp[$j]]['name']."</span><br /><span style='font-weight:bold'>".$tab_grp[$tab_id_grp[$j]]['matiere']['nom_complet']."</span><br />";
 				$str="";
 				foreach ($tab_grp[$tab_id_grp[$j]]['profs']['users'] as $tmp_prof) {
 					$str.=$tmp_prof["civilite"]." ".my_strtoupper($tmp_prof["nom"])." ".my_strtoupper(mb_substr($tmp_prof["prenom"],0,1)).", ";
 				}
 				$str = mb_substr($str, 0, -2);
-				echo "<span style='font-size:small'>";
-				echo $str;
-				echo "</span>";
-				//echo " <span style='color:red'>$tab_id_grp[$j]</span>";
-				echo "</td>\n";
-	
-				echo "<td width='39%' style='text-align:left; vertical-align: top;'>\n";
-				if(isset($tab_dev[$tab_dates[$i]][$tab_id_grp[$j]])) {
-					//for($k=0;$k<count($tab_dev[$tab_dates[$i]][$tab_id_grp[$j]]);$k++) {
-						//echo "<div class='see_all_notice couleur_bord_tableau_notice color_fond_notices_t' style='margin: 1px; padding: 1px; border: 1px solid black;'>".$tab_dev[$tab_dates[$i]][$tab_id_grp[$j]][$k]['contenu']."</div>\n";
-					foreach($tab_dev[$tab_dates[$i]][$tab_id_grp[$j]] as $key => $value) {
-						echo "<div class='see_all_notice couleur_bord_tableau_notice color_fond_notices_t' style='margin: 1px; padding: 1px; border: 1px solid black; width: 99%;'>";
+				$lignes_date_courante.="<span style='font-size:small'>";
+				$lignes_date_courante.=$str;
+				$lignes_date_courante.="</span>";
+				//$lignes_date_courante.=" <span style='color:red'>$tab_id_grp[$j]</span>";
+				$lignes_date_courante.="</td>\n";
 
-						if($value['date_visibilite_eleve']!='0000-00-00 00:00:00') {
-							echo "<div style='float:right; width: 6em; border: 1px solid black; margin: 2px; font-size: xx-small; text-align: center;'>Donné le ".formate_date($value['date_visibilite_eleve'])."</div>\n";
-						}
+				if($afficher_compte_rendus_seulement=='n') {
+					$lignes_date_courante.="<td width='".$perc_col_suivantes."%' style='text-align:left; vertical-align: top;'>\n";
+					if(isset($tab_dev[$tab_dates[$i]][$tab_id_grp[$j]])) {
 
-						echo $value['contenu'];
-						$adj=affiche_docs_joints($value['id_ct'],"t");
-						if($adj!='') {
-							echo "<div style='border: 1px dashed black'>\n";
-							echo $adj;
-							echo "</div>\n";
+						/*
+						$chaine_travail_a_faire_futur.="<hr />\n";
+						$chaine_travail_a_faire_futur.="<p>";
+						$chaine_travail_a_faire_futur.="<span style='font-size:x-small'>".$tab_grp[$tab_id_grp[$j]]['name']."</span><br /><span style='font-weight:bold'>".$tab_grp[$tab_id_grp[$j]]['matiere']['nom_complet']."</span><br />\n";
+						$chaine_travail_a_faire_futur.="<span style='font-size:small'>".$str."</span>";
+						$chaine_travail_a_faire_futur.="</p>";
+						*/
+
+						//for($k=0;$k<count($tab_dev[$tab_dates[$i]][$tab_id_grp[$j]]);$k++) {
+							//$lignes_date_courante.="<div class='see_all_notice couleur_bord_tableau_notice color_fond_notices_t' style='margin: 1px; padding: 1px; border: 1px solid black;'>".$tab_dev[$tab_dates[$i]][$tab_id_grp[$j]][$k]['contenu']."</div>\n";
+						foreach($tab_dev[$tab_dates[$i]][$tab_id_grp[$j]] as $key => $value) {
+							// 20130727
+							$class_color_fond_notice="color_fond_notices_t";
+							if($CDTPeutPointerTravailFait) {
+								if(array_key_exists($value['id_ct'], $tab_etat_travail_fait)) {
+									if($tab_etat_travail_fait[$value['id_ct']]['etat']=='fait') {
+										$image_etat="../images/edit16b.png";
+										$texte_etat_travail="FAIT: Le travail est actuellement pointé comme fait.\n";
+										if($tab_etat_travail_fait[$value['id_ct']]['date_modif']!=$tab_etat_travail_fait[$value['id_ct']]['date_initiale']) {
+											$texte_etat_travail.="Le travail a été pointé comme fait la première fois le ".formate_date($tab_etat_travail_fait[$value['id_ct']]['date_initiale'], "y")."\net modifié pour la dernière fois par la suite le ".formate_date($tab_etat_travail_fait[$value['id_ct']]['date_modif'], "y")."\n";
+										}
+										else {
+											$texte_etat_travail.="Le travail a été pointé comme fait le ".formate_date($tab_etat_travail_fait[$value['id_ct']]['date_initiale'], "y")."\n";
+										}
+										$texte_etat_travail.="Cliquer pour corriger si le travail n'est pas encore fait.";
+										$class_color_fond_notice="color_fond_notices_t_fait";
+									}
+									else {
+										$image_etat="../images/edit16.png";
+										$texte_etat_travail="NON FAIT: Le travail n'est actuellement pas fait.\nCliquer pour pointer le travail comme fait.";
+									}
+								}
+								else {
+									$image_etat="../images/edit16.png";
+									$texte_etat_travail="NON FAIT: Le travail n'est actuellement pas fait.\nCliquer pour pointer le travail comme fait.";
+								}
+							}
+
+							$lignes_date_courante.="<div id='div_travail_".$value['id_ct']."' class='see_all_notice couleur_bord_tableau_notice $class_color_fond_notice' style='margin: 1px; padding: 1px; border: 1px solid black; width: 99%; min-height:2em;'>";
+
+							if($value['date_visibilite_eleve']!='0000-00-00 00:00:00') {
+								$donne_le=formate_date($value['date_visibilite_eleve']);
+								$lignes_date_courante.="<div style='float:right; width: 6em; border: 1px solid black; margin: 2px; font-size: xx-small; text-align: center;' title=\"Travail donné le $donne_le\">Donné le ".$donne_le."</div>\n";
+								//$chaine_travail_a_faire_futur.="Donné le ".formate_date($value['date_visibilite_eleve'])."<br />";
+							}
+
+							if($CDTPeutPointerTravailFait) {
+								$lignes_date_courante.="<div id='div_etat_travail_".$value['id_ct']."' style='float:right; width: 16px; margin: 2px; text-align: center;'><a href=\"javascript:cdt_modif_etat_travail('$selected_eleve_login', '".$value['id_ct']."')\" title=\"$texte_etat_travail\"><img src='$image_etat' class='icone16' /></a></div>\n";
+							}
+
+							$lignes_date_courante.=$value['contenu'];
+							//$chaine_travail_a_faire_futur.=$value['contenu'];
+							$adj=affiche_docs_joints($value['id_ct'],"t");
+							if($adj!='') {
+								$lignes_date_courante.="<div style='border: 1px dashed black'>\n";
+								$lignes_date_courante.=$adj;
+								//$chaine_travail_a_faire_futur.=$adj."<br />";
+								$lignes_date_courante.="</div>\n";
+							}
+							$lignes_date_courante.="</div>\n";
 						}
-						echo "</div>\n";
 					}
+					$lignes_date_courante.="</td>\n";
 				}
-				echo "</td>\n";
-	
-				echo "<td width='39%' style='text-align:left; vertical-align: top;'>\n";
-				if(isset($tab_notices[$tab_dates[$i]][$tab_id_grp[$j]])) {
-					//for($k=0;$k<count($tab_notices[$tab_dates[$i]][$tab_id_grp[$j]]);$k++) {
-					foreach($tab_notices[$tab_dates[$i]][$tab_id_grp[$j]] as $key => $value) {
-						echo "<div class='see_all_notice couleur_bord_tableau_notice color_fond_notices_c' style='margin: 1px; padding: 1px; border: 1px solid black; width: 99%;'>".$value['contenu'];
-						$adj=affiche_docs_joints($value['id_ct'],"c");
-						if($adj!='') {
-							echo "<div style='border: 1px dashed black'>\n";
-							echo $adj;
-							echo "</div>\n";
+
+				if($afficher_travail_a_faire_seulement=='n') {
+					$lignes_date_courante.="<td width='".$perc_col_suivantes."%' style='text-align:left; vertical-align: top;'>\n";
+					if(isset($tab_notices[$tab_dates[$i]][$tab_id_grp[$j]])) {
+						//for($k=0;$k<count($tab_notices[$tab_dates[$i]][$tab_id_grp[$j]]);$k++) {
+						foreach($tab_notices[$tab_dates[$i]][$tab_id_grp[$j]] as $key => $value) {
+							$lignes_date_courante.="<div class='see_all_notice couleur_bord_tableau_notice color_fond_notices_c' style='margin: 1px; padding: 1px; border: 1px solid black; width: 99%;'>".$value['contenu'];
+							$adj=affiche_docs_joints($value['id_ct'],"c");
+							if($adj!='') {
+								$lignes_date_courante.="<div style='border: 1px dashed black'>\n";
+								$lignes_date_courante.=$adj;
+								$lignes_date_courante.="</div>\n";
+							}
+							$lignes_date_courante.="</div>\n";
 						}
-						echo "</div>\n";
 					}
+					$lignes_date_courante.="</td>\n";
 				}
-				echo "</td>\n";
-				echo "</tr>\n";
+				$lignes_date_courante.="</tr>\n";
 	
 			}
 		}
-		echo "</table>\n";
+		$lignes_date_courante.="</table>\n";
+		$lignes_date_courante.="</div>\n";
+
+		echo $lignes_date_courante;
+
+		if($tab_timestamp_dates[$tab_dates[$i]]>=$timestamp_date_debut_cdt_mail) {
+			$lignes_cdt_mail.=$lignes_date_courante;
+		}
+	}
+
+	if ($infos_generales != '') {
+		echo "<a name='informations_generales'></a>";
+		echo "<div style='padding:1em;'>\n";
+		echo "<h2 class='grande_ligne couleur_bord_tableau_notice'>\n<strong>INFORMATIONS GENERALES</strong>\n</h2>\n";
+		echo $infos_generales;
 		echo "</div>\n";
+	}
+
+	echo "<hr />\n";
+	echo "<p style='text-align:center; font-style:italic;'>Cahiers de textes du ";
+	echo strftime("%d/%m/%Y", getSettingValue("begin_bookings"));
+	echo " au ";
+	echo strftime("%d/%m/%Y", getSettingValue("end_bookings"));
+	echo "</p>\n";
+
+	// 20130812
+	if($envoi_mail=="y") {
+		if(!check_mail($_POST['mail_dest'])) {
+			$message="L'adresse mail choisie '".$_POST['mail_dest']."' est invalide.";
+			echo "<p style='color:red; text-align:center;'>$message</p>
+			<script type='text/javascript'>
+				document.getElementById('div_compte_rendu_envoi_mail').innerHTML=\"<span style='color:red'>$message</span>\";
+			</script>\n";
+		}
+		else {
+			$sujet="Cahier de textes";
+			$message="Bonjour(soir),\nVoici le contenu du cahier de textes à compter du ".$date_debut_cdt_mail.":\n".$lignes_cdt_mail;
+			$destinataire=$_POST['mail_dest'];
+			$header_suppl="";
+			if((isset($_SESSION['email']))&&(check_mail($_SESSION['email']))) {
+				$header_suppl.="Bcc:".$_SESSION['email']."\r\n";
+			}
+			$envoi=envoi_mail($sujet, $message, $destinataire, $header_suppl, "html");
+			if($envoi) {
+				$message="Le cahier de textes a été expédié à l'adresse mail choisie '".$_POST['mail_dest']."'.";
+				echo "<p style='color:green; text-align:center;'>$message</p>
+				<script type='text/javascript'>
+					document.getElementById('div_compte_rendu_envoi_mail').innerHTML=\"<span style='color:green'>$message</span>\";
+				</script>\n";
+			}
+			else {
+				$message="Echec de l'envoi du cahier de textes à l'adresse mail choisie '".$_POST['mail_dest']."'.";
+				echo "<p style='color:red; text-align:center;'>$message</p>
+				<script type='text/javascript'>
+					document.getElementById('div_compte_rendu_envoi_mail').innerHTML=\"<span style='color:red'>$message</span>\";
+				</script>\n";
+			}
+		}
+
+		// DEBUG:
+		//echo "<div style='border: 1px solid red; text-align:center;'>$lignes_cdt_mail</div>";
 	}
 
 	require("../lib/footer.inc.php");
@@ -485,6 +782,14 @@ if ($nb_test == 0) {
 		echo "Choisissez une classe et une matière.";
 	}
 	echo "\n</h2>\n";
+
+	echo "<hr />\n";
+	echo "<p style='text-align:center; font-style:italic;'>Cahiers de textes du ";
+	echo strftime("%d/%m/%Y", getSettingValue("begin_bookings"));
+	echo " au ";
+	echo strftime("%d/%m/%Y", getSettingValue("end_bookings"));
+	echo "</p>\n";
+
 	require("../lib/footer.inc.php");
 	die();
 }
@@ -495,11 +800,8 @@ $content = @mysql_result($appel_info_cahier_texte, 0, 'contenu');
 $id_ct = @mysql_result($appel_info_cahier_texte, 0, 'id_ct');
 $content .= affiche_docs_joints($id_ct,"c");
 if ($content != '') {
-	// echo "<div  style=\"border-bottom-style: solid; border-width:2px; border-color: ".$couleur_bord_tableau_notice."; \"><strong>INFORMATIONS GENERALES</strong></div>";
-	//echo "\n<div class='see_all_notice>\n";
 	echo "<h2 class='grande_ligne couleur_bord_tableau_notice'>\n<strong>INFORMATIONS GENERALES</strong>\n</h2>\n";
-	// echo "<table style=\"border-style:solid; border-width:0px; border-color: ".$couleur_bord_tableau_notice."; padding: 2px; margin: 2px;\" width = '100%' cellpadding='5'><tr><td>".$content."</td></tr></table>";
-echo "<div class='see_all_general couleur_bord_tableau_notice'>".$content."</div>";
+	echo "<div class='see_all_general couleur_bord_tableau_notice color_fond_notices_i' style='width:98%'>".$content."</div>";
 }
 
 	// echo "<div  style=\"border-bottom-style: solid; border-width:2px; border-color: ".$couleur_bord_tableau_notice."; \"><strong>CAHIER DE TEXTES: comptes rendus de séance</strong></div><br />";
@@ -621,7 +923,11 @@ while (true) {
 		$content .= affiche_docs_joints($not_dev->id_ct,$not_dev->type);
 		echo "<h3 class='see_all_h3'>\n<strong>\n";
 			if ($not_dev->type == "t") {
+				echo "<a name='travail_".$not_dev->id_ct."'></a>";
 				echo("A faire pour le : ");
+			}
+			else {
+				echo "<a name='compte_rendu_".$not_dev->id_ct."'></a>";
 			}
 			echo(strftime("%a %d %b %y", $not_dev->date_ct));
 		echo "</strong>\n</h3>\n";
@@ -640,7 +946,46 @@ while (true) {
 			}
 		}
 		// echo("<table style=\"border-style:solid; border-width:1px; border-color: ".$couleur_bord_tableau_notice.";\" width=\"100%\" cellpadding=\"1\" bgcolor=\"".$color_fond_notices[$not_dev->type]."\">\n<tr>\n<td>\n$content</td>\n</tr>\n</table>\n<br/>\n");
-		echo "<div class='see_all_notice couleur_bord_tableau_notice color_fond_notices_".$not_dev->type."'>";
+		if($not_dev->type=="t") {
+
+			// 20130727
+			$class_color_fond_notice="color_fond_notices_t";
+			if($CDTPeutPointerTravailFait) {
+				get_etat_et_img_cdt_travail_fait($not_dev->id_ct);
+				/*
+				if(array_key_exists($not_dev->id_ct, $tab_etat_travail_fait)) {
+					if($tab_etat_travail_fait[$not_dev->id_ct]['etat']=='fait') {
+						$image_etat="../images/edit16b.png";
+						$texte_etat_travail="FAIT: Le travail est actuellement pointé comme fait.\n";
+						if($tab_etat_travail_fait[$not_dev->id_ct]['date_modif']!=$tab_etat_travail_fait[$not_dev->id_ct]['date_initiale']) {
+							$texte_etat_travail.="Le travail a été pointé comme fait la première fois le ".formate_date($tab_etat_travail_fait[$not_dev->id_ct]['date_initiale'], "y")."\net modifié pour la dernière fois par la suite le ".formate_date($tab_etat_travail_fait[$not_dev->id_ct]['date_modif'], "y")."\n";
+						}
+						else {
+							$texte_etat_travail.="Le travail a été pointé comme fait le ".formate_date($tab_etat_travail_fait[$not_dev->id_ct]['date_initiale'], "y")."\n";
+						}
+						$texte_etat_travail.="Cliquer pour corriger si le travail n'est pas encore fait.";
+						$class_color_fond_notice="color_fond_notices_t_fait";
+					}
+					else {
+						$image_etat="../images/edit16.png";
+						$texte_etat_travail="NON FAIT: Le travail n'est actuellement pas fait.\nCliquer pour pointer le travail comme fait.";
+					}
+				}
+				else {
+					$image_etat="../images/edit16.png";
+					$texte_etat_travail="NON FAIT: Le travail n'est actuellement pas fait.\nCliquer pour pointer le travail comme fait.";
+				}
+				*/
+			}
+
+			echo "<div id='div_travail_".$not_dev->id_ct."' class='see_all_notice couleur_bord_tableau_notice $class_color_fond_notice' style='min-height:2em;'>";
+		}
+		else {
+			echo "<div class='see_all_notice couleur_bord_tableau_notice color_fond_notices_".$not_dev->type."''>";
+		}
+
+// id='div_travail_".$value['id_ct']."' class='see_all_notice couleur_bord_tableau_notice $class_color_fond_notice
+
 		/* if ($not_dev->type == "t") {
 			echo "see_all_a_faire'>\n";
 		} else {
@@ -648,7 +993,12 @@ while (true) {
 		}*/
 
 		if(($type_notice=='devoir')&&($not_dev->date_visibilite_eleve!='0000-00-00 00:00:00')) {
-			echo "<div style='float:right; width: 6em; border: 1px solid black; margin: 2px; font-size: xx-small; text-align: center;'>Donné le ".formate_date($not_dev->date_visibilite_eleve)."</div>\n";
+			$donne_le=formate_date($not_dev->date_visibilite_eleve);
+			echo "<div style='float:right; width: 6em; border: 1px solid black; margin: 2px; font-size: xx-small; text-align: center;' title=\"Travail donné le $donne_le\">Donné le ".$donne_le."</div>\n";
+		}
+
+		if(($type_notice=='devoir')&&($CDTPeutPointerTravailFait)) {
+			echo "<div id='div_etat_travail_".$not_dev->id_ct."' style='float:right; width: 16px; margin: 2px; text-align: center;'><a href=\"javascript:cdt_modif_etat_travail('$selected_eleve_login', '".$not_dev->id_ct."')\" title=\"$texte_etat_travail\"><img src='$image_etat' class='icone16' /></a></div>\n";
 		}
 
 		echo "$content\n</div>\n";
@@ -658,5 +1008,13 @@ while (true) {
 
 //if ($current_imprime=='n') echo "</td></tr></table>";
 //echo "</td></tr></table>";
+
+echo "<hr />\n";
+echo "<p style='text-align:center; font-style:italic;'>Cahiers de textes du ";
+echo strftime("%d/%m/%Y", getSettingValue("begin_bookings"));
+echo " au ";
+echo strftime("%d/%m/%Y", getSettingValue("end_bookings"));
+echo "</p>\n";
+
 require("../lib/footer.inc.php");
 ?>

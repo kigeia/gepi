@@ -50,6 +50,7 @@ $niveau_arbo = 1;
 
 // Initialisations files
 require_once("../lib/initialisations.inc.php");
+require_once("../lib/share-trombinoscope.inc.php");
 
 // Resume session
 
@@ -216,8 +217,9 @@ if (!suivi_ariane($_SERVER['PHP_SELF'],$titre_page))
   $tbs_menu[$nummenu]['entree'][]=array('lien'=>$chemin , 'titre'=>$titre, 'expli'=>$expli, 'ancre'=>$ancre);
   
   $chemin = "config_prefs.php";
-  $titre = "Paramétrage de l'interface ".$gepiSettings['denomination_professeur'];
-  $expli = "Paramétrage des items de l'interface simplifiée pour certaines pages. Gestion du menu en barre horizontale.";
+  //$titre = "Paramétrage de l'interface ".$gepiSettings['denomination_professeur'];
+  $titre = "Paramétrage des interfaces simplifiées et complémentaires";
+  $expli = "Paramétrage des items de l'interface simplifiée pour certaines pages.<br />Gestion du menu en barre horizontale.";
   $ancre="config_prefs";
   $tbs_menu[$nummenu]['entree'][]=array('lien'=>$chemin , 'titre'=>$titre, 'expli'=>$expli, 'ancre'=>$ancre);
 
@@ -298,11 +300,13 @@ if (!suivi_ariane($_SERVER['PHP_SELF'],$titre_page))
   $ancre="clean_tables";
   $tbs_menu[$nummenu]['entree'][]=array('lien'=>$chemin , 'titre'=>$titre, 'expli'=>$expli, 'ancre'=>$ancre);
   
-  $chemin = "efface_base.php";
-  $titre = "Effacer la base";
-  $expli = "Permet de réinitialiser les bases en effaçant toutes les données ".$gepiSettings['denomination_eleves']." de la base.";
-  $ancre="efface_base";
-  $tbs_menu[$nummenu]['entree'][]=array('lien'=>$chemin , 'titre'=>$titre, 'expli'=>$expli, 'ancre'=>$ancre);
+if(!getSettingAOui('gepi_en_production')) {
+	  $chemin = "efface_base.php";
+	  $titre = "Effacer la base";
+	  $expli = "Permet de réinitialiser les bases en effaçant toutes les données ".$gepiSettings['denomination_eleves']." de la base.";
+	  $ancre="efface_base";
+	  $tbs_menu[$nummenu]['entree'][]=array('lien'=>$chemin , 'titre'=>$titre, 'expli'=>$expli, 'ancre'=>$ancre);
+}
 
   if ($multisite != 'y') {
 	$chemin = "../mod_trombinoscopes/trombinoscopes_admin.php#purge";
@@ -318,12 +322,13 @@ if (!suivi_ariane($_SERVER['PHP_SELF'],$titre_page))
   $ancre="gestion_temp_dir";
   $tbs_menu[$nummenu]['entree'][]=array('lien'=>$chemin , 'titre'=>$titre, 'expli'=>$expli, 'ancre'=>$ancre);
   
+if(!getSettingAOui('gepi_en_production')) {
   $chemin = "gestion_base_test.php";
   $titre = "Gestion des données de test";
   $expli = "Permet d'inserer des données de test dans la base. Ne pas utiliser sur une base de production.";
   $ancre="gestion_base_test";
   $tbs_menu[$nummenu]['entree'][]=array('lien'=>$chemin , 'titre'=>$titre, 'expli'=>$expli, 'ancre'=>$ancre);
-
+}
 /*
 <!--
 <table class='menu' summary='Menu initialisation'>

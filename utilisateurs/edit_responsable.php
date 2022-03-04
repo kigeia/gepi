@@ -1,7 +1,7 @@
 <?php
 /*
  *
- * Copyright 2001, 2012 Thomas Belliard, Laurent Delineau, Eric Lebrun
+ * Copyright 2001, 2013 Thomas Belliard, Laurent Delineau, Eric Lebrun
  *
  * This file is part of GEPI.
  *
@@ -88,6 +88,19 @@ if ($mode == "classe") {
 
 aff_time();
 
+if((isset($_GET['acces_resp_legal_0']))&&(($_GET['acces_resp_legal_0']=='y')||($_GET['acces_resp_legal_0']=='n'))) {
+	check_token();
+
+	$sql="UPDATE responsables2 SET acces_sp='".$_GET['acces_resp_legal_0']."' WHERE pers_id='".$_GET['pers_id']."' AND ele_id='".$_GET['ele_id']."';";
+	$update=mysql_query($sql);
+	if($update) {
+		$msg="Modification de l'accès aux données pour pers_id=".$_GET['pers_id']." et ele_id=".$_GET['ele_id']." effectuée.<br />";
+	}
+	else {
+		$msg="Erreur lors de la modification de l'accès aux données pour pers_id=".$_GET['pers_id']." et ele_id=".$_GET['ele_id']."<br />";
+	}
+}
+
 // Trois actions sont possibles depuis cette page : activation, désactivation et suppression.
 // L'édition se fait directement sur la page de gestion des responsables
 if (!$error) {
@@ -166,10 +179,14 @@ if (!$error) {
 			if ($test == "0") {
 				$msg .= "Erreur lors de la suppression de l'utilisateur : celui-ci n'existe pas.";
 			} else {
+				// Suppression du compte proprement dite:
 				$res = mysql_query("DELETE FROM utilisateurs WHERE (login = '".$_GET['parent_login']."')");
 				if ($res) {
 					$msg .= "L'utilisateur ".$_GET['parent_login'] . " a été supprimé.";
+					// Réinitialisation du champ login dans la table 'resp_pers':
 					$res2 = mysql_query("UPDATE resp_pers SET login='' WHERE login = '".$_GET['parent_login'] . "'");
+					// Suppression de scorie éventuelle:
+					$res3 = mysql_query("DELETE FROM sso_table_correspondance WHERE login_gepi = '".$_GET['parent_login']."'");
 				} else {
 					$msg .= "Erreur lors de la suppression de l'utilisateur.";
 				}
@@ -180,11 +197,15 @@ if (!$error) {
 				$test = mysql_result(mysql_query("SELECT count(login) FROM utilisateurs WHERE login = '" . $current_parent->login ."'"), 0);
 				if ($test > 0) {
 					// L'utilisateur existe bien dans la tables utilisateurs, on désactive
+					// Suppression du compte proprement dite:
 					$res = mysql_query("DELETE FROM utilisateurs WHERE login = '" . $current_parent->login . "'");
 					if (!$res) {
 						$msg .= "Erreur lors de l'activation du compte ".$current_parent->login."<br />";
 					} else {
+						// Réinitialisation du champ login dans la table 'resp_pers':
 						$res = mysql_query("UPDATE resp_pers SET login = '' WHERE login = '" . $current_parent->login ."'");
+						// Suppression de scorie éventuelle:
+						$res3 = mysql_query("DELETE FROM sso_table_correspondance WHERE login_gepi = '".$current_parent->login."'");
 						$nb_comptes++;
 					}
 				}
@@ -302,7 +323,14 @@ aff_time();
 	}
 	echo " | <a href='impression_bienvenue.php?mode=responsable'>Fiches bienvenue</a>";
 
-	echo " | <a href='import_prof_csv.php?export_statut=responsable'>Export CSV</a>";
+	echo " | <a href='import_prof_csv.php?export_statut=responsable' title='Seuls les comptes actifs sont exportés.
+Export CSV avec entête au format NOM;PRENOM;LOGIN;EMAIL;ENFANTS;SEXE;IDENTIFIANT;STATUT'>Export CSV</a>";
+	echo " <a href='import_prof_csv.php?export_statut=responsable&amp;sans_entete=y' title='Seuls les comptes actifs sont exportés.
+Export CSV sans entête'><img src='../images/disabled.png' width='20' height='20' title='Export CSV sans entête' alt='CSV sans entête'></a>";
+	echo " | <a href='import_prof_csv.php?export_statut=responsable&amp;avec_adresse=y' title='Seuls les comptes actifs sont exportés.
+	Export avec adresse responsable.
+Export CSV avec entête au format NOM;PRENOM;LOGIN;EMAIL;ENFANTS;SEXE;IDENTIFIANT;STATUT;ADRESSE'>Export CSV avec adresse</a>";
+	echo " <a href='import_prof_csv.php?export_statut=responsable&amp;sans_entete=y'><img src='../images/disabled.png' width='20' height='20' title='Export CSV avec adresse sans entête' alt='CSV avec adresse sans entête'></a>";
 
 	echo " | <a href='edit_eleve.php'>Comptes élèves</a>";
 
@@ -310,7 +338,8 @@ aff_time();
 
 	aff_time();
 
-	echo "<form action='edit_responsable.php' method='post'>\n";
+	echo "<form action='edit_responsable.php' method='post'>
+	<fieldset style='border: 1px solid grey; background-image: url(\"../images/background/opacite50.png\");'>\n";
 	echo add_token_field();
 
 	echo "<p style='font-weight:bold;'>Actions par lot pour les comptes responsables existants : </p>\n";
@@ -375,47 +404,163 @@ aff_time();
 	echo "</p>\n";
 
 	echo "</blockquote>\n";
+	echo "</fieldset>\n";
 	echo "</form>\n";
 
-
 	echo "<p><br /></p>\n";
+
+	//========================================================
+	include("change_auth_mode.inc.php");
+	//========================================================
 
 	echo "<p><b>Liste des comptes responsables existants</b> :</p>\n";
 	echo "<blockquote>\n";
 
-	$afficher_tous_les_resp=isset($_POST['afficher_tous_les_resp']) ? $_POST['afficher_tous_les_resp'] : "n";
-	$critere_recherche=isset($_POST['critere_recherche']) ? $_POST['critere_recherche'] : "";
+	$afficher_tous_les_resp=isset($_POST['afficher_tous_les_resp']) ? $_POST['afficher_tous_les_resp'] : (isset($_GET['afficher_tous_les_resp']) ? $_GET['afficher_tous_les_resp'] : "n");
+
+	$critere_recherche=isset($_POST['critere_recherche']) ? $_POST['critere_recherche'] : (isset($_GET['critere_recherche']) ? $_GET['critere_recherche'] : "");
 	//$critere_recherche=preg_replace("/[^a-zA-ZÀÄÂÉÈÊËÎÏÔÖÙÛÜ½¼Ççàäâéèêëîïôöùûü_ -]/u", "", $critere_recherche);
 	$critere_recherche=nettoyer_caracteres_nom($critere_recherche, 'a', ' -','');
-  	$critere_recherche_login=isset($_POST['critere_recherche_login']) ? $_POST['critere_recherche_login'] : (isset($_GET['critere_recherche_login']) ? $_GET['critere_recherche_login'] : "");
+
+	$critere_recherche_login=isset($_POST['critere_recherche_login']) ? $_POST['critere_recherche_login'] : (isset($_GET['critere_recherche_login']) ? $_GET['critere_recherche_login'] : "");
 	//$critere_recherche_login=preg_replace("/[^a-zA-ZÀÄÂÉÈÊËÎÏÔÖÙÛÜ½¼Ççàäâéèêëîïôöùûü_ -]/u", "", $critere_recherche_login);
 	$critere_recherche_login=nettoyer_caracteres_nom($critere_recherche_login, 'a', ' -_.','');
 
-	$critere_id_classe=isset($_POST['critere_id_classe']) ? preg_replace('/[^0-9]/', '', $_POST['critere_id_classe']) : (isset($_POST['classe']) ? preg_replace('/[^0-9]/', '', $_POST['classe']) : "");
+	$critere_id_classe=isset($_POST['critere_id_classe']) ? preg_replace('/[^0-9]/', '', $_POST['critere_id_classe']) : (isset($_POST['classe']) ? preg_replace('/[^0-9]/', '', $_POST['classe']) : (isset($_GET['critere_id_classe']) ? preg_replace('/[^0-9]/', '', $_GET['critere_id_classe']) : (isset($_GET['classe']) ? preg_replace('/[^0-9]/', '', $_GET['classe']) : "")));
+
+	$critere_etat=isset($_POST['critere_etat']) ? $_POST['critere_etat'] : (isset($_GET['critere_etat']) ? $_GET['critere_etat'] : "");
+	if(!in_array($critere_etat, array('actif', 'inactif'))) {
+		$critere_etat="";
+	}
+
+	$critere_auth_mode=isset($_POST['critere_auth_mode']) ? $_POST['critere_auth_mode'] : (isset($_GET['critere_auth_mode']) ? $_GET['critere_auth_mode'] : array());
+
+	$critere_limit=isset($_POST['critere_limit']) ? $_POST['critere_limit'] : (isset($_GET['critere_limit']) ? $_GET['critere_limit'] : 20);
+	if(($critere_limit=="")||(!preg_match("/^[0-9]*$/", $critere_limit))||($critere_limit<1)) {
+		$critere_limit=20;
+	}
 	//====================================
 
+	//++++++++++++++++++++++++
+	if((isset($critere_recherche))&&($critere_recherche!="")) {
+		$_SESSION['edit_resp_critere_recherche']=$critere_recherche;
+	}
+
+	if($critere_recherche=="") {
+		if(isset($_SESSION['edit_resp_critere_recherche'])) {
+			if(isset($_GET['test_recup_critere'])) {
+				$critere_recherche=$_SESSION['edit_resp_critere_recherche'];
+			}
+			unset($_SESSION['edit_resp_critere_recherche']);
+		}
+	}
+	//++++++++++++++++++++++++
+	if((isset($critere_recherche_login))&&($critere_recherche_login!="")) {
+		$_SESSION['edit_resp_critere_recherche_login']=$critere_recherche_login;
+	}
+
+	if($critere_recherche_login=="") {
+		if(isset($_SESSION['edit_resp_critere_recherche_login'])) {
+			if(isset($_GET['test_recup_critere'])) {
+				$critere_recherche_login=$_SESSION['edit_resp_critere_recherche_login'];
+			}
+			unset($_SESSION['edit_resp_critere_recherche_login']);
+		}
+	}
+	//++++++++++++++++++++++++
+	if((isset($critere_id_classe))&&($critere_id_classe!="")) {
+		$_SESSION['edit_resp_critere_id_classe']=$critere_id_classe;
+	}
+
+	if($critere_id_classe=="") {
+		if(isset($_SESSION['edit_resp_critere_id_classe'])) {
+			if(isset($_GET['test_recup_critere'])) {
+				$critere_id_classe=$_SESSION['edit_resp_critere_id_classe'];
+			}
+			unset($_SESSION['edit_resp_critere_id_classe']);
+		}
+	}
+	//++++++++++++++++++++++++
+	if((isset($critere_etat))&&($critere_etat!="")) {
+		$_SESSION['edit_resp_critere_etat']=$critere_etat;
+	}
+
+	if($critere_etat=="") {
+		if(isset($_SESSION['edit_resp_critere_etat'])) {
+			if(isset($_GET['test_recup_critere'])) {
+				$critere_etat=$_SESSION['edit_resp_critere_etat'];
+			}
+			unset($_SESSION['edit_resp_critere_etat']);
+		}
+	}
+	//++++++++++++++++++++++++
+	if((isset($critere_auth_mode))&&(is_array($critere_auth_mode))&&(count($critere_auth_mode)>0)) {
+		$_SESSION['edit_resp_critere_auth_mode']=$critere_auth_mode;
+	}
+
+	if(count($critere_auth_mode)==0) {
+		if(isset($_SESSION['edit_resp_critere_auth_mode'])) {
+			if(isset($_GET['test_recup_critere'])) {
+				$critere_auth_mode=$_SESSION['edit_resp_critere_auth_mode'];
+			}
+			unset($_SESSION['edit_resp_critere_auth_mode']);
+		}
+	}
+	if((isset($critere_etat))&&($critere_etat!="")) {
+		$_SESSION['edit_resp_critere_etat']=$critere_etat;
+	}
+	//++++++++++++++++++++++++
+	if((isset($critere_limit))&&($critere_limit!="")&&($critere_limit>19)) {
+		$_SESSION['edit_resp_critere_limit']=$critere_limit;
+	}
+
+	if($critere_limit=="") {
+		if(isset($_SESSION['edit_resp_critere_limit'])) {
+			if(isset($_GET['test_recup_critere'])) {
+				$critere_limit=$_SESSION['edit_resp_critere_limit'];
+			}
+			unset($_SESSION['edit_resp_critere_limit']);
+		}
+	}
+	//++++++++++++++++++++++++
+
+	$rowspan=6;
+	$sql="SELECT u.*,rp.pers_id FROM utilisateurs u, resp_pers rp, responsables2 r, eleves e  WHERE u.statut='responsable' AND rp.login=u.login AND rp.pers_id=r.pers_id AND r.ele_id=e.ele_id AND e.login NOT IN (SELECT login FROM j_eleves_classes) ORDER BY u.nom,u.prenom;";
+	//echo "$sql<br />";
+	$test_parents = mysql_query($sql);
+	if(mysql_num_rows($test_parents)>0) {
+		$rowspan++;
+	}
+
 	echo "<form enctype='multipart/form-data' name='form_rech' action='".$_SERVER['PHP_SELF']."' method='post'>\n";
-	echo "<table style='border:1px solid black;' summary=\"Filtrage\">\n";
+	//echo "<fieldset style='border: 1px solid grey; background-image: url(\"../images/background/opacite50.png\");'>\n";
+	echo "<table style='border:1px solid grey; background-image: url(\"../images/background/opacite50.png\");' summary=\"Filtrage\">\n";
 	echo "<tr>\n";
-	echo "<td valign='top' rowspan='7'>\n";
+	echo "<td valign='top' rowspan='$rowspan'>\n";
 	echo "Filtrage:";
 	echo "</td>\n";
 	echo "<td>\n";
-	echo "<input type='submit' name='filtrage' value='Afficher' /> les responsables ayant un login dont le <b>nom</b> contient: ";
+	echo "<input type='submit' name='filtrage' value='Afficher' /> les responsables ayant un login dont le <b>nom</b> contient&nbsp;: ";
+	echo "</td>\n";
+	echo "<td>\n";
 	echo "<input type='text' name='critere_recherche' value='$critere_recherche' />\n";
 	echo "</td>\n";
 	echo "</tr>\n";
 
 	echo "<tr>\n";
 	echo "<td>\n";
-	echo "<input type='submit' name='filtrage' value='Afficher' /> les responsables ayant un <b>login</b> qui contient: ";
+	echo "<input type='submit' name='filtrage' value='Afficher' /> les responsables ayant un <b>login</b> qui contient&nbsp;: ";
+	echo "</td>\n";
+	echo "<td>\n";
 	echo "<input type='text' name='critere_recherche_login' value='$critere_recherche_login' />\n";
 	echo "</td>\n";
 	echo "</tr>\n";
 
 	echo "<tr>\n";
 	echo "<td>\n";
-	echo "<input type='submit' name='filtrage' value='Afficher' /> les responsables (<em>ayant un login</em>) d'élève(s) de la <b>classe</b> de: ";
+	echo "<input type='submit' name='filtrage' value='Afficher' /> les responsables (<em>ayant un login</em>) d'élève(s) de la <b>classe</b> de&nbsp;: ";
+	echo "</td>\n";
+	echo "<td>\n";
 	echo "<select name='critere_id_classe'>\n";
 	echo "<option value=''>---</option>\n";
 	$sql="SELECT DISTINCT id, classe FROM classes c, j_eleves_classes jec, eleves e, utilisateurs u, resp_pers rp, responsables2 r WHERE c.id=jec.id_classe AND jec.login=e.login AND e.ele_id=r.ele_id AND r.pers_id=rp.pers_id AND rp.login=u.login ORDER BY classe;";
@@ -431,10 +576,11 @@ aff_time();
 	echo "</td>\n";
 	echo "</tr>\n";
 
-
+	/*
 	$sql="SELECT u.*,rp.pers_id FROM utilisateurs u, resp_pers rp, responsables2 r, eleves e  WHERE u.statut='responsable' AND rp.login=u.login AND rp.pers_id=r.pers_id AND r.ele_id=e.ele_id AND e.login NOT IN (SELECT login FROM j_eleves_classes) ORDER BY u.nom,u.prenom;";
 	//echo "$sql<br />";
 	$test_parents = mysql_query($sql);
+	*/
 	if(mysql_num_rows($test_parents)>0) {
 		$nb_resp_anormaux_actifs=0;
 		while($lig_resp_anormaux=mysql_fetch_object($test_parents)) {
@@ -449,7 +595,7 @@ aff_time();
 		echo "</tr>\n";
 	
 		echo "<tr>\n";
-		echo "<td>\n";
+		echo "<td colspan='2'>\n";
 		echo "<input type='button' name='button_afficher_resp_eleves_sans_classe' value=\"Afficher tous les responsables d'élèves hors classe\" onClick=\"document.getElementById('afficher_resp_eleves_sans_classe').value='y'; document.form_rech.submit();\" /> (<em>".mysql_num_rows($test_parents)." dont ".$nb_resp_anormaux_actifs." actif";
 		if($nb_resp_anormaux_actifs>0) {echo "s";}
 		echo "</em>)\n";
@@ -458,43 +604,166 @@ aff_time();
 		echo "</tr>\n";
 	}
 
+	$style_etat_actif="";
+	$sql="SELECT 1=1 FROM utilisateurs u, resp_pers rp WHERE u.login=rp.login AND u.etat='actif';";
+	$res_etat_actif=mysql_query($sql);
+	$nb_etat_actif=mysql_num_rows($res_etat_actif);
+	if($nb_etat_actif==0) {$style_etat_actif=" style='color:red'";}
+
+	$style_etat_inactif="";
+	$sql="SELECT 1=1 FROM utilisateurs u, resp_pers rp WHERE u.login=rp.login AND u.etat='inactif';";
+	$res_etat_inactif=mysql_query($sql);
+	$nb_etat_inactif=mysql_num_rows($res_etat_inactif);
+	if($nb_etat_inactif==0) {$style_etat_inactif=" style='color:red'";}
+
+	echo "<tr>\n";
+	echo "<td style='vertical-align:top'>\n";
+	echo "<input type='submit' name='filtrage' value='Afficher' /> les responsables (<em>ayant un login</em>) dont le compte est&nbsp;: ";
+	echo "</td>\n";
+	echo "<td>\n";
+	echo "<input type='checkbox' name='critere_etat' id='etat_actif' value='actif' onchange=\"verif_checkbox_etat('etat_actif')\" ";
+	if($critere_etat=="actif") {echo "checked ";}
+	echo "/><label for='etat_actif'$style_etat_actif>actif (<em title='$nb_etat_actif compte(s) responsables toutes classes confondues.'>$nb_etat_actif</em>)</label><br />\n";
+	echo "<input type='checkbox' name='critere_etat' id='etat_inactif' value='inactif' onchange=\"verif_checkbox_etat('etat_inactif')\" ";
+	if($critere_etat=="inactif") {echo "checked ";}
+	echo "/><label for='etat_inactif'$style_etat_inactif>inactif (<em title='$nb_etat_inactif compte(s) responsables toutes classes confondues.'>$nb_etat_inactif</em>)</label>\n";
+	echo "</td>\n";
+	echo "</tr>\n";
+
+	$style_auth_mode_gepi="";
+	$sql="SELECT 1=1 FROM utilisateurs u, resp_pers rp WHERE u.login=rp.login AND u.auth_mode='gepi';";
+	$res_auth_mode_gepi=mysql_query($sql);
+	$nb_auth_mode_gepi=mysql_num_rows($res_auth_mode_gepi);
+	if($nb_auth_mode_gepi==0) {$style_auth_mode_gepi=" style='color:red'";}
+
+	$style_auth_mode_sso="";
+	$sql="SELECT 1=1 FROM utilisateurs u, resp_pers rp WHERE u.login=rp.login AND u.auth_mode='sso';";
+	$res_auth_mode_sso=mysql_query($sql);
+	$nb_auth_mode_sso=mysql_num_rows($res_auth_mode_sso);
+	if($nb_auth_mode_sso==0) {$style_auth_mode_sso=" style='color:red'";}
+
+	$style_auth_mode_ldap="";
+	$sql="SELECT 1=1 FROM utilisateurs u, resp_pers rp WHERE u.login=rp.login AND u.auth_mode='ldap';";
+	$res_auth_mode_ldap=mysql_query($sql);
+	$nb_auth_mode_ldap=mysql_num_rows($res_auth_mode_ldap);
+	if($nb_auth_mode_ldap==0) {$style_auth_mode_ldap=" style='color:red'";}
+
+	echo "<tr>\n";
+	echo "<td style='vertical-align:top'>\n";
+	echo "<input type='submit' name='filtrage' value='Afficher' /> les responsables (<em>ayant un login</em>) dont mode d'authentification est&nbsp;: ";
+	echo "</td>\n";
+	echo "<td>\n";
+	echo "<input type='checkbox' name='critere_auth_mode[]' id='auth_mode_gepi' value='gepi' ";
+	if(in_array("gepi", $critere_auth_mode)) {echo "checked ";}
+	echo "/><label for='auth_mode_gepi'$style_auth_mode_gepi>gepi (<em title='$nb_auth_mode_gepi compte(s) responsables toutes classes confondues.'>$nb_auth_mode_gepi</em>)</label><br />\n";
+	echo "<input type='checkbox' name='critere_auth_mode[]' id='auth_mode_sso' value='sso' ";
+	if(in_array("sso", $critere_auth_mode)) {echo "checked ";}
+	echo "/><label for='auth_mode_sso'$style_auth_mode_sso>sso (<em title='$nb_auth_mode_sso compte(s) responsables toutes classes confondues.'>$nb_auth_mode_sso</em>)</label><br />\n";
+	echo "<input type='checkbox' name='critere_auth_mode[]' id='auth_mode_ldap' value='ldap' ";
+	if(in_array("ldap", $critere_auth_mode)) {echo "checked ";}
+	echo "/><label for='auth_mode_ldap'$style_auth_mode_ldap>ldap (<em title='$nb_auth_mode_ldap compte(s) responsables toutes classes confondues.'>$nb_auth_mode_ldap</em>)</label>\n";
+	echo "</td>\n";
+	echo "</tr>\n";
+
+	$sql="SELECT 1=1 FROM utilisateurs u, resp_pers rp WHERE u.login=rp.login;";
+	$res_resp=mysql_query($sql);
+	$nb_resp=mysql_num_rows($res_resp);
+
+	echo "<tr>\n";
+	echo "<td style='vertical-align:top'>\n";
+	echo "Restreindre la recherche à \n";
+	echo "</td>\n";
+	echo "<td>\n";
+	echo "<select name='critere_limit'>
+	<option value='20'";
+	if($critere_limit==20) {echo " selected";}
+	echo ">20</option>
+	<option value='50'";
+	if($critere_limit==50) {echo " selected";}
+	echo ">50</option>
+	<option value='100'";
+	if($critere_limit==100) {echo " selected";}
+	echo ">100</option>";
+	for($loop=0;$loop<ceil($nb_resp/200);$loop++) {
+		$n=200*(1+$loop);
+		if($n>$nb_resp) {
+			$n=$nb_resp;
+		}
+		echo "
+	<option value='$n'";
+		if($critere_limit==$n) {echo " selected";}
+		echo ">$n</option>";
+	}
+	echo "
+</select> enregistrements\n";
+	echo "</td>\n";
+	echo "</tr>\n";
+
+
 	echo "<tr>\n";
 	echo "<td>\n";
 	echo "ou";
 	echo "</td>\n";
+	echo "<td>\n";
+	echo "</td>\n";
 	echo "</tr>\n";
 
 	echo "<tr>\n";
-	echo "<td>\n";
+	echo "<td colspan='3'>\n";
 	echo "<input type='button' name='afficher_tous' value='Afficher tous les responsables ayant un login' onClick=\"document.getElementById('afficher_tous_les_resp').value='y'; document.form_rech.submit();\" />\n";
 	echo "</td>\n";
 	echo "</tr>\n";
 	echo "</table>\n";
 
 	echo "<input type='hidden' name='afficher_tous_les_resp' id='afficher_tous_les_resp' value='n' />\n";
+	//echo "</fieldset>\n";
 	echo "</form>\n";
 	//====================================
 	echo "<br />\n";
 
+	echo "
+<script type='text/javascript'>
+	function verif_checkbox_etat(id) {
+		if(document.getElementById(id).checked==true) {
+			document.getElementById('etat_actif').checked=false;
+			document.getElementById('etat_inactif').checked=false;
+
+			document.getElementById(id).checked=true;
+		}
+	}
+
+	/*
+	function verif_checkbox_auth_mode(id) {
+		if(document.getElementById(id).checked==true) {
+			document.getElementById('auth_mode_gepi').checked=false;
+			document.getElementById('auth_mode_sso').checked=false;
+			document.getElementById('auth_mode_ldap').checked=false;
+
+			document.getElementById(id).checked=true;
+		}
+	}
+	*/
+</script>\n";
 ?>
 <!--table border="1"-->
 <table class='boireaus' border='1' summary="Liste des comptes existants">
 <tr>
 	<th>Identifiant</th>
 	<th>Nom Prénom</th>
+	<!--th colspan='2'>Responsable de</th-->
 	<th>Responsable de</th>
 	<th>Etat</th>
 	<th>Mode auth.</th>
 	<th>Supprimer</th>
-	<th colspan="4">Réinitialiser le mot de passe</th>
+	<th colspan="3">Réinitialiser le mot de passe</th>
+	<th>Fiche bienvenue</th>
 </tr>
 <?php
 //$quels_parents = mysql_query("SELECT u.*, r.pers_id FROM utilisateurs u, resp_pers r WHERE (u.statut = 'responsable' AND r.login = u.login) ORDER BY u.nom,u.prenom");
 
 if((!isset($_POST['afficher_resp_eleves_sans_classe']))||($_POST['afficher_resp_eleves_sans_classe']!='y')) {
-	//if($critere_id_classe=='') {
 	if(($critere_id_classe=='')||($afficher_tous_les_resp=='y')) {
-		$sql="SELECT u.*, r.pers_id FROM utilisateurs u, resp_pers r WHERE (u.statut = 'responsable' AND r.login = u.login";
+		$sql="SELECT DISTINCT u.*, rp.pers_id FROM utilisateurs u, resp_pers rp, responsables2 r WHERE (u.statut = 'responsable' AND rp.login = u.login AND r.pers_id=rp.pers_id";
 	}
 	else {
 		$sql="SELECT DISTINCT u.*, r.pers_id FROM classes c, j_eleves_classes jec, eleves e, utilisateurs u, resp_pers rp, responsables2 r WHERE (u.statut = 'responsable' AND rp.login=u.login";
@@ -513,25 +782,51 @@ if((!isset($_POST['afficher_resp_eleves_sans_classe']))||($_POST['afficher_resp_
 			$sql.=" AND rp.login = u.login AND jec.id_classe='$critere_id_classe' AND jec.login=e.login AND e.ele_id=r.ele_id AND r.pers_id=rp.pers_id";
 		}
 	}
+
+	if(($critere_etat!="")&&(in_array($critere_etat, array('actif', 'inactif')))) {
+		$sql.=" AND u.etat='".$_POST['critere_etat']."'";
+	}
+
+	if(count($critere_auth_mode)>0) {
+		$chaine_auth_mode="";
+		for($loop=0;$loop<count($critere_auth_mode);$loop++) {
+			if(in_array($critere_auth_mode[$loop], array('sso', 'gepi', 'ldap'))) {
+				if($chaine_auth_mode!="") {
+					$chaine_auth_mode.=" OR ";
+				}
+				$chaine_auth_mode.=" u.auth_mode='".$critere_auth_mode[$loop]."'";
+			}
+		}
+
+		if($chaine_auth_mode!="") {
+			$sql.=" AND ($chaine_auth_mode)";
+		}
+	}
+
 	$sql.=") ORDER BY u.nom,u.prenom";
 
 	// Effectif sans login avec filtrage sur le nom:
-	//$nb1 = mysql_num_rows(mysql_query($sql));
-	
 	if($afficher_tous_les_resp!='y'){
-		if(($critere_recherche=="")&&($critere_recherche_login=="")&&($critere_id_classe=="")) {
-			$sql.=" LIMIT 20";
-		}
+		$nb_lignes_avant_limit=mysql_num_rows(mysql_query($sql));
+		//if(($critere_recherche=="")&&($critere_recherche_login=="")&&($critere_id_classe=="")) {
+			$sql.=" LIMIT $critere_limit";
+		//}
 	}
 }
 else {
-	$sql="SELECT u.*,rp.pers_id FROM utilisateurs u, resp_pers rp, responsables2 r, eleves e  WHERE u.statut='responsable' AND rp.login=u.login AND rp.pers_id=r.pers_id AND r.ele_id=e.ele_id AND e.login NOT IN (SELECT login FROM j_eleves_classes) ORDER BY u.nom,u.prenom;";
+	//$sql="SELECT DISTINCT u.*,rp.pers_id, r.resp_legal, r.acces_sp FROM utilisateurs u, resp_pers rp, responsables2 r, eleves e  WHERE u.statut='responsable' AND rp.login=u.login AND rp.pers_id=r.pers_id AND r.ele_id=e.ele_id AND e.login NOT IN (SELECT login FROM j_eleves_classes) ORDER BY u.nom,u.prenom;";
+	$sql="SELECT DISTINCT u.*,rp.pers_id FROM utilisateurs u, resp_pers rp, responsables2 r, eleves e  WHERE u.statut='responsable' AND rp.login=u.login AND rp.pers_id=r.pers_id AND r.ele_id=e.ele_id AND e.login NOT IN (SELECT login FROM j_eleves_classes) ORDER BY u.nom,u.prenom;";
 }
 //echo "$sql<br />\n";
 $quels_parents = mysql_query($sql);
 
 // Effectif sans login avec filtrage sur le nom:
 $nb1 = mysql_num_rows($quels_parents);
+
+$complement_nb_lignes="";
+if((isset($nb_lignes_avant_limit))&&($nb_lignes_avant_limit!=$nb1)) {
+	$complement_nb_lignes=" sur ".$nb_lignes_avant_limit;
+}
 
 $compteur_resp=0;
 $alt=1;
@@ -544,8 +839,15 @@ while ($current_parent = mysql_fetch_object($quels_parents)) {
 		echo "<td>";
 			echo $current_parent->nom . " " . $current_parent->prenom;
 		echo "</td>\n";
+		/*
+		echo "<td title='Responsable légal $current_parent->resp_legal'>";
+			echo "<span style='color:red'>A REVOIR: un responsable peut être resp_legal 1,2 ou 0 selon l'enfant</span>";
+			echo $current_parent->resp_legal;
+		echo "</td>\n";
+		*/
 		echo "<td>";
-		$sql="SELECT DISTINCT e.nom,e.prenom,c.classe FROM eleves e,
+		/*
+		$sql="SELECT DISTINCT e.login, e.nom,e.prenom,c.classe FROM eleves e,
 												j_eleves_classes jec,
 												classes c,
 												responsables2 r
@@ -555,6 +857,16 @@ while ($current_parent = mysql_fetch_object($quels_parents)) {
 												r.pers_id='$current_parent->pers_id' AND
 												(r.resp_legal='1' OR r.resp_legal='2')
 											ORDER BY e.nom,e.prenom";
+		*/
+		$sql="SELECT DISTINCT e.login, e.nom,e.prenom, e.ele_id,c.classe, r.resp_legal, r.acces_sp FROM eleves e,
+												j_eleves_classes jec,
+												classes c,
+												responsables2 r
+											WHERE e.login=jec.login AND
+												jec.id_classe=c.id AND
+												r.ele_id=e.ele_id AND
+												r.pers_id='$current_parent->pers_id'
+											ORDER BY e.nom,e.prenom";
 		$res_enfants=mysql_query($sql);
 		//echo "$sql<br />";
 		if(mysql_num_rows($res_enfants)==0){
@@ -562,7 +874,39 @@ while ($current_parent = mysql_fetch_object($quels_parents)) {
 		}
 		else{
 			while($current_enfant=mysql_fetch_object($res_enfants)){
-				echo casse_mot($current_enfant->prenom,'majf2')." ".casse_mot($current_enfant->nom,'maj')." (<i>".$current_enfant->classe."</i>)<br />\n";
+
+				echo "<a href='../eleves/modify_eleve.php?eleve_login=$current_enfant->login'>".casse_mot($current_enfant->prenom,'majf2')." ".casse_mot($current_enfant->nom,'maj')."</a> (<i>".$current_enfant->classe."</i>)";
+				if($current_enfant->resp_legal==0) {
+					if(getSettingAOui('GepiMemesDroitsRespNonLegaux')) {
+						if($current_enfant->acces_sp=='y') {
+							echo " <a href='".$_SERVER['PHP_SELF']."?pers_id=$current_parent->pers_id&amp;ele_id=".$current_enfant->ele_id."&amp;acces_resp_legal_0=n";
+							if(isset($critere_recherche)) {echo "&amp;critere_recherche=".$critere_recherche;}
+							if(isset($critere_recherche_login)) {echo "&amp;critere_recherche_login=".$critere_recherche_login;}
+							if(isset($critere_id_classe)) {echo "&amp;critere_id_classe=".$critere_id_classe;}
+							if(isset($afficher_tous_les_resp)) {echo "&amp;afficher_tous_les_resp=".$afficher_tous_les_resp;}
+							echo add_token_in_url()."'";
+							echo " onclick=\"return confirm_abandon (this, change, '$themessage')\"";
+							echo "><img src='../images/vert.png' width='16' height='16' title=\"Le responsable non légal $current_parent->prenom $current_parent->nom a accès aux données notes, CDT,... de l'élève (si ces modules sont actifs)\" /></a>";
+						}
+						else {
+							echo " <a href='".$_SERVER['PHP_SELF']."?pers_id=$current_parent->pers_id&amp;ele_id=".$current_enfant->ele_id."&amp;acces_resp_legal_0=y";
+							if(isset($critere_recherche)) {echo "&amp;critere_recherche=".$critere_recherche;}
+							if(isset($critere_recherche_login)) {echo "&amp;critere_recherche_login=".$critere_recherche_login;}
+							if(isset($critere_id_classe)) {echo "&amp;critere_id_classe=".$critere_id_classe;}
+							if(isset($afficher_tous_les_resp)) {echo "&amp;afficher_tous_les_resp=".$afficher_tous_les_resp;}
+							echo add_token_in_url()."'";
+							echo " onclick=\"return confirm_abandon (this, change, '$themessage')\"";
+							echo "><img src='../images/rouge.png' width='16' height='16' title=\"Le responsable non légal $current_parent->prenom $current_parent->nom n'a pas accès aux données notes, CDT,... de l'élève (si ces modules sont actifs)\" /></a>";
+						}
+					}
+				}
+
+				echo "&nbsp;";
+				echo "<span title='Responsable légal $current_enfant->resp_legal'>";
+					echo $current_enfant->resp_legal;
+				echo "</span>";
+
+				echo "<br />\n";
 			}
 		}
 		echo "</td>\n";
@@ -571,36 +915,40 @@ while ($current_parent = mysql_fetch_object($quels_parents)) {
 				echo "<font color='green'>".$current_parent->etat."</font>";
 				if($current_parent->login!='') {
 					echo "<br />";
-					echo "<a href='edit_responsable.php?action=rendre_inactif&amp;mode=individual&amp;parent_login=".$current_parent->login.add_token_in_url()."'>Désactiver";
+					echo "<a href='edit_responsable.php?action=rendre_inactif&amp;mode=individual&amp;parent_login=".$current_parent->login."&amp;test_recup_critere=y".add_token_in_url()."'>Désactiver";
 				}
 			} else {
 				echo "<font color='red'>".$current_parent->etat."</font>";
 				if($current_parent->login!='') {
 					echo "<br />";
-					echo "<a href='edit_responsable.php?action=rendre_actif&amp;mode=individual&amp;parent_login=".$current_parent->login.add_token_in_url()."'>Activer";
+					echo "<a href='edit_responsable.php?action=rendre_actif&amp;mode=individual&amp;parent_login=".$current_parent->login."&amp;test_recup_critere=y".add_token_in_url()."'>Activer";
 				}
 			}
 			echo "</a>";
 		echo "</td>\n";
 
 		echo "<td>";
-		echo $current_parent->auth_mode;
+			echo "<a href='ajax_modif_utilisateur.php?mode=changer_auth_mode2&amp;login_user=".$current_parent->login."&amp;auth_mode_user=".$current_parent->auth_mode."&amp;test_recup_critere=y".add_token_in_url()."' onclick=\"afficher_changement_auth_mode('$current_parent->login', '$current_parent->auth_mode') ;return false;\">";
+			echo "<span id='auth_mode_$current_parent->login'>";
+			echo $current_parent->auth_mode;
+			echo "</span>";
+			echo "</a>";
 		echo "</td>\n";
 
 		echo "<td>";
-		echo "<a href='edit_responsable.php?action=supprimer&amp;mode=individual&amp;parent_login=".$current_parent->login.add_token_in_url()."' onclick=\"javascript:return confirm('Êtes-vous sûr de vouloir supprimer l\'utilisateur ?')\">Supprimer</a>";
+		echo "<a href='edit_responsable.php?action=supprimer&amp;mode=individual&amp;parent_login=".$current_parent->login."&amp;test_recup_critere=y".add_token_in_url()."' onclick=\"javascript:return confirm('Êtes-vous sûr de vouloir supprimer l\'utilisateur ?')\">Supprimer</a>";
 		echo "</td>";
 
 		if($current_parent->etat == "actif" && ($current_parent->auth_mode == "gepi" || $gepiSettings['ldap_write_access'] == "yes")) {
 			echo "<td>";
 			//echo "<br />";
-			echo "<a href=\"reset_passwords.php?user_login=".$current_parent->login."&amp;user_status=responsable&amp;mode=html".add_token_in_url()."\" onclick=\"javascript:return confirm('Êtes-vous sûr de vouloir effectuer cette opération ?\\n Celle-ci est irréversible, et réinitialisera le mot de passe de l\'utilisateur avec un mot de passe alpha-numérique généré aléatoirement.\\n En cliquant sur OK, vous lancerez la procédure, qui génèrera une page contenant la fiche-bienvenue à imprimer immédiatement pour distribution à l\'utilisateur concerné.')\" target='_blank'>Aléatoirement</a>";
+			echo "<a href=\"reset_passwords.php?user_login=".$current_parent->login."&amp;user_status=responsable&amp;mode=html"."&amp;test_recup_critere=y".add_token_in_url()."\" onclick=\"javascript:return confirm('Êtes-vous sûr de vouloir effectuer cette opération ?\\n Celle-ci est irréversible, et réinitialisera le mot de passe de l\'utilisateur avec un mot de passe alpha-numérique généré aléatoirement.\\n En cliquant sur OK, vous lancerez la procédure, qui génèrera une page contenant la fiche-bienvenue à imprimer immédiatement pour distribution à l\'utilisateur concerné.')\" target='_blank'>Aléatoirement</a>";
 			echo "</td>";
 			echo "<td>";
-			echo "<a href=\"reset_passwords.php?user_login=".$current_parent->login."&amp;user_status=responsable&amp;mode=html&amp;affiche_adresse_resp=y".add_token_in_url()."\" onclick=\"javascript:return confirm('Êtes-vous sûr de vouloir effectuer cette opération ?\\n Celle-ci est irréversible, et réinitialisera le mot de passe de l\'utilisateur avec un mot de passe alpha-numérique généré aléatoirement.\\n En cliquant sur OK, vous lancerez la procédure, qui génèrera une page contenant la fiche-bienvenue à imprimer immédiatement pour distribution à l\'utilisateur concerné.')\" target='_blank'>Aléa.avec&nbsp;adresse</a>";
+			echo "<a href=\"reset_passwords.php?user_login=".$current_parent->login."&amp;user_status=responsable&amp;mode=html&amp;affiche_adresse_resp=y"."&amp;test_recup_critere=y".add_token_in_url()."\" onclick=\"javascript:return confirm('Êtes-vous sûr de vouloir effectuer cette opération ?\\n Celle-ci est irréversible, et réinitialisera le mot de passe de l\'utilisateur avec un mot de passe alpha-numérique généré aléatoirement.\\n En cliquant sur OK, vous lancerez la procédure, qui génèrera une page contenant la fiche-bienvenue à imprimer immédiatement pour distribution à l\'utilisateur concerné.')\" target='_blank'>Aléa.avec&nbsp;adresse</a>";
 			echo "</td>";
 			echo "<td>";
-			echo "<a href=\"change_pwd.php?user_login=".$current_parent->login.add_token_in_url()."\" onclick=\"javascript:return confirm('Êtes-vous sûr de vouloir effectuer cette opération ?\\n Celle-ci réinitialisera le mot de passe de l\'utilisateur avec un mot de passe que vous choisirez.\\n En cliquant sur OK, vous lancerez une page qui vous demandera de saisir un mot de passe et de le valider.')\" target='_blank'>Choisi </a>";
+			echo "<a href=\"change_pwd.php?user_login=".$current_parent->login."&amp;test_recup_critere=y".add_token_in_url()."\" onclick=\"javascript:return confirm('Êtes-vous sûr de vouloir effectuer cette opération ?\\n Celle-ci réinitialisera le mot de passe de l\'utilisateur avec un mot de passe que vous choisirez.\\n En cliquant sur OK, vous lancerez une page qui vous demandera de saisir un mot de passe et de le valider.')\" target='_blank'>Choisi </a>";
 			echo "</td>\n";
 		}
 		else {
@@ -608,13 +956,19 @@ while ($current_parent = mysql_fetch_object($quels_parents)) {
 			echo "&nbsp;";
 			echo "</td>\n";
 		}
+
+		echo "<td>";
+		echo "<a href='../gestion/modele_fiche_information.php?user_login=".$current_parent->login."&amp;test_recup_critere=y"."&amp;fiche=responsables' target='_blank' title=\"Générer la fiche bienvenue pour $current_parent->nom $current_parent->prenom.
+Le mot de passe n'est pas modifié, ni affiché.\">Fiche.B.</a>\n";
+		echo "</td>\n";
+
 	echo "</tr>\n";
 	$compteur_resp++;
 	flush();
 }
 echo "</table>\n";
 aff_time();
-echo "<p>$compteur_resp ligne(s) affichée(s).</p>\n";
+echo "<p>$compteur_resp ligne(s)".$complement_nb_lignes." affichée(s).</p>\n";
 echo "</blockquote>\n";
 
 ?>
@@ -623,7 +977,6 @@ echo "</blockquote>\n";
 if (mysql_num_rows($quels_parents) == "0") {
 	echo "<p>Pour créer de nouveaux comptes d'accès associés aux responsables d'élèves définis dans Gepi, vous devez cliquer sur le lien 'Ajouter de nouveaux comptes' ci-dessus.</p>";
 }
-
 
 echo "<p><em>NOTES&nbsp;:</em></p>
 <a name='bloc_adresse'></a>

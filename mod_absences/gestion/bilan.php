@@ -480,9 +480,11 @@ $pdf->Cell(0, 5, ($civilite_cpe[$i]." ".mb_substr($prenom_cpe[$i],0,1).". ".$nom
 // Et on affiche le pdf généré... (ou on le sauvegarde en local)
 // $pdf->Output(); pour afficher sur votre browser
 
+$pref_output_mode_pdf=get_output_mode_pdf();
+
 $nom_lettre=date("Ymd_Hi");
 $nom_lettre='Bilan_'.$nom_lettre.'.pdf';
-$pdf->Output($nom_lettre,'I');
+$pdf->Output($nom_lettre,$pref_output_mode_pdf);
 
 
 

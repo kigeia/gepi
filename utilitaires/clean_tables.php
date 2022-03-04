@@ -3,7 +3,7 @@
 /*
 * $Id$
 *
-* Copyright 2001-2012 Thomas Belliard, Laurent Delineau, Edouard Hue, Eric Lebrun
+* Copyright 2001-2013 Thomas Belliard, Laurent Delineau, Edouard Hue, Eric Lebrun
 * This file is part of GEPI.
 *
 * GEPI is free software; you can redistribute it and/or modify
@@ -42,6 +42,11 @@ $valid = isset($_POST["valid"]) ? $_POST["valid"] : 'no';
 
 $id_info=isset($_POST['id_info']) ? $_POST['id_info'] : (isset($_GET['id_info']) ? $_GET['id_info'] : '');
 $mode_auto=isset($_POST['mode_auto']) ? $_POST['mode_auto'] : (isset($_GET['mode_auto']) ? $_GET['mode_auto'] : 'n');
+
+$style_specifique[] = "lib/DHTMLcalendar/calendarstyle";
+$javascript_specifique[] = "lib/DHTMLcalendar/calendar";
+$javascript_specifique[] = "lib/DHTMLcalendar/lang/calendar-fr";
+$javascript_specifique[] = "lib/DHTMLcalendar/calendar-setup";
 
 //==================================
 // header
@@ -1165,19 +1170,69 @@ elseif ((isset($_POST['maj']) and (($_POST['maj'])=="9")) or (isset($_GET['maj']
 		echo $texte_info_action;
 		update_infos_action_nettoyage($id_info, $texte_info_action);
 
+		// Aucun groupe non associé à une matière ou à une classe ne doit exister
+		$sql="select g.* from groupes g left join j_groupes_classes jgc on jgc.id_groupe=g.id where jgc.id_groupe is NULL;";
+		$res_grp2=mysql_query($sql);
+		if(mysql_num_rows($res_grp2)>0){
+			$texte_info_action="<p>Un ou des groupes existent sans être associés à aucune classe.<br />C'est une anomalie.<br />En voici la liste&nbsp;:<br />\n";
+			while($ligne=mysql_fetch_object($res_grp2)) {
+				$texte_info_action.="Suppression du groupe n°$ligne->id&nbsp;: $ligne->name (<em>$ligne->description</em>)&nbsp;: ";
+
+				//$sql="DELETE from groupes WHERE id='$ligne->id';";
+				//echo "$sql<br />";
+				//$menage=mysql_query($sql);
+				$menage=delete_group($ligne->id);
+				if($menage) {
+					$texte_info_action.="<span style='color:green'>SUCCES</span>";
+				}
+				else {
+					$texte_info_action.="<span style='color:red'>ECHEC</span>";
+				}
+				$texte_info_action.="<br />\n";
+			}
+			echo $texte_info_action;
+			update_infos_action_nettoyage($id_info, $texte_info_action);
+		}
+
+		$sql="select g.* from groupes g left join j_groupes_matieres jgm on jgm.id_groupe=g.id where jgm.id_groupe is NULL;";
+		$res_grp2=mysql_query($sql);
+		if(mysql_num_rows($res_grp2)>0){
+			$texte_info_action="<p>Un ou des groupes existent sans être associés à aucune matière.<br />C'est une anomalie.<br />En voici la liste&nbsp;:<br />\n";
+			while($ligne=mysql_fetch_object($res_grp2)) {
+				$texte_info_action.="Suppression du groupe n°$ligne->id&nbsp;: $ligne->name (<em>$ligne->description</em>)&nbsp;: ";
+				//$sql="DELETE from groupes WHERE id='$ligne->id';";
+				//echo "$sql<br />";
+				//$menage=mysql_query($sql);
+				$menage=delete_group($ligne->id);
+				if($menage) {
+					$texte_info_action.="<span style='color:green'>SUCCES</span>";
+				}
+				else {
+					$texte_info_action.="<span style='color:red'>ECHEC</span>";
+				}
+				$texte_info_action.="<br />\n";
+			}
+			echo $texte_info_action;
+			update_infos_action_nettoyage($id_info, $texte_info_action);
+		}
+
+		// On va supprimer des tables 'j_signalement', 'j_groupes_classes','j_groupes_matieres','j_groupes_professeurs','j_eleves_groupes', 'j_groupes_visibilite', 'acces_cdt_groupes', les groupes qui ne sont pas dans la table 'groupes'
 		for($i=0;$i<count($table);$i++){
 			$err_no=0;
 			$sql="SELECT DISTINCT id_groupe FROM ".$table[$i]." ORDER BY id_groupe";
+			//echo "$sql<br />";
 			$res_grp1=mysql_query($sql);
 
 			if(mysql_num_rows($res_grp1)>0){
 				//echo "<p>On parcourt la table '".$table[$i]."'.</p>\n";
 				while($ligne=mysql_fetch_array($res_grp1)){
 					$sql="SELECT 1=1 FROM groupes WHERE id='".$ligne[0]."'";
+					//echo "$sql<br />";
 					$res_test=mysql_query($sql);
 
 					if(mysql_num_rows($res_test)==0){
 						$sql="DELETE FROM $table[$i] WHERE id_groupe='$ligne[0]'";
+						//echo "$sql<br />";
 						$texte_info_action="Suppression d'une référence à un groupe d'identifiant $ligne[0] dans la table $table[$i] alors que le groupe n'existe pas dans la table 'groupes'.<br />\n";
 						echo $texte_info_action;
 						update_infos_action_nettoyage($id_info, $texte_info_action);
@@ -2381,6 +2436,40 @@ elseif (isset($_POST['action']) AND $_POST['action'] == 'check_auto_increment') 
 
 		echo "<p>Terminé.</p>\n";
 	}
+} elseif (isset($_REQUEST['action']) AND $_REQUEST['action'] == 'clean_table_log') {
+	echo "<p class=bold>";
+	if(isset($_GET['chgt_annee'])) {
+		echo "<a href='../gestion/changement_d_annee.php'><img src='../images/icons/back.png' alt='Retour' class='back_link'/> Retour à la page de Changement d'année</a> ";
+	}
+	else {
+		echo "<a href='../accueil.php'><img src='../images/icons/back.png' alt='Retour' class='back_link'/> Retour accueil</a> ";
+		echo "| <a href='clean_tables.php'>Retour page Vérification / Nettoyage des tables</a>\n";
+	}
+	echo "</p>\n";
+
+	$date_limite=isset($_REQUEST['date_limite']) ? $_REQUEST['date_limite'] : NULL;
+	if(isset($date_limite)) {
+		echo "<p><b>Nettoyage des logs antérieurs au $date_limite&nbsp;:</b> ".clean_table_log($date_limite)."</p>\n";
+
+		echo "<p>Terminé.</p>\n";
+	}
+} elseif (isset($_REQUEST['action']) AND $_REQUEST['action'] == 'clean_table_tentative_intrusion') {
+	echo "<p class=bold>";
+	if(isset($_GET['chgt_annee'])) {
+		echo "<a href='../gestion/changement_d_annee.php'><img src='../images/icons/back.png' alt='Retour' class='back_link'/> Retour à la page de Changement d'année</a> ";
+	}
+	else {
+		echo "<a href='../accueil.php'><img src='../images/icons/back.png' alt='Retour' class='back_link'/> Retour accueil</a> ";
+		echo "| <a href='clean_tables.php'>Retour page Vérification / Nettoyage des tables</a>\n";
+	}
+	echo "</p>\n";
+
+	$date_limite=isset($_REQUEST['date_limite']) ? $_REQUEST['date_limite'] : NULL;
+	if(isset($date_limite)) {
+		echo "<p><b>Nettoyage des logs de tentatives d'intrusion antérieurs au $date_limite&nbsp;:</b> ".clean_table_tentative_intrusion($date_limite)."</p>\n";
+
+		echo "<p>Terminé.</p>\n";
+	}
 } elseif (isset($_POST['action']) AND $_POST['action'] == 'clean_cdt') {
 	echo "<p class=bold><a href='../accueil.php'><img src='../images/icons/back.png' alt='Retour' class='back_link'/> Retour accueil</a> ";
 	echo "| <a href='clean_tables.php'>Retour page Vérification / Nettoyage des tables</a>\n";
@@ -2400,6 +2489,16 @@ elseif (isset($_POST['action']) AND $_POST['action'] == 'check_auto_increment') 
 		//echo "$sql<br />\n";
 		$suppr=mysql_query($sql);
 	}
+	echo "</p>\n";
+
+	echo "<p>Terminé.</p>\n";
+} elseif (isset($_POST['action']) AND $_POST['action'] == 'clean_temp_tables') {
+	echo "<p class=bold><a href='../accueil.php'><img src='../images/icons/back.png' alt='Retour' class='back_link'/> Retour accueil</a> ";
+	echo "| <a href='clean_tables.php'>Retour page Vérification / Nettoyage des tables</a>\n";
+	echo "</p>\n";
+
+	echo "<p><b>Nettoyage des tables temporaires&nbsp;:</b> \n";
+	echo clean_temp_tables();
 	echo "</p>\n";
 
 	echo "<p>Terminé.</p>\n";
@@ -2656,9 +2755,9 @@ elseif (isset($_POST['action']) AND $_POST['action'] == 'check_auto_increment') 
 			if(!$update) {$nb_erreurs++;}
 			$cpt++;
 		}
+		$texte_info_action.="<p>$nb_corrections correction(s) effectuée(s) avec $nb_erreurs erreur(s).</p>";
+		$texte_info_action.="<p>Terminé.</p>\n";
 	}
-	$texte_info_action.="<p>$nb_corrections correction(s) effectuée(s) avec $nb_erreurs erreur(s).</p>";
-	$texte_info_action.="<p>Terminé.</p>\n";
 
 	echo $texte_info_action;
 	update_infos_action_nettoyage($id_info, $texte_info_action);
@@ -2793,6 +2892,37 @@ elseif (isset($_POST['action']) AND $_POST['action'] == 'check_auto_increment') 
 		//echo "$sql<br />\n";
 		$suppr=mysql_query($sql);
 	}
+	echo "</p>\n";
+
+	echo "<p>Recherche et suppression des documents (<em>travaux, punitions,...</em>) joints aux incidents et sanctions&nbsp;:<br />\n";
+	$dossier_documents_discipline="documents/discipline";
+	if(((isset($multisite))&&($multisite=='y'))||(getSettingValue('multisite')=='y')) {
+		if(isset($_COOKIE['RNE'])) {
+			$dossier_documents_discipline.="_".$_COOKIE['RNE'];
+			if(!file_exists("../$dossier_documents_discipline")) {
+				@mkdir("../$dossier_documents_discipline",0770);
+			}
+		}
+	}
+	$handle=opendir('../'.$dossier_documents_discipline);
+	$nb_suppr=0;
+	$nb_err=0;
+	while ($file = readdir($handle)) {
+		if (($file != '.') and ($file != '..') and ($file != 'remove.txt')
+		and ($file != '.htaccess') and ($file != '.htpasswd') and ($file != 'index.html') and ($file != '.test')
+		// Les tests précédents sont inutiles avec ce qui suit, mais les conserver permet de ne pas oublier des pièges en cas de modif
+		and(preg_match('/^incident_/', $file))) {
+			if(deltree('../'.$dossier_documents_discipline."/".$file, true)) {
+				$nb_suppr++;
+			}
+			else {
+				$nb_err++;
+			}
+		}
+	}
+	closedir($handle);
+	echo "$nb_suppr suppression(s) de dossiers d'incidents.<br />";
+	echo "$nb_err erreur(s) de suppression.";
 	echo "</p>\n";
 
 	echo "<p>Terminé.</p>\n";
@@ -3468,6 +3598,8 @@ else {
 
 	//====================================================
 
+	echo "<a name='nettoyage_par_le_vide'></a>\n";
+
 	echo "<h2>Nettoyage par le vide;) au changement d'année</h2>\n";
 	echo "<div style='margin-left: 3em;'>\n";
 
@@ -3482,14 +3614,21 @@ else {
 		echo "<hr />\n";
 	
 		echo "<p>Au changement d'année, il est recommandé de vider les entrées des tables 'absences_rb', 'absences_repas' et 'absences_eleves' du module abs1 de Gepi, ainsi que les tables a_agregation_decompte, a_notifications, a_saisies, a_saisies_version, a_traitements du module abs2 : </p>\n";
-		echo "<form action=\"clean_tables.php\" method=\"post\">\n";
+		echo "<form action=\"clean_tables.php\" method=\"post\" id='form_suppr_abs'>\n";
 		echo add_token_field();
 		echo "<center>\n";
 		echo "<input type=submit value=\"Vider les tables enregistrements du module absences\" />\n";
+
+		//include("../lib/calendrier/calendrier.class.php");
+		//$cal = new Calendrier("form_suppr_abs", "date_limite");
+
 		$annee=strftime("%Y");
 		$mois=strftime("%m");
 		if($mois<=7) {$annee--;}
-		echo "pour les absences antérieures au <input type='text' name='date_limite' size='10' value='31/07/$annee' />\n";
+		echo "pour les absences antérieures au <input type='text' name='date_limite' id='date_limite' size='10' value='31/07/$annee' onKeyDown=\"clavier_date(this.id,event);\" AutoComplete=\"off\" title=\"Vous pouvez modifier la date à l'aide des flèches Up et Down du pavé de direction.\" />\n";
+		//echo "<a href=\"#calend\" onClick=\"".$cal->get_strPopup('../lib/calendrier/pop.calendrier.php', 350, 170)."\"><img src=\"../lib/calendrier/petit_calendrier.gif\" border=\"0\" alt=\"Petit calendrier\" /></a>";
+		echo img_calendrier_js("date_limite", "img_bouton_date_limite");
+
 		echo "</center>\n";
 		echo "<input type='hidden' name='action' value='clean_absences' />\n";
 		echo "<p><i>NOTE&nbsp;:</i> Prenez soin de faire une <a href='../gestion/accueil_sauve.php'>sauvegarde de la base</a> et un <a href='../mod_annees_anterieures/index.php'>archivage des données antérieures</a> avant le changement d'année.</p>\n";
@@ -3504,7 +3643,11 @@ else {
 		echo "<input type=submit value=\"Vider les tables du module Discipline\" />\n";
 		echo "</center>\n";
 		echo "<input type='hidden' name='action' value='vidage_mod_discipline' />\n";
-		echo "<p><i>NOTE&nbsp;:</i> Prenez soin de faire une <a href='../gestion/accueil_sauve.php'>sauvegarde de la base</a> et un <a href='../mod_annees_anterieures/index.php'>archivage des données antérieures</a> avant le changement d'année.</p>\n";
+		echo "<p><i>NOTES&nbsp;:</i></p>
+<ul>
+<li>Prenez soin de faire une <a href='../gestion/accueil_sauve.php'>sauvegarde de la base</a> un <a href='../mod_annees_anterieures/index.php'>archivage des données antérieures</a> avant le changement d'année.</li>
+<li>Les documents (<em>travaux, punitions,...</em>) joints au incidents et sanctions seront aussi supprimés.</li>
+</ul>\n";
 		echo "</form>\n";
 
 		echo "<hr />\n";
@@ -3516,8 +3659,64 @@ else {
 		echo "<input type=submit value=\"Vider les tables du module Cahier de Textes\" />\n";
 		echo "</center>\n";
 		echo "<input type='hidden' name='action' value='clean_cdt' />\n";
-		echo "<p><i>NOTE&nbsp;:</i> Prenez soin de faire une <a href='../gestion/accueil_sauve.php'>sauvegarde de la base</a>, l'<a href='../cahier_texte_2/archivage_cdt.php'>archivage des Cahiers de Textes</a> et l'<a href='../mod_annees_anterieures/index.php'>archivage des données antérieures</a> avant le changement d'année.</p>\n";
+		echo "<p><i>NOTES&nbsp;:</i></p>
+<ul>
+<li>Prenez soin de faire une <a href='../gestion/accueil_sauve.php'>sauvegarde de la base</a>, l'<a href='../cahier_texte_2/archivage_cdt.php'>archivage des Cahiers de Textes</a> et l'<a href='../mod_annees_anterieures/index.php'>archivage des données antérieures</a> avant le changement d'année.</li>
+</ul>\n";
 		echo "</form>\n";
+
+		echo "<hr />\n";
+	
+		echo "<p>Vider les tables temporaires utilisées lors de l'initialisation de l'année, lors de l'archivage des cahiers de textes en fin d'année, lors de l'import des absences depuis un XML de Sconet,...<br />
+		Ces tables peuvent prendre inutilement de la place lorsque vous faites une sauvegarde.<br />
+		En revanche, évitez de les vider lorsqu'une opération d'initialisation, archive, import,... est en cours (<em>vous perturberiez cette opération</em>).</p>\n";
+		echo "<form action=\"clean_tables.php\" method=\"post\">\n";
+		echo add_token_field();
+		echo "<center>\n";
+		echo "<input type=submit value=\"Vider les tables temporaires\" />\n";
+		echo "</center>\n";
+		echo "<input type='hidden' name='action' value='clean_temp_tables' />\n";
+		echo "</form>\n";
+
+		//===================================================================
+
+		echo "<hr />\n";
+
+		echo "<form action=\"clean_tables.php\" method=\"post\" id='form_clean_log'>\n";
+		echo add_token_field();
+		echo "<center>\n";
+		echo "<input type=submit value=\"Vider les logs de connexion\" />\n";
+
+		$annee=strftime("%Y");
+		$mois=strftime("%m");
+		if($mois<=7) {$annee--;}
+		echo " antérieurs au <input type='text' name='date_limite' id='date_limite_cl' size='10' value='31/07/$annee' onKeyDown=\"clavier_date(this.id,event);\" AutoComplete=\"off\" title=\"Vous pouvez modifier la date à l'aide des flèches Up et Down du pavé de direction.\" />\n";
+		echo img_calendrier_js("date_limite_cl", "img_bouton_date_limite_cl");
+
+		echo "</center>\n";
+		echo "<input type='hidden' name='action' value='clean_table_log' />\n";
+		echo "</form>\n";
+	
+		//===================================================================
+
+		echo "<hr />\n";
+
+		echo "<form action=\"clean_tables.php\" method=\"post\" id='form_clean_tentative_intrusion'>\n";
+		echo add_token_field();
+		echo "<center>\n";
+		echo "<input type=submit value=\"Vider les logs de tentatives d'intrusion\" />\n";
+
+		$annee=strftime("%Y");
+		$mois=strftime("%m");
+		if($mois<=7) {$annee--;}
+		echo " antérieurs au <input type='text' name='date_limite' id='date_limite_cti' size='10' value='31/07/$annee' onKeyDown=\"clavier_date(this.id,event);\" AutoComplete=\"off\" title=\"Vous pouvez modifier la date à l'aide des flèches Up et Down du pavé de direction.\" />\n";
+		echo img_calendrier_js("date_limite_cti", "img_bouton_date_limite_cti");
+
+		echo "</center>\n";
+		echo "<input type='hidden' name='action' value='clean_table_tentative_intrusion' />\n";
+		echo "</form>\n";
+	
+		//===================================================================
 
 	echo "</div>\n";
 

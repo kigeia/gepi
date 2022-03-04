@@ -32,6 +32,10 @@ h2 {
 	background-color: #DFDFDF;
 }
 
+.div_conteneur_infobulle {
+	box-shadow: 4px 2px 6px #DFDFDF;
+}
+
 table.boireaus {
 	margin-top: 1em;
 	border-style: solid;
@@ -56,6 +60,7 @@ table.boireaus {
 	border-style: solid;
 	border-width: 1px;
 	border-color: black;
+    padding: 5px;
 }
 .boireaus .lig-1 {
 	background-color: #C8FFC8;
@@ -69,7 +74,20 @@ table.boireaus {
 .boireaus .modif {
 	background-color: #eeaaff;
 }
+tr.white_hover:hover {
+	background-color:white;
+}
 
+.boireaus_alt tr:nth-child(even) {
+	background-color: #C8FFC8;
+}
+.boireaus_alt tr:nth-child(odd) {
+	background-color: #FFE6AA;
+}
+
+.boireaus_th_left th {
+	text-align:left;
+}
 
 /*
 #messagerie {
@@ -146,7 +164,12 @@ background-color: #F00;
 }
 
 .colonne + .colonne {
-	border-left:thin solid #d3d3d3;
+	/*border-left:thin solid #d3d3d3;*/
+	border-left: none;
+}
+
+.div_tableau + .div_tableau > .colonne {
+	border-top: none;
 }
 
 .colonne3 {

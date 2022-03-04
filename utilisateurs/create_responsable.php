@@ -44,6 +44,9 @@ $create_mode = isset($_POST["mode"]) ? $_POST["mode"] : NULL;
 
 $_POST['reg_auth_mode'] = (!isset($_POST['reg_auth_mode']) OR !in_array($_POST['reg_auth_mode'], array("auth_locale", "auth_ldap", "auth_sso"))) ? "auth_locale" : $_POST['reg_auth_mode'];
 
+// Passer à 'y' pour provoquer l'affichage des requetes:
+$debug_create_resp="n";
+
 if ($create_mode == "classe" OR $create_mode == "individual") {
 	// On a une demande de création, on continue
 	check_token();
@@ -55,7 +58,9 @@ if ($create_mode == "classe" OR $create_mode == "individual") {
 	if ($create_mode == "individual") {
 		//echo "grouik : ".$_POST['pers_id'];
 		// $_POST['pers_id'] est filtré automatiquement contre les injections SQL, on l'utilise directement
-		$test = mysql_query("SELECT count(e.login) FROM eleves e, responsables2 re WHERE (e.ele_id = re.ele_id AND re.pers_id = '" . $_POST['pers_id'] ."')");
+		$sql="SELECT count(e.login) FROM eleves e, responsables2 re WHERE (e.ele_id = re.ele_id AND re.pers_id = '" . $_POST['pers_id'] ."')";
+		if($debug_create_resp=="y") {echo "$sql<br />\n";}
+		$test = mysql_query($sql);
 		if (mysql_result($test, 0) == "0") {
 			$error = true;
 			$msg .= "Erreur lors de la création de l'utilisateur : aucune association avec un élève n'a été trouvée !<br/>";
@@ -66,7 +71,7 @@ if ($create_mode == "classe" OR $create_mode == "individual") {
 				"r.login = '' AND " .
 				"r.pers_id = re.pers_id AND " .
 				"re.pers_id = '" . $_POST['pers_id'] ."')";
-			//echo "$sql<br />";
+			if($debug_create_resp=="y") {echo "$sql<br />\n";}
 			$quels_parents = mysql_query($sql);
 		}
 	} else {
@@ -89,7 +94,7 @@ if ($create_mode == "classe" OR $create_mode == "individual") {
 					"e.login = jec.login AND " .
 					"jec.id_classe = c.id AND " .
 					"(re.resp_legal='1' OR re.resp_legal='2'))";
-			//echo "$sql<br />";
+			if($debug_create_resp=="y") {echo "$sql<br />\n";}
 			$quels_parents = mysql_query($sql);
 			if (!$quels_parents) $msg .= mysql_error();
 		} elseif (is_numeric($_POST['classe'])) {
@@ -110,7 +115,7 @@ if ($create_mode == "classe" OR $create_mode == "individual") {
 					"e.login = jec.login AND " .
 					"jec.id_classe = '" . $_POST['classe']."' AND " .
 					"(re.resp_legal='1' OR re.resp_legal='2'))";
-			//echo "$sql<br />";
+			if($debug_create_resp=="y") {echo "$sql<br />\n";}
 			$quels_parents = mysql_query($sql);
 			if (!$quels_parents) $msg .= mysql_error();
 		} else {
@@ -136,7 +141,7 @@ if ($create_mode == "classe" OR $create_mode == "individual") {
 											WHERE nom_u = '".strtoupper($current_parent->nom)."'
 											AND prenom_u = '".strtoupper($current_parent->prenom)."'
 											AND statut_u = 'teacher'";
-
+					if($debug_create_resp=="y") {echo "$sql_p<br />\n";}
 					$query_p = mysql_query($sql_p);
 					$nbre = mysql_num_rows($query_p);
 
@@ -198,7 +203,7 @@ if ($create_mode == "classe" OR $create_mode == "individual") {
 							"etat = 'actif', " .
 							"auth_mode = '".$reg_auth."', " .
 							"change_mdp = 'n'";
-					//echo "$sql<br />";
+					if($debug_create_resp=="y") {echo "$sql<br />\n";}
 					$reg = mysql_query($sql);
 	
 					if (!$reg) {
@@ -206,11 +211,13 @@ if ($create_mode == "classe" OR $create_mode == "individual") {
 					} else {
 						$sql="UPDATE resp_pers SET login = '" . $reg_login . "' WHERE (pers_id = '" . $current_parent->pers_id . "')";
 						$reg2 = mysql_query($sql);
+						if($debug_create_resp=="y") {echo "$sql<br />\n";}
 						//$msg.="$sql<br />";
 						$nb_comptes++;
 
 						// Ménage:
 						$sql="SELECT id FROM infos_actions WHERE titre LIKE 'Nouveau responsable%($current_parent->pers_id)';";
+						if($debug_create_resp=="y") {echo "$sql<br />\n";}
 						$res_actions=mysql_query($sql);
 						if(mysql_num_rows($res_actions)>0) {
 							while($lig_action=mysql_fetch_object($res_actions)) {
@@ -240,6 +247,17 @@ if ($create_mode == "classe" OR $create_mode == "individual") {
 		$chaine_nouveaux_seulement="";
 		if((isset($_POST['nouveaux_seulement']))&&($_POST['nouveaux_seulement'])) {
 			$chaine_nouveaux_seulement="&amp;nouveaux_seulement=y";
+			saveSetting('creer_comptes_parents_nouveaux_seulement', 'y');
+		}
+		else {
+			saveSetting('creer_comptes_parents_nouveaux_seulement', 'n');
+		}
+
+		if(isset($_POST['fiches_bienvenue_un_jeu_par_parent'])) {
+			saveSetting('fiches_bienvenue_un_jeu_par_parent', 'y');
+		}
+		else {
+			saveSetting('fiches_bienvenue_un_jeu_par_parent', 'n');
 		}
 
 		if ($nb_comptes > 0 && ($_POST['reg_auth_mode'] == "auth_locale" || $gepiSettings['ldap_write_access'] == "yes")) {
@@ -301,13 +319,26 @@ $afficher_tous_les_resp=isset($_POST['afficher_tous_les_resp']) ? $_POST['affich
 $critere_recherche=isset($_POST['critere_recherche']) ? $_POST['critere_recherche'] : (isset($_GET['critere_recherche']) ? $_GET['critere_recherche'] : "");
 $critere_recherche=preg_replace("/[^a-zA-ZÀÄÂÉÈÊËÎÏÔÖÙÛÜ½¼Ççàäâéèêëîïôöùûü_ -]/u", "", $critere_recherche);
 
+$critere_recherche_rl0=isset($_POST['critere_recherche_rl0']) ? $_POST['critere_recherche_rl0'] : (isset($_GET['critere_recherche_rl0']) ? $_GET['critere_recherche_rl0'] : "");
+$critere_recherche_rl0=preg_replace("/[^a-zA-ZÀÄÂÉÈÊËÎÏÔÖÙÛÜ½¼Ççàäâéèêëîïôöùûü_ -]/u", "", $critere_recherche_rl0);
+$filtrage_rl0=isset($_POST['filtrage_rl0']) ? $_POST['filtrage_rl0'] : (isset($_GET['filtrage_rl0']) ? $_GET['filtrage_rl0'] : NULL);
+if(isset($filtrage_rl0)) {
+	$critere_recherche=$critere_recherche_rl0;
+	$mode_recherche='rl0';
+}
+
 //$quels_parents = mysql_query("SELECT * FROM resp_pers WHERE login='' ORDER BY nom,prenom");
 //$quels_parents = mysql_query("SELECT * FROM resp_pers WHERE login='' ORDER BY nom,prenom");
 //$sql="SELECT * FROM resp_pers rp WHERE rp.login=''";
 
 // Effectif total sans login:
 //$sql="SELECT 1=1 FROM resp_pers rp WHERE rp.login=''";
-$sql="SELECT DISTINCT rp.pers_id FROM resp_pers rp, responsables2 r WHERE rp.login='' AND rp.pers_id=r.pers_id AND (r.resp_legal='1' OR r.resp_legal='2');";
+if((isset($mode_recherche))&&($mode_recherche=='rl0')) {
+	$sql="SELECT DISTINCT rp.pers_id FROM resp_pers rp, responsables2 r WHERE rp.login='' AND rp.pers_id=r.pers_id AND r.resp_legal='0';";
+}
+else {
+	$sql="SELECT DISTINCT rp.pers_id FROM resp_pers rp, responsables2 r WHERE rp.login='' AND rp.pers_id=r.pers_id AND (r.resp_legal='1' OR r.resp_legal='2');";
+}
 $nb = mysql_num_rows(mysql_query($sql));
 
 $sql="SELECT * FROM resp_pers rp WHERE rp.login=''";
@@ -318,6 +349,7 @@ if($afficher_tous_les_resp!='y'){
 	}
 }
 $sql.=" ORDER BY rp.nom, rp.prenom";
+if($debug_create_resp=="y") {echo "$sql<br />\n";}
 
 // Effectif sans login avec filtrage sur le nom:
 $nb1 = mysql_num_rows(mysql_query($sql));
@@ -366,17 +398,11 @@ else{
 
 	echo "<p><b>Créer des comptes par lot</b> :</p>\n";
 	echo "<blockquote>\n";
-	echo "<form action='create_responsable.php' method='post'>\n";
-	//=====================
-	// Sécurité: 20101118
+	echo "<form action='create_responsable.php' method='post' style='border: 1px solid grey; background-image: url(\"../images/background/opacite50.png\"); padding:5px;'>\n";
 	echo add_token_field();
-	//=====================
 
 	echo "<input type='hidden' name='mode' value='classe' />\n";
-	//===========================
-	// AJOUT: boireaus 20071102
 	echo "<input type='hidden' name='creation_comptes_classe' value='y' />\n";
-	//===========================
 	echo "<p>Sélectionnez le mode d'authentification appliqué aux comptes :</p>";
 
 	echo "<select name='reg_auth_mode' size='1'>";
@@ -404,8 +430,12 @@ else{
 	echo "</select>\n";
 
 	echo "<br />\n";
-	echo "<input type='checkbox' name='nouveaux_seulement' id='nouveaux_seulement' value='y' /><label for='nouveaux_seulement'> Ne pas générer de fiche bienvenue pour les comptes existants</label><br />\n";
-
+	echo "<input type='checkbox' name='nouveaux_seulement' id='nouveaux_seulement' value='y' ";
+	if(getSettingAOui('creer_comptes_parents_nouveaux_seulement')) {echo "checked ";}
+	echo "/><label for='nouveaux_seulement'> Ne pas générer de fiche bienvenue pour les comptes existants</label><br />\n";
+	echo "<input type='checkbox' name='fiches_bienvenue_un_jeu_par_parent' id='fiches_bienvenue_un_jeu_par_parent' value='y' ";
+	if(getSettingAOui('fiches_bienvenue_un_jeu_par_parent')) {echo "checked ";}
+	echo "/><label for='fiches_bienvenue_un_jeu_par_parent'> Ne pas générer autant de jeux de fiches bienvenue par parent qu'il y a d'enfant<br />(<em>ce qui donnerait 3 fiches par parent s'il y a 3 enfants dans l'établissement (soit 6 fiches par couple)</em>).</label><br />\n";
 	echo "<input type='submit' name='Valider' value='Valider' />\n";
 	echo "</form>\n";
 
@@ -463,17 +493,26 @@ else{
 	echo "Utilisez le formulaire de recherche pour adapter la recherche.";
 	echo "</p>\n";
 
+	//debug_var();
+
 	//===================================
 	//echo "<div style='border:1px solid black;'>\n";
-	echo "<form enctype='multipart/form-data' name='form_rech' action='".$_SERVER['PHP_SELF']."' method='post'>\n";
-	echo "<table style='border:1px solid black;' summary=\"Filtrage\">\n";
+	echo "<form enctype='multipart/form-data' name='form_rech' action='".$_SERVER['PHP_SELF']."' method='post' style='border: 1px solid grey; background-image: url(\"../images/background/opacite50.png\"); padding:5px;'>\n";
+	//style='border:1px solid black;' 
+	echo "<table summary=\"Filtrage\">\n";
 	echo "<tr>\n";
 	echo "<td valign='top' rowspan='3'>\n";
 	echo "Filtrage:";
 	echo "</td>\n";
 	echo "<td>\n";
-	echo "<input type='submit' name='filtrage' value='Afficher' /> les responsables sans login dont le <b>nom</b> contient: ";
+	echo "<input type='submit' name='filtrage' value='Afficher' /> les responsables (<em>légaux 1 et 2</em>) sans login dont le <b>nom</b> contient: ";
 	echo "<input type='text' name='critere_recherche' value='$critere_recherche' />\n";
+
+	echo "<br />\n";
+
+	echo "<input type='submit' name='filtrage_rl0' value='Afficher' /> les responsables non responsables légaux (<em>resp_legal=0</em>) sans login dont le <b>nom</b> contient: ";
+	echo "<input type='text' name='critere_recherche_rl0' value='$critere_recherche' />\n";
+
 	echo "</td>\n";
 	echo "</tr>\n";
 	echo "<tr>\n";
@@ -483,7 +522,7 @@ else{
 	echo "</tr>\n";
 	echo "<tr>\n";
 	echo "<td>\n";
-	echo "<input type='button' name='afficher_tous' value='Afficher tous les responsables sans login' onClick=\"document.getElementById('afficher_tous_les_resp').value='y'; document.form_rech.submit();\" />\n";
+	echo "<input type='button' name='afficher_tous' value='Afficher tous les responsables légaux 1 et 2 sans login' onClick=\"document.getElementById('afficher_tous_les_resp').value='y'; document.form_rech.submit();\" />\n";
 	echo "</td>\n";
 	echo "</tr>\n";
 	echo "</table>\n";
@@ -495,7 +534,7 @@ else{
 	echo "<br />\n";
 
 	echo "<p>Cliquez sur le bouton 'Créer' d'un responsable pour créer un compte associé.</p>\n";
-	echo "<form id='form_create_one_resp' action='create_responsable.php' method='post'>\n";
+	echo "<form id='form_create_one_resp' action='create_responsable.php' method='post' style='border: 1px solid grey; background-image: url(\"../images/background/opacite50.png\"); padding:5px;'>\n";
 	//=====================
 	// Sécurité: 20101118
 	echo add_token_field();
@@ -507,15 +546,27 @@ else{
 	echo "<input type='hidden' name='afficher_tous_les_resp' value='$afficher_tous_les_resp' />\n";
 
 	// Sélection du mode d'authentification
-	echo "<p>Mode d'authentification : <select name='reg_auth_mode' size='1'>";
+	echo "<p>Mode d'authentification : <select name='reg_auth_mode' size='1' title=\"Mode d'authentification pour les comptes à créer avec les boutons ci-dessous.\">";
 	if ($session_gepi->auth_locale) {
-		echo "<option value='auth_locale'>Authentification locale (base Gepi)</option>";
+		echo "<option value='auth_locale'";
+		if((isset($reg_auth_mode))&&($reg_auth_mode=='auth_locale')) {
+			echo " selected";
+		}
+		echo ">Authentification locale (base Gepi)</option>";
 	}
 	if ($session_gepi->auth_ldap) {
-		echo "<option value='auth_ldap'>Authentification LDAP</option>";
+		echo "<option value='auth_ldap'";
+		if((isset($reg_auth_mode))&&($reg_auth_mode=='auth_ldap')) {
+			echo " selected";
+		}
+		echo ">Authentification LDAP</option>";
 	}
 	if ($session_gepi->auth_sso) {
-		echo "<option value='auth_sso'>Authentification unique (SSO)</option>";
+		echo "<option value='auth_sso'";
+		if((isset($reg_auth_mode))&&($reg_auth_mode=='auth_sso')) {
+			echo " selected";
+		}
+		echo ">Authentification unique (SSO)</option>";
 	}
 	echo "</select>";
 	echo "</p>";
@@ -524,15 +575,25 @@ else{
 	echo "<table class='boireaus' border='1' summary=\"Créer\">\n";
 	$alt=1;
 	while ($current_parent = mysql_fetch_object($quels_parents)) {
-
-		$sql="SELECT DISTINCT e.ele_id, e.nom, e.prenom, c.classe, r.resp_legal
-				FROM responsables2 r, eleves e, j_eleves_classes jec, classes c
-				WHERE r.pers_id='".$current_parent->pers_id."' AND
-					(r.resp_legal='1' OR r.resp_legal='2') AND
-					r.ele_id=e.ele_id AND
-					jec.login=e.login AND
-					jec.id_classe=c.id";
-		//echo "$sql<br />";
+		if((isset($mode_recherche))&&($mode_recherche=='rl0')) {
+			$sql="SELECT DISTINCT e.ele_id, e.nom, e.prenom, c.classe, r.resp_legal
+					FROM responsables2 r, eleves e, j_eleves_classes jec, classes c
+					WHERE r.pers_id='".$current_parent->pers_id."' AND
+						r.resp_legal='0' AND
+						r.ele_id=e.ele_id AND
+						jec.login=e.login AND
+						jec.id_classe=c.id";
+		}
+		else {
+			$sql="SELECT DISTINCT e.ele_id, e.nom, e.prenom, c.classe, r.resp_legal
+					FROM responsables2 r, eleves e, j_eleves_classes jec, classes c
+					WHERE r.pers_id='".$current_parent->pers_id."' AND
+						(r.resp_legal='1' OR r.resp_legal='2') AND
+						r.ele_id=e.ele_id AND
+						jec.login=e.login AND
+						jec.id_classe=c.id";
+		}
+		if($debug_create_resp=="y") {echo "$sql<br />\n";}
 		$test=mysql_query($sql);
 		if(mysql_num_rows($test)>0){
 			$alt=$alt*(-1);

@@ -72,6 +72,8 @@ class Session {
 
 	public function __construct($login_CAS_en_cours = false) {
 
+global $temoin_pas_d_update_session_table_log;
+
     if (!$login_CAS_en_cours) {
       # On initialise la session
       session_name("GEPI");
@@ -135,8 +137,32 @@ class Session {
 	          exit();
             }
         } else {
-          # Pas de timeout : on met à jour le log
-          $this->update_log();
+			$debug_maintien_session="n";
+			if($debug_maintien_session=="y") {
+				$sql = "SELECT END from log where SESSION_ID = '" . session_id() . "' and START = '" . $this->start . "';";
+				$tmp_res_fin_session=mysql_query($sql);
+				$tmp_fin_session=mysql_result($tmp_res_fin_session,0,'END');
+			}
+
+			if((!isset($temoin_pas_d_update_session_table_log))||($temoin_pas_d_update_session_table_log!="y")) {
+				# Pas de timeout : on met à jour le log
+				$this->update_log();
+
+				if($debug_maintien_session=="y") {
+					$fich=fopen("/tmp/update_log.txt", "a+");
+					fwrite($fich, strftime("%Y%m%d %H%M%S")." : Update log à $tmp_fin_session\n");
+					fwrite($fich, "$sql\n");
+					fclose($fich);
+				}
+			}
+			else {
+				if($debug_maintien_session=="y") {
+					$fich=fopen("/tmp/update_log.txt", "a+");
+					fwrite($fich, strftime("%Y%m%d %H%M%S")." : Pas d update log \nLa fin de session reste à $tmp_fin_session\n".(isset($temoin_pas_d_update_session_table_log) ? "\$temoin_pas_d_update_session_table_log=".$temoin_pas_d_update_session_table_log : "\$temoin_pas_d_update_session_table_log non initialise")."\n");
+					fwrite($fich, "$sql\n");
+					fclose($fich);
+				}
+			}
         }
       }
 		}
@@ -436,6 +462,7 @@ class Session {
 	# un utilisateur correctement authentifié, et qu'il est bien autorisé à
 	# l'être. Elle remplace la fonction resumeSession qui était préalablement utilisée.
 	public function security_check() {
+		global $pas_acces_a_une_page_sans_etre_logue;
 		# Codes renvoyés :
 		# 0 = logout automatique
 		# 1 = session valide
@@ -449,7 +476,9 @@ class Session {
 				$this->authenticate();
 			}
 		} else if ($this->is_anonymous()) {
-			tentative_intrusion(1, "Accès à une page sans être logué (peut provenir d'un timeout de session).");
+			if((!isset($pas_acces_a_une_page_sans_etre_logue))||($pas_acces_a_une_page_sans_etre_logue!="y")) {
+				tentative_intrusion(1, "Accès à une page sans être logué (peut provenir d'un timeout de session).");
+			}
 			return "0";
 			exit;
 		}
@@ -542,14 +571,21 @@ class Session {
 
 	// Création d'une entrée de log
 	public function insert_log() {
+  
+    include_once(dirname(__FILE__).'/HTMLPurifier.standalone.php');
+    $config = HTMLPurifier_Config::createDefault();
+    $config->set('Core.Encoding', 'utf-8'); // replace with your encoding
+    $config->set('HTML.Doctype', 'XHTML 1.0 Strict'); // replace with your doctype
+    $purifier = new HTMLPurifier($config);
+    
 		if (!isset($_SERVER['HTTP_REFERRER'])) $_SERVER['HTTP_REFERER'] = '';
 	    $sql = "INSERT INTO log (LOGIN, START, SESSION_ID, REMOTE_ADDR, USER_AGENT, REFERER, AUTOCLOSE, END) values (
 	                '" . $this->login . "',
 	                '" . $this->start . "',
 	                '" . session_id() . "',
-	                '" . $_SERVER['REMOTE_ADDR'] . "',
-	                '" . $_SERVER['HTTP_USER_AGENT'] . "',
-	                '" . $_SERVER['HTTP_REFERER'] . "',
+	                '" . $purifier->purify($_SERVER['REMOTE_ADDR']) . "',
+	                '" . $purifier->purify($_SERVER['HTTP_USER_AGENT']) . "',
+	                '" . $purifier->purify($_SERVER['HTTP_REFERER']) . "',
 	                '1',
 	                '" . $this->start . "' + interval " . $this->maxLength . " minute
 	            )
@@ -646,6 +682,7 @@ class Session {
 	    // Détruit le cookie sur le navigateur
 	    $CookieInfo = session_get_cookie_params();
 	    @setcookie(session_name(), '', time()-3600, $CookieInfo['path']);
+
 
 	    // détruit la session sur le serveur
 	    session_destroy();
@@ -1008,7 +1045,6 @@ if (getSettingValue("sso_cas_table") == 'yes') {
 		$dbHost = $GLOBALS['dbHost'];
 		$dbUser = $GLOBALS['dbUser'];
 		$dbPass = $GLOBALS['dbPass'];
-		$db_nopersist = $GLOBALS['db_nopersist'];
 		$dbDb = $GLOBALS['dbDb'];
 
 		//list ($idpers,$login) = isauth();
@@ -1023,7 +1059,7 @@ if (getSettingValue("sso_cas_table") == 'yes') {
 
 			// A ce stade, l'utilisateur est authentifié
 			// Etablir à nouveau la connexion à la base
-			if (empty($db_nopersist))
+			if (isset($GLOBALS['db_nopersist']) && !$GLOBALS['db_nopersist'])
 				$db_c = mysql_pconnect($dbHost, $dbUser, $dbPass);
 			else
 				$db_c = mysql_connect($dbHost, $dbUser, $dbPass);
@@ -1120,6 +1156,13 @@ if (getSettingValue("sso_cas_table") == 'yes') {
 	}
 
 	public function record_failed_login($_login) {
+  
+    include_once(dirname(__FILE__).'/HTMLPurifier.standalone.php');
+    $config = HTMLPurifier_Config::createDefault();
+    $config->set('Core.Encoding', 'utf-8'); // replace with your encoding
+    $config->set('HTML.Doctype', 'XHTML 1.0 Strict'); // replace with your doctype
+    $purifier = new HTMLPurifier($config);
+    
 		# Une tentative de login avec un mot de passe erronnée a été détectée.
 		$test_login = sql_count(sql_query("SELECT login FROM utilisateurs WHERE (login = '".$_login."')"));
 
@@ -1131,9 +1174,9 @@ if (getSettingValue("sso_cas_table") == 'yes') {
 	        	'" . $_login . "',
 	            now(),
 	            '',
-	            '" . $_SERVER['REMOTE_ADDR'] . "',
-	            '" . $_SERVER['HTTP_USER_AGENT'] . "',
-	            '" . $_SERVER['HTTP_REFERER'] . "',
+	            '" . $purifier->purify($_SERVER['REMOTE_ADDR']) . "',
+	            '" . $purifier->purify($_SERVER['HTTP_USER_AGENT']) . "',
+	            '" . $purifier->purify($_SERVER['HTTP_REFERER']) . "',
 	            '4',
 	            now());";
 	        $res = sql_query($sql);
@@ -1156,7 +1199,7 @@ if (getSettingValue("sso_cas_table") == 'yes') {
 			// Le login n'existe pas. On fait donc un test sur l'IP.
 			$sql = "select LOGIN from log where
                 START > now() - interval " . getSettingValue("temps_compte_verrouille") . " minute and
-                REMOTE_ADDR = '".$_SERVER['REMOTE_ADDR']."'";
+                REMOTE_ADDR = '".$purifier->purify($_SERVER['REMOTE_ADDR'])."'";
             $res_test = sql_query($sql);
             if (sql_count($res_test) <= 10) {
 				// On a moins de 10 enregistrements. On enregistre et on ne renvoie pas de code
@@ -1165,9 +1208,9 @@ if (getSettingValue("sso_cas_table") == 'yes') {
                     '" . $_login . "',
                     now(),
                     '',
-                    '" . $_SERVER['REMOTE_ADDR'] . "',
-                    '" . $_SERVER['HTTP_USER_AGENT'] . "',
-                    '" . $_SERVER['HTTP_REFERER'] . "',
+                    '" . $purifier->purify($_SERVER['REMOTE_ADDR']) . "',
+                    '" . $purifier->purify($_SERVER['HTTP_USER_AGENT']) . "',
+                    '" . $purifier->purify($_SERVER['HTTP_REFERER']) . "',
                     '4',
                     now()
                     )
@@ -1191,7 +1234,7 @@ if (getSettingValue("sso_cas_table") == 'yes') {
           $reg_data = sql_query("UPDATE utilisateurs SET date_verrouillage=now() WHERE login='".$_login."' and statut!='administrateur'");
        }
        # On enregistre une alerte de sécurité.
-       tentative_intrusion(2, "Verrouillage du compte ".$_login." en raison d'un trop grand nombre de tentatives de connexion infructueuses. Ce peut être une tentative d'attaque brute-force.");
+       tentative_intrusion(2, "Verrouillage du compte ".$_login." en raison d'un trop grand nombre de tentatives de connexion infructueuses. Ce peut être une tentative d'attaque brute-force.", $_login);
        return true;
 	}
 
@@ -1476,7 +1519,12 @@ if (getSettingValue("sso_cas_table") == 'yes') {
             $new_compte_utilisateur->setPrenom($user['prenom']);
             $new_compte_utilisateur->setShowEmail('no');
             $new_compte_utilisateur->setStatut($user['statut']);
-            $new_compte_utilisateur->save();
+            //$new_compte_utilisateur->save();
+			if ($new_compte_utilisateur->save()) {
+				return true;
+			} else {
+				return false;
+			}
         }
         
 			} else {

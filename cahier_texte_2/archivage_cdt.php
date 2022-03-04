@@ -1,7 +1,7 @@
 <?php
 /*
 *
-* Copyright 2001, 2011 Thomas Belliard, Laurent Delineau, Edouard Hue, Eric Lebrun, Gabriel Fischer
+* Copyright 2001, 2013 Thomas Belliard, Laurent Delineau, Edouard Hue, Eric Lebrun, Gabriel Fischer
 *
 * This file is part of GEPI.
 *
@@ -100,7 +100,10 @@ echo "'><img src='../images/icons/back.png' alt='Retour' class='back_link'/> Ret
 if($dossier_etab=="") {
 	echo "</p>\n";
 
-	echo "<p style='color:red'>Le dossier d'archivage de l'établissement n'a pas pu être identifié.</p>\n";
+	echo "<p style='color:red'>Le dossier d'archivage de l'établissement n'a pas pu être identifié.<br />
+Cela ne devrait pas arriver sauf si votre Gepi était auparavant en 'multisite' et qu'il ne l'est plus.<br />
+En quittant le mode multisite, il se peut que vous ayez oublié laissé un enregistrement 'multisite=y' dans la table 'setting'.<br />
+Dans ce cas, passer la valeur à 'n' règlera le problème.</p>\n";
 	require("../lib/footer.inc.php");
 	die();
 }
@@ -145,7 +148,7 @@ if(!isset($step)) {
 	echo "<li><p>Lors de l'archivage, les cahiers de textes sont parcourus pour mettre en place une arborescence copie de l'arborescence des cahiers de textes.<br />La procédure ne vide pas les tables des cahiers de textes.</p></li>\n";
 	echo "<li><p>Si vous souhaitez tester la procédure d'archivage, vous pouvez, à n'importe quel moment de l'année, effectuer un archivage sans transfert des documents joints.<br />Une arborescence copie sera mise en place.<br />Vous pourrez la consulter... et la supprimer si vous le souhaitez sans impact sur les cahiers de textes en cours d'utilisation.<br />En revanche, si vous cochez Transfert, les documents joints aux cahiers de textes seront déplacés.<br />Un professeur qui consulterait son cahier de textes de l'année courante, trouverait ses comptes-rendus, mais les documents joints ne seraient plus disponibles.</p></li>\n";
 	echo "<li><p>En fin d'année, il est recommandé d'effectuer un archivage avec transfert des documents pour ne pas laisser de scories pour les enseignements des années suivantes (<em>et éviter d'encombrer l'arborescence du serveur de fichiers inutiles</em>).</p><p>Une fois l'archivage de fin d'année effectué, vous pourrez vider les tables des cahiers de textes dans <a href='../utilitaires/clean_tables.php'>Gestion générale/Nettoyage des tables</a><br />(<em>ce nettoyage 'manuel' des tables n'est pas indispensable; il est effectué automatiquement lors de l'initialisation de l'année si vous ne faites pas une initialisation tout à la main</em>)</p></li>\n";
-	echo "<li><p>Dans les archives de CDT, les professeurs ne pourront consulter que leurs propres cahiers de textes.br />Les comptes de statut 'administrateur', 'scolarite' auront accès à toutes les archives de cahiers de textes.<br />Les autres statuts n'y auront aucun accès.</p></li>\n";
+	echo "<li><p>Dans les archives de CDT, les professeurs ne pourront consulter que leurs propres cahiers de textes.<br />Les comptes de statut 'administrateur', 'scolarite' auront accès à toutes les archives de cahiers de textes.<br />Les autres statuts n'y auront aucun accès.</p></li>\n";
 	echo "</ul>\n";
 }
 else {
@@ -191,7 +194,7 @@ else {
 
 		//$sql="INSERT INTO tempo2 SELECT id,name FROM groupes;";
 		// On ne retient que les groupes associés à des classes... les autres sont des scories qui devraient être supprimées par un Nettoyage de la base
-		$sql="INSERT INTO tempo2 SELECT id,name FROM groupes WHERE id IN (SELECT DISTINCT id_groupe FROM j_groupes_classes);";
+		$sql="INSERT INTO tempo2 SELECT id,name FROM groupes WHERE id IN (SELECT DISTINCT id_groupe FROM j_groupes_classes WHERE id_groupe NOT IN (SELECT id_groupe FROM j_groupes_visibilite WHERE domaine='cahier_texte' AND visible='n'));";
 		$res=mysql_query($sql);
 		if(!$res) {
 			echo "<p style='color:red'>ABANDON&nbsp;: Il s'est produit un problème lors de l'insertion de la liste des groupes dans la table 'tempo2'.</p>\n";
@@ -322,7 +325,29 @@ else {
 						'style_telephone.css',
 						'style_telephone_login.css');
 		for($i=0;$i<count($tab_styles);$i++) {
-			copy("../css/".$tab_styles[$i],$dossier_css."/".$tab_styles[$i]);
+			if(file_exists("../css/".$tab_styles[$i])) {
+				copy("../css/".$tab_styles[$i],$dossier_css."/".$tab_styles[$i]);
+			}
+		}
+
+		if(!file_exists($dossier_annee."/images")) {
+			$res=mkdir($dossier_annee."/images");
+		}
+		if(file_exists($dossier_annee."/images")) {
+			$tab_img=array("add.png", "chercher.png", "close16.png","trash.png");
+			for($i=0;$i<count($tab_img);$i++) {
+				copy("../images/icons/".$tab_img[$i],$dossier_annee."/images/".$tab_img[$i]);
+			}
+		}
+
+		if(!file_exists($dossier_annee."/js")) {
+			$res=mkdir($dossier_annee."/js");
+		}
+		if(file_exists($dossier_annee."/js")) {
+			$tab_js=array("position.js", "brainjar_drag.js");
+			for($i=0;$i<count($tab_js);$i++) {
+				copy("../lib/".$tab_js[$i],$dossier_annee."/js/".$tab_js[$i]);
+			}
 		}
 
 		echo "<form enctype='multipart/form-data' action='".$_SERVER['PHP_SELF']."' method='post' name='formulaire'>\n";
@@ -354,6 +379,11 @@ else {
 
 		//$nom_fichier=array();
 
+		function corrige_nom_fichier($chaine) {
+			//return preg_replace('/[^A-Za-z0-9\.-]/','_',preg_replace('/&/','et',unhtmlentities(remplace_accents($chaine,'all'))));
+			return preg_replace("/_$/", "", preg_replace("/_{2,}/", "_", preg_replace('/[^A-Za-z0-9\.\-]/','_',remplace_accents(preg_replace('/&/','et',unhtmlentities($chaine)),'all'))));
+		}
+
 		$sql="SELECT * FROM tempo2 LIMIT $largeur_tranche;";
 		$res_grp=mysql_query($sql);
 		if(mysql_num_rows($res_grp)>0) {
@@ -372,14 +402,15 @@ else {
 				$description_groupe=preg_replace('/&/','et',unhtmlentities(remplace_accents($current_group['description'],'all')));
 				$classlist_string_groupe=preg_replace('/&/','et',unhtmlentities(remplace_accents($current_group['classlist_string'],'all')));
 				*/
-				$nom_groupe=preg_replace('/[^A-Za-z0-9\.-]/','_',preg_replace('/&/','et',unhtmlentities(remplace_accents($current_group['name'],'all'))));
-				$description_groupe=preg_replace('/[^A-Za-z0-9\.-]/','_',preg_replace('/&/','et',unhtmlentities(remplace_accents($current_group['description'],'all'))));
-				$classlist_string_groupe=preg_replace('/[^A-Za-z0-9\.-]/','_',preg_replace('/&/','et',unhtmlentities(remplace_accents($current_group['classlist_string'],'all'))));
+				$nom_groupe=corrige_nom_fichier($current_group['name']);
+				$description_groupe=corrige_nom_fichier($current_group['description']);
+				$classlist_string_groupe=corrige_nom_fichier($current_group['classlist_string']);
 				$nom_page_html_groupe=strtr($id_groupe."_".$nom_groupe."_".$description_groupe."_".$classlist_string_groupe.".$extension","/","_");
 
-
-				$nom_complet_matiere=preg_replace('/&/','et',unhtmlentities(remplace_accents($current_group['matiere']['nom_complet'],'all')));
-				$nom_enseignement=preg_replace('/&/','et',unhtmlentities(remplace_accents($nom_groupe." (".$description_groupe.")",'all')));
+				//$nom_complet_matiere=preg_replace('/&/','et',unhtmlentities(remplace_accents($current_group['matiere']['nom_complet'],'all')));
+				//$nom_enseignement=preg_replace('/&/','et',unhtmlentities(remplace_accents($nom_groupe." (".$description_groupe.")",'all')));
+				$nom_complet_matiere=preg_replace("/_$/", "", preg_replace("/_{2,}/", "_", remplace_accents(preg_replace('/&/','et',unhtmlentities($current_group['matiere']['nom_complet'])),'all')));
+				$nom_enseignement=preg_replace("/_$/", "", preg_replace("/_{2,}/", "_", remplace_accents(preg_replace('/&/','et',unhtmlentities($nom_groupe." (".$description_groupe.")")),'all')));
 
 
 				$nom_detaille_groupe=$current_group['name']." (<i>".$current_group['description']." en (".$current_group['classlist_string'].")</i>)";

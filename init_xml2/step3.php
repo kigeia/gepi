@@ -41,6 +41,21 @@ if (!checkAccess()) {
     die();
 }
 
+$auth_sso=getSettingValue("auth_sso") ? getSettingValue("auth_sso") : "";
+
+$gepi_non_plugin_lcs_mais_recherche_ldap=false;
+if((getSettingAOui('gepi_non_plugin_lcs_mais_recherche_ldap'))&&(file_exists("../secure/config_ldap.inc.php"))) {
+	include("../secure/config_ldap.inc.php");
+
+	$lcs_ldap_base_dn=$ldap_base_dn;
+	$lcs_ldap_host=$ldap_host;
+	$lcs_ldap_port=$ldap_port;
+	$gepi_non_plugin_lcs_mais_recherche_ldap=true;
+
+	$lcs_ldap_people_dn = 'ou=people,'.$lcs_ldap_base_dn;
+	$lcs_ldap_groups_dn = 'ou=groups,'.$lcs_ldap_base_dn;
+}
+
 //**************** EN-TETE *****************
 $titre_page = "Outil d'initialisation de l'année : Importation des élèves - Etape 3";
 require_once("../lib/header.inc.php");
@@ -59,9 +74,12 @@ echo "<center><h3 class='gepi'>Première phase d'initialisation<br />Importation
 echo "<center><h3 class='gepi'>Troisième étape : Enregistrement des élèves et affectation des élèves dans les classes</h3></center>\n";
 
 if (isset($is_posted) and ($is_posted == "yes")) {
+	$temoin_erreur_pour_un_eleve_au_moins=0;
+
 	check_token(false);
-    $call_data = mysql_query("SELECT ID_TEMPO,ELENOM,ELEPRE,ELENOET,ELE_ID,ELESEXE,ELEDATNAIS,ELEDOUBL,ELENONAT,ELEREG,DIVCOD,ETOCOD_EP,LIEU_NAISSANCE FROM temp_gep_import2 ORDER BY DIVCOD,ELENOM,ELEPRE");
+    $call_data = mysql_query("SELECT ID_TEMPO,ELENOM,ELEPRE,ELENOET,ELE_ID,ELESEXE,ELEDATNAIS,ELEDOUBL,ELENONAT,ELEREG,DIVCOD,ETOCOD_EP,LIEU_NAISSANCE,MEF_CODE, DATE_ENTREE FROM temp_gep_import2 ORDER BY DIVCOD,ELENOM,ELEPRE");
     $nb = mysql_num_rows($call_data);
+    $nb_utilisateurs_eleves_restaures=0;
     $i = "0";
     while ($i < $nb) {
         //$req = mysql_query("select col2 from tempo2 where col1 = '$i'");
@@ -92,6 +110,10 @@ if (isset($is_posted) and ($is_posted == "yes")) {
 
 	    $reg_lieu_naissance = mysql_result($call_data, $i, "LIEU_NAISSANCE");
 
+	    $reg_mef_code = mysql_result($call_data, $i, "MEF_CODE");
+
+	    $reg_date_entree = mysql_result($call_data, $i, "DATE_ENTREE");
+
 		$reg_login="";
 	    $req = mysql_query("select col2 from tempo2 where col1 = '$id_tempo'");
 	    if($req) {
@@ -99,10 +121,12 @@ if (isset($is_posted) and ($is_posted == "yes")) {
 		}
 		else {
 		    echo "<p style='color:red'>Erreur pour l'élève $reg_nom $reg_prenom (<em>non trouvé dans 'tempo2', donc pas de login trouvé</em>).</p>\n";
+		    $temoin_erreur_pour_un_eleve_au_moins++;
 		}
 
 		if($reg_login=="") {
 		    echo "<p style='color:red'>Erreur pour l'élève $reg_nom $reg_prenom : login vide</p>\n";
+		    $temoin_erreur_pour_un_eleve_au_moins++;
 		}
 		else {
 
@@ -110,7 +134,7 @@ if (isset($is_posted) and ($is_posted == "yes")) {
 		    if ($reg_naissance == '') {$reg_naissance = "19000101";}
 		    $maj_tempo = mysql_query("UPDATE temp_gep_import2 SET LOGIN='$reg_login' WHERE ID_TEMPO='$id_tempo'");
 
-		    $reg_eleve = mysql_query("INSERT INTO eleves SET no_gep='$no_gep',login='$reg_login',nom='".mysql_real_escape_string($reg_nom)."',prenom='".mysql_real_escape_string($reg_prenom)."',sexe='$reg_sexe',naissance='$reg_naissance',elenoet='$reg_elenoet',ele_id='$reg_ele_id', lieu_naissance='$reg_lieu_naissance'");
+		    $reg_eleve = mysql_query("INSERT INTO eleves SET no_gep='$no_gep',login='$reg_login',nom='".mysql_real_escape_string($reg_nom)."',prenom='".mysql_real_escape_string($reg_prenom)."',sexe='$reg_sexe',naissance='$reg_naissance',elenoet='$reg_elenoet',ele_id='$reg_ele_id', lieu_naissance='$reg_lieu_naissance',mef_code='$reg_mef_code',date_entree='$reg_date_entree'");
 
 		    if (!$reg_eleve) {echo "<p style='color:red'>Erreur lors de l'enregistrement de l'élève $reg_nom $reg_prenom.</p>\n";}
 			else {
@@ -132,6 +156,9 @@ if (isset($is_posted) and ($is_posted == "yes")) {
 					$insert_u=mysql_query($sql);
 					if(!$insert_u) {
 						echo "<span style='color:red'>Erreur lors de la re-création du compte utilisateur pour ".$reg_nom." ".$reg_prenom."</span>.<br />\n";
+					}
+					else {
+						$nb_utilisateurs_eleves_restaures++;
 					}
 				}
 			}
@@ -211,8 +238,17 @@ if (isset($is_posted) and ($is_posted == "yes")) {
 	// On renseigne le témoin: La mise à jour à partir de sconet sera possible.
 	saveSetting("import_maj_xml_sconet", 1);
 
-    //echo "<p>L'importation des données de <b>GEP</b> concernant la constitution des classes est terminée.</p>";
     echo "<p>L'importation des données concernant la constitution des classes est terminée.</p>\n";
+
+	if($temoin_erreur_pour_un_eleve_au_moins>0) {
+		echo "<p><span style='color:red'>Il s'est produit une ou des erreurs à l'enregistrement d'élève(s).</span><br /><a href='index.php'>Revenir à la page d'accueil de l'initialisation</a>, ou poursuivre...</p>\n";
+	}
+
+	if($nb_utilisateurs_eleves_restaures>0) {
+		echo "<p>$nb_utilisateurs_eleves_restaures compte(s) d'utilisateur(s) élève(s) a(ont) été restauré(s) (<em>avec leur(s) mot(s) de passe</em>), mais ils sont actuellement inactifs.<br />Lorsque vous voudrez rouvrir l'accès élève, vous devrez activer les comptes élèves dans <a href='../utilisateurs/edit_eleve.php' target='_blank'>Gestion des bases/Comptes utilisateurs/Élèves</a>.</p>\n";
+	}
+
+	echo "<br />";
     echo "<center><p><a href='responsables.php'>Procéder à la deuxième phase d'importation des responsables</a></p></center>\n";
 	echo "<p><br /></p>\n";
     require("../lib/footer.inc.php");
@@ -223,7 +259,8 @@ else {
     $del = @mysql_query("DELETE FROM tempo2");
 
 	//if(getSettingValue('use_sso')=="lcs") {
-	if(getSettingValue('auth_sso')=="lcs") {
+	//if(getSettingValue('auth_sso')=="lcs") {
+	if(($auth_sso=='lcs')||($gepi_non_plugin_lcs_mais_recherche_ldap)) {
 		// On va récupérer les logins du LCS
 		require_once("../lib/lcs.inc.php");
 		$ds = connect_ldap($lcs_ldap_host,$lcs_ldap_port,"","");
@@ -231,17 +268,32 @@ else {
 
 
     $tab_sql=array();
-	$tab_sql[]="SELECT ID_TEMPO,ELENOM,ELEPRE,ELENOET,ELE_ID,ELESEXE,ELEDATNAIS,ELEDOUBL,ELENONAT,ELEREG,DIVCOD,ETOCOD_EP FROM temp_gep_import2 t, tempo_utilisateurs tu WHERE t.ELE_ID=tu.identifiant1 ORDER BY DIVCOD,ELENOM,ELEPRE;";
-	$tab_sql[]="SELECT ID_TEMPO,ELENOM,ELEPRE,ELENOET,ELE_ID,ELESEXE,ELEDATNAIS,ELEDOUBL,ELENONAT,ELEREG,DIVCOD,ETOCOD_EP FROM temp_gep_import2 WHERE ELE_ID NOT IN (SELECT identifiant1 FROM tempo_utilisateurs) ORDER BY DIVCOD,ELENOM,ELEPRE;";
+	$tab_sql[]="SELECT ID_TEMPO,ELENOM,ELEPRE,ELENOET,ELE_ID,ELESEXE,ELEDATNAIS,ELEDOUBL,ELENONAT,ELEREG,DIVCOD,ETOCOD_EP,MEF_CODE, DATE_ENTREE FROM temp_gep_import2 t, tempo_utilisateurs tu WHERE t.ELE_ID=tu.identifiant1 ORDER BY DIVCOD,ELENOM,ELEPRE;";
+	$tab_sql[]="SELECT ID_TEMPO,ELENOM,ELEPRE,ELENOET,ELE_ID,ELESEXE,ELEDATNAIS,ELEDOUBL,ELENONAT,ELEREG,DIVCOD,ETOCOD_EP,MEF_CODE, DATE_ENTREE FROM temp_gep_import2 WHERE ELE_ID NOT IN (SELECT identifiant1 FROM tempo_utilisateurs) ORDER BY DIVCOD,ELENOM,ELEPRE;";
 
     echo "<p>Le tableau suivant affiche les données qui vont être enregistrées dans la base de donnée GEPI lorsque vous aurez confirmé ce choix tout en bas de la page.<br /><b>Tant que vous n'avez pas validé en bas de la page, aucune donnée n'est enregistrée !</b></p>\n";
     echo "<p>Les valeurs en rouge signalent d'éventuelles données manquantes (<em>ND pour \"non défini\"</em>) dans le fichier <b>ElevesSansAdresses.xml</b> fourni ! Ceci n'est pas gênant pour l'enregistrement dans la base <b>GEPI</b>. Vous aurez en effet la possibilité de compléter les données manquantes avec les outils fournis dans <b>GEPI</b></p>\n";
     echo "<p>Une fois cette page entièrement chargée, ce qui peut prendre un peu de temps, <b>veuillez lire attentivement les remarques en bas de la page </b>avant de procéder à l'enregistrement définitif des données</p>\n";
     echo "<table border='1' class='boireaus' cellpadding='2' cellspacing='2' summary='Tableau des élèves'>\n";
-    echo "<tr><th><p class=\"small\">N° INE</p></th><th><p class=\"small\">Identifiant</p></th><th><p class=\"small\">Nom</p></th><th><p class=\"small\">Prénom</p></th><th><p class=\"small\">Sexe</p></th><th><p class=\"small\">Date de naiss.</p></th><th><p class=\"small\">Régime</p></th><th><p class=\"small\">Doublant</p></th><th><p class=\"small\">Classe</p></th><th><p class=\"small\">Etablissement d'origine ou précédent</p></th></tr>\n";
+    echo "<tr>
+	<th><p class=\"small\">N° INE</p></th>
+	<th><p class=\"small\">Identifiant</p></th>
+	<th><p class=\"small\">Nom</p></th>
+	<th><p class=\"small\">Prénom</p></th>
+	<th><p class=\"small\">Sexe</p></th>
+	<th><p class=\"small\">Date de naiss.</p></th>
+	<th><p class=\"small\">Régime</p></th>
+	<th><p class=\"small\">Doublant</p></th>
+	<th><p class=\"small\">Classe</p></th>
+	<th><p class=\"small\">MEF</p></th>
+	<th><p class=\"small\" title=\"Date d'entrée dans l'établissement\">Date entrée</p></th>
+	<th><p class=\"small\">Etablissement d'origine ou précédent</p></th>
+</tr>\n";
 
 	$alt=1;
     $max_lignes_pb = 0;
+
+	$tab_mef=array();
 
     $ii = "0";
 
@@ -282,6 +334,29 @@ else {
 			$reg_doublant = mysql_result($call_data, $i, "ELEDOUBL");
 			$reg_classe = mysql_result($call_data, $i, "DIVCOD");
 			$reg_etab = mysql_result($call_data, $i, "ETOCOD_EP");
+
+			$reg_mef_code = mysql_result($call_data, $i, "MEF_CODE");
+
+			$reg_date_entree = mysql_result($call_data, $i, "DATE_ENTREE");
+
+			if(!isset($tab_mef[$reg_mef_code])) {
+				$tab_mef[$reg_mef_code]="<span style='color:red' title=\"Code MEF inconnu : $reg_mef_code\">???</span>";
+
+				$sql="SELECT * FROM mef WHERE mef_code='$reg_mef_code';";
+				$res_mef=mysql_query($sql);
+				if(mysql_num_rows($res_mef)>0) {
+					$lig_mef=mysql_fetch_object($res_mef);
+					if($lig_mef->libelle_edition!='') {
+						$tab_mef[$reg_mef_code]=$lig_mef->libelle_edition;
+					}
+					elseif($lig_mef->libelle_long!='') {
+						$tab_mef[$reg_mef_code]=$lig_mef->libelle_long;
+					}
+					elseif($lig_mef->libelle_court!='') {
+						$tab_mef[$reg_mef_code]=$lig_mef->libelle_court;
+					}
+				}
+			}
 
 			$reg_regime = mysql_result($call_data, $i, "ELEREG");
 			if ($no_gep != '') {
@@ -337,7 +412,8 @@ else {
 				}
 	
 				// Dans le cas où Gepi est intégré à un ENT, il ne doit pas générer de login mais récupérer celui qui existe déjà
-				if (getSettingValue("use_ent") == 'y') {
+				// A MODIFIER : Pouvoir gérer use_ent et NetCollege ITOP hors 27:
+				if ((getSettingValue("use_ent") == 'y')&&(!preg_match("/^027/", getSettingValue('gepiSchoolRne')))) {
 					// On a récupéré les informations dans la table ldap_bx
 					// voir aussi les explications de la ligne 710 du fichiers professeurs.php
 					$sql_p = "SELECT login_u FROM ldap_bx
@@ -356,7 +432,8 @@ else {
 
 				//echo "Avant auth_sso<br />";
 				//if(getSettingValue('use_sso')=="lcs") {
-				if(getSettingValue('auth_sso')=="lcs") {
+				//if(getSettingValue('auth_sso')=="lcs") {
+				if(($auth_sso=='lcs')||($gepi_non_plugin_lcs_mais_recherche_ldap)) {
 					$lcs_eleve_en_erreur="y";
 					if($reg_elenoet!='') {
 						$login_eleve=get_lcs_login($reg_elenoet, 'eleve');
@@ -502,6 +579,8 @@ else {
 				echo "<td><p class=\"small\">$reg_regime_aff</p></td>\n";
 				echo "<td><p class=\"small\">$reg_doublant_aff</p></td>\n";
 				echo "<td><p class=\"small\">$classe_aff</p></td>\n";
+				echo "<td><p class=\"small\">".$tab_mef[$reg_mef_code]."</p></td>\n";
+				echo "<td><p class=\"small\">".formate_date($reg_date_entree)."</p></td>\n";
 				echo "<td><p class=\"small\">$reg_etab_aff</p></td>\n";
 				echo "</tr>\n";
 			}
@@ -539,7 +618,8 @@ else {
         }
     }
 
-    if (getSettingValue("use_ent") == 'y') {
+    // A MODIFIER : Pouvoir gérer use_ent et NetCollege ITOP hors 27:
+    if ((getSettingValue("use_ent") == 'y')&&(!preg_match("/^027/", getSettingValue('gepiSchoolRne')))) {
     	// Dans le cas d'un ent on renvoie l'admin pour qu'il vérifie tous les logins de la forme erreur_xx
     	echo '
 			<p>--&gt; Avant d\'enregistrer, vous allez vérifier tous les logins potentiellement erronés.</p>

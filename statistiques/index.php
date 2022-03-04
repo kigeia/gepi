@@ -2,7 +2,7 @@
 /*
  *
  *
- * Copyright 2001, 2011 Thomas Belliard, Laurent Delineau, Edouard Hue, Eric Lebrun, Julien Jocal
+ * Copyright 2001, 2012 Thomas Belliard, Laurent Delineau, Edouard Hue, Eric Lebrun, Julien Jocal
  *
  * This file is part of GEPI.
  *
@@ -43,9 +43,9 @@ $test=mysql_query($sql);
 if(mysql_num_rows($test)==0) {
 $sql="INSERT INTO droits SET id='/statistiques/index.php',
 administrateur='V',
-professeur='F',
-cpe='F',
-scolarite='F',
+professeur='V',
+cpe='V',
+scolarite='V',
 eleve='F',
 responsable='F',
 secours='F',
@@ -72,8 +72,72 @@ echo "</p>\n";
 
 echo "<ul>\n";
 echo "<li><a href='classes_effectifs.php'>Classes, effectifs,...</a></li>\n";
-echo "<li><a href='export_donnees_bulletins.php'>Export de données des bulletins</a></li>\n";
-echo "<li><a href='stat_connexions.php'>Statistiques de connexion</a></li>\n";
+if($_SESSION['statut']=='administrateur') {
+	if(getSettingAOui('active_bulletins')) {
+		echo "<li><a href='export_donnees_bulletins.php'>Export de données des bulletins</a></li>\n";
+	}
+	echo "<li><a href='stat_connexions.php'>Statistiques de connexion</a></li>\n";
+}
+elseif($_SESSION['statut']=='scolarite') {
+	if(getSettingAOui('active_bulletins')) {
+		echo "<li><a href='export_donnees_bulletins.php'>Export de données des bulletins</a></li>\n";
+	}
+	if((getSettingAOui('AccesStatConnexionEleScolarite'))||
+	(getSettingAOui('AccesDetailConnexionEleScolarite'))||
+	(getSettingAOui('AccesStatConnexionRespScolarite'))||
+	(getSettingAOui('AccesDetailConnexionRespScolarite'))) {
+		echo "<li><a href='stat_connexions.php'>Statistiques de connexion</a></li>\n";
+	}
+}
+elseif($_SESSION['statut']=='cpe') {
+	/*
+	if(getSettingAOui('active_bulletins')) {
+		echo "<li><a href='export_donnees_bulletins.php'>Export de données des bulletins</a></li>\n";
+	}
+	*/
+	if((getSettingAOui('AccesStatConnexionEleCpe'))||
+	(getSettingAOui('AccesDetailConnexionEleCpe'))||
+	(getSettingAOui('AccesStatConnexionRespCpe'))||
+	(getSettingAOui('AccesDetailConnexionRespCpe'))) {
+		echo "<li><a href='stat_connexions.php'>Statistiques de connexion</a></li>\n";
+	}
+}
+elseif($_SESSION['statut']=='professeur') {
+	$acces="n";
+
+	if((getSettingAOui('AccesStatConnexionEleProfesseur'))||
+	(getSettingAOui('AccesDetailConnexionEleProfesseur'))||
+	(getSettingAOui('AccesStatConnexionRespProfesseur'))||
+	(getSettingAOui('AccesDetailConnexionRespProfesseur'))) {
+		$acces="y";
+	}
+
+	if($acces=="n") {
+		if(is_pp($_SESSION['login'])) {
+			if((getSettingAOui('AccesStatConnexionEleProfP'))||
+			(getSettingAOui('AccesDetailConnexionEleProfP'))||
+			(getSettingAOui('AccesStatConnexionRespProfP'))||
+			(getSettingAOui('AccesDetailConnexionRespProfP'))) {
+				$acces="y";
+			}
+		}
+	}
+
+	if($acces=="y") {
+		echo "<li><a href='stat_connexions.php'>Statistiques de connexion</a></li>\n";
+	}
+}
+
+if(getSettingAOui('active_mod_discipline')) {
+	if(acces("/mod_discipline/stats2/index.php", $_SESSION['statut'])) {
+		echo "<li>Discipline&nbsp;:<br />
+	<ul>
+		<li><a href='../mod_discipline/stats2/index.php'>Statistiques</a></li>
+		<li><a href='../mod_discipline/disc_stat.php'>Statistiques (<em>plus rudimentaires</em>)</a></li>
+	</ul>
+</li>\n";
+	}
+}
 echo "</ul>\n";
 
 

@@ -54,6 +54,8 @@ if (empty($_GET['nom_lieu']) and empty($_POST['nom_lieu'])) { $nom_lieu=""; }
 if (empty($_GET['com_lieu']) and empty($_POST['com_lieu'])) { $com_lieu="";}
     else { if (isset($_GET['com_lieu'])) {$com_lieu=$_GET['com_lieu'];} if (isset($_POST['com_lieu'])) {$com_lieu=$_POST['com_lieu'];} }
 
+include("function.php");
+
 $lieu = AbsenceEleveLieuQuery::create()->findPk($id_lieu);
 if ($action == 'supprimer') {
 	check_token();
@@ -72,7 +74,7 @@ if ($action == 'supprimer') {
     }
 } elseif ($action == 'ajouterdefaut') {
 	check_token();
-    include("function.php");
+    //include("function.php");
     ajoutLieuxParDefaut();
 } else {
     if ($nom_lieu != '') {
@@ -87,9 +89,32 @@ if ($action == 'supprimer') {
     }
 }
 
+if(isset($_GET['corriger'])) {
+	check_token();
+
+	$table="a_lieux";
+
+	$sql="SELECT * FROM $table ORDER BY sortable_rank, nom;";
+	//echo "$sql<br />";
+	$res=mysql_query($sql);
+	$cpt=1;
+	while($lig=mysql_fetch_object($res)) {
+		$sql="UPDATE $table SET sortable_rank='$cpt' WHERE id='$lig->id';";
+		//echo "$sql<br />";
+		$update=mysql_query($sql);
+		if(!$update) {
+			$msg="Erreur lors de la correction des rangs.<br />";
+			break;
+		}
+		$cpt++;
+	}
+	$msg="Correction effectuée.<br />";
+}
+//==========================================
 // header
 $titre_page = "Gestion des lieux d'absence";
 require_once("../../lib/header.inc.php");
+//==========================================
 
 echo "<p class=bold>";
 echo "<a href=\"index.php\">";
@@ -175,4 +200,7 @@ echo add_token_field();
     <br/><br/>
 </div>
 
-<?php require("../../lib/footer.inc.php");?>
+<?php
+	echo check_sortable_rank_trouble('a_lieux', 'lieux');
+	require("../../lib/footer.inc.php");
+?>

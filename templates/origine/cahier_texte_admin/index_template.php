@@ -367,7 +367,7 @@ echo add_token_field();
 		jours
 	  </p>
 
-	  <h2>Visibilité des documents joints</h2>
+	  <h2>Possibilités sur les documents joints</h2>
 	  <p>
 		<input type="checkbox"
 			   name="cdt_possibilite_masquer_pj"
@@ -378,6 +378,18 @@ echo add_token_field();
 		       <?php if(getSettingValue("cdt_possibilite_masquer_pj")=="y") {echo " checked";} ?>
 			   />
 		<label for='cdt_possibilite_masquer_pj'> Possibilité pour les professeurs de cacher aux élèves et responsables les documents joints aux Cahiers de textes.</label>
+	  </p>
+
+	  <p>
+		<input type="checkbox"
+			   name="cdt_afficher_volume_docs_joints"
+			   id="cdt_afficher_volume_docs_joints"
+			   onchange='changement();'
+			   title="Volume total des documents joints"
+			   value="y"
+		       <?php if(getSettingAOui("cdt_afficher_volume_docs_joints")) {echo " checked";} ?>
+			   />
+		<label for='cdt_afficher_volume_docs_joints'> Afficher dans le CDT le volume total de documents joints.</label>
 	  </p>
 
 	  <h2>Visa des cahiers de texte</h2>
@@ -449,6 +461,7 @@ echo add_token_field();
 	  <li><a href='index.php?ajout_index_documents=y'>Protéger les sous-dossiers de 'documents/' contre des accès anormaux</a></li>
 	  <li><a href='../cahier_texte_2/archivage_cdt.php'>Archivage des cahiers de textes en fin d'année scolaire</a></li>
 	  <li><a href='../cahier_texte_2/export_cdt.php'>Export de cahiers de textes et accès inspecteur (<em>sans authentification</em>)</a></li>
+	  <li><a href='../cahier_texte_2/correction_notices_cdt_formules_maths.php'>Téléchargement des images de formules mathématiques et correction des notices en conséquence</a></li>
 	</ul>
 	
 	<hr />

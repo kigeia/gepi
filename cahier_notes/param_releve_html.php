@@ -1,7 +1,7 @@
 <?php
 /*
  *
- * Copyright 2001-2011 Thomas Belliard, Laurent Delineau, Edouard Hue, Eric Lebrun
+ * Copyright 2001-2013 Thomas Belliard, Laurent Delineau, Edouard Hue, Eric Lebrun
  *
  * This file is part of GEPI.
  *
@@ -43,7 +43,7 @@ if ($resultat_session == 'c') {
 $sql="SELECT 1=1 FROM droits WHERE id='/cahier_notes/param_releve_html.php';";
 $res_test=mysql_query($sql);
 if (mysql_num_rows($res_test)==0) {
-	$sql="INSERT INTO droits VALUES ('/cahier_notes/param_releve_html.php', 'V', 'V', 'F', 'V', 'F', 'F', 'F','F', 'Relevé de notes', '1');";
+	$sql="INSERT INTO droits VALUES ('/cahier_notes/param_releve_html.php', 'V', 'V', 'V', 'V', 'F', 'F', 'F','F', 'Relevé de notes', '1');";
 	$res_insert=mysql_query($sql);
 }
 
@@ -146,7 +146,7 @@ if (isset($_POST['ok'])) {
 			$reg_ok = 'no';
 		}
 	}
-	
+
 	if (isset($_POST['releve_col_matiere_largeur'])) {
 	
 		if (!(my_ereg ("^[0-9]{1,}$", $_POST['releve_col_matiere_largeur'])) || $_POST['releve_col_matiere_largeur'] < 1) {
@@ -157,7 +157,17 @@ if (isset($_POST['ok'])) {
 			$reg_ok = 'no';
 		}
 	}
-	
+
+	if (isset($_POST['releve_col_moyenne_largeur'])) {
+		if (!(my_ereg ("^[0-9]{1,}$", $_POST['releve_col_moyenne_largeur'])) || $_POST['releve_col_moyenne_largeur'] < 1) {
+			$_POST['releve_col_moyenne_largeur'] = 30;
+		}
+		if (!saveSetting("releve_col_moyenne_largeur", $_POST['releve_col_moyenne_largeur'])) {
+			$msg .= "Erreur lors de l'enregistrement de releve_col_moyenne_largeur !";
+			$reg_ok = 'no';
+		}
+	}
+
 	if (isset($_POST['releve_ecart_entete'])) {
 	
 		if (!(my_ereg ("^[0-9]{1,}$", $_POST['releve_ecart_entete']))) {
@@ -318,7 +328,16 @@ if (isset($_POST['ok'])) {
 			$reg_ok = 'no';
 		}
 	}
-	
+
+	/*
+	if (isset($_POST['releve_avec_moyenne'])) {
+		if (!saveSetting("releve_avec_moyenne", $_POST['releve_avec_moyenne'])) {
+			$msg .= "Erreur lors de l'enregistrement de releve_avec_moyenne !";
+			$reg_ok = 'no';
+		}
+	}
+	*/
+
 	if (isset($_POST['releve_mention_doublant'])) {
 	
 		if (!saveSetting("releve_mention_doublant", $_POST['releve_mention_doublant'])) {
@@ -493,23 +512,28 @@ if (($reg_ok == 'yes') and (isset($_POST['ok']))) {
    $msg = "Enregistrement réussi !";
 }
 
-
+//==============================================================
 // End standart header
 require_once("../lib/header.inc.php");
 if (!loadSettings()) {
     die("Erreur chargement settings");
 }
+//==============================================================
 ?>
 
-<p class=bold><a href="visu_releve_notes_bis.php" onclick="self.close();return false;"><img src='../images/icons/back.png' alt='Refermer' class='back_link'/> Refermer </a></p>
+<p class="bold"><a href="visu_releve_notes_bis.php" onclick="self.close();return false;"><img src='../images/icons/back.png' alt='Refermer' class='back_link'/> Refermer </a></p>
 
 <?php
 
-// A FAIRE: Créer des droits
-
-if ((($_SESSION['statut']=='professeur') AND ((getSettingValue("GepiProfImprBul")!='yes') OR ((getSettingValue("GepiProfImprBul")=='yes') AND (getSettingValue("GepiProfImprBulSettings")!='yes')))) OR (($_SESSION['statut']=='scolarite') AND (getSettingValue("GepiScolImprBulSettings")!='yes')) OR (($_SESSION['statut']=='administrateur') AND (getSettingValue("GepiAdminImprBulSettings")!='yes')))
+if ((($_SESSION['statut']=='professeur') AND (getSettingValue("GepiProfImprRelSettings")!='yes')) OR 
+(($_SESSION['statut']=='scolarite') AND (getSettingValue("GepiScolImprRelSettings")!='yes')) OR 
+(($_SESSION['statut']=='cpe') AND (getSettingValue("GepiCpeImprRelSettings")!='yes')) OR 
+// Les comptes administrateurs n'ont pas accès aux relevés de notes normalement...
+(($_SESSION['statut']=='administrateur') AND (getSettingValue("GepiAdminImprBulSettings")!='yes')))
 {
-    die("Droits insuffisants pour effectuer cette opération");
+	echo "<p style='color:red'>Droits insuffisants pour effectuer cette opération.</p>";
+	require("../lib/footer.inc.php");
+	die();
 }
 
 // Compteur pour alterner les couleurs de lignes
@@ -529,8 +553,9 @@ $tabdiv_infobulle[]=creer_div_infobulle('parametres_communs_html_et_pdf',$titre_
 <?php
 echo add_token_field();
 ?>
-<H3>Mise en page du relevé de notes HTML</H3>
-<table cellpadding="8" cellspacing="0" width="100%" border="0" summary="Tableau des paramètres">
+<h3>Mise en page du relevé de notes HTML</h3>
+<table cellpadding="8" cellspacing="0" width="100%" border="0">
+    <caption class="invisible">Tableau des paramètres</caption>
 
     <tr <?php if ($nb_ligne % 2) echo "bgcolor=".$bgcolor;$nb_ligne++; ?>>
         <td style="font-variant: small-caps;">
@@ -615,6 +640,21 @@ echo add_token_field();
 		}
 		else{
 			echo "150";
+		}
+		?>" onKeyDown="clavier_2(this.id,event,0,2000);" />
+        </td>
+    </tr>
+    <tr <?php if ($nb_ligne % 2) echo "bgcolor=".$bgcolor;$nb_ligne++; ?>>
+        <td style="font-variant: small-caps;">
+        <label for='releve_col_moyenne_largeur' style='cursor: pointer;'>Largeur de la deuxième colonne (moyenne) en pixels&nbsp;:</label><br />
+        <span class="small">(sous réserve que la colonne moyenne du carnet de notes soit affichée)</span>
+        </td>
+        <td><input type="text" name="releve_col_moyenne_largeur" id="releve_col_moyenne_largeur" size="20" value="<?php
+		if(getSettingValue("releve_col_moyenne_largeur")!=""){
+			echo(getSettingValue("releve_col_moyenne_largeur"));
+		}
+		else{
+			echo "30";
 		}
 		?>" onKeyDown="clavier_2(this.id,event,0,2000);" />
         </td>
@@ -748,7 +788,7 @@ echo add_token_field();
         <td style="font-variant: small-caps;">
         Faire apparaitre le nom de l'établissement sur le relevé&nbsp;:<br />(<i>certains établissements ont le nom dans le Logo</i>)
 		<?php
-			echo "<a href=\"#\" onclick='return false;' onmouseover=\"afficher_div('parametres_communs_html_et_pdf','y',100,100);\"  onmouseout=\"cacher_div('parametres_communs_html_et_pdf');\"><img src='../images/icons/ico_ampoule.png' width='15' height='25' /></a>";
+			echo "<a href=\"#\" onclick='return false;' onmouseover=\"afficher_div('parametres_communs_html_et_pdf','y',100,100);\"  onmouseout=\"cacher_div('parametres_communs_html_et_pdf');\"><img src='../images/icons/ico_ampoule.png' class='icone15x25' /></a>";
 		?>
         </td>
 	<?php
@@ -778,7 +818,7 @@ echo add_token_field();
         <td style="font-variant: small-caps;">
         Faire apparaitre l'adresse de l'établissement sur le relevé&nbsp;:<br />(<i>certains établissements ont l'adresse dans le Logo</i>)
 		<?php
-			echo "<a href=\"#\" onclick='return false;' onmouseover=\"afficher_div('parametres_communs_html_et_pdf','y',100,100);\"  onmouseout=\"cacher_div('parametres_communs_html_et_pdf');\"><img src='../images/icons/ico_ampoule.png' width='15' height='25' /></a>";
+			echo "<a href=\"#\" onclick='return false;' onmouseover=\"afficher_div('parametres_communs_html_et_pdf','y',100,100);\"  onmouseout=\"cacher_div('parametres_communs_html_et_pdf');\"><img src='../images/icons/ico_ampoule.png' class='icone15x25' /></a>";
 		?>
         </td>
 	<?php
@@ -815,11 +855,11 @@ echo add_token_field();
 
 
 <?php
-//Informations devant figurer sur le relevé de notes</H3>
+//Informations devant figurer sur le relevé de notes</h3>
 ?>
 <h3>Informations devant figurer sur le relevé de notes</h3>
 <table cellpadding="8" cellspacing="0" width="100%" border="0" summary="Tableau des informations devant figurer sur le relevé de notes">
-<tr <?php if ($nb_ligne % 2) echo "bgcolor=".$bgcolor;$nb_ligne++; ?>>
+    <tr <?php if ($nb_ligne % 2) echo "bgcolor=".$bgcolor;$nb_ligne++; ?>>
         <td style="font-variant: small-caps;">
         Afficher le nom court de la classe&nbsp;:
         </td>
@@ -987,7 +1027,7 @@ if (getSettingValue("active_module_trombinoscopes")=='y') {
         <td style="font-variant: small-caps;">
         Afficher le numéro de téléphone de l'établissement&nbsp;:
 		<?php
-			echo "<a href=\"#\" onclick='return false;' onmouseover=\"afficher_div('parametres_communs_html_et_pdf','y',100,100);\"  onmouseout=\"cacher_div('parametres_communs_html_et_pdf');\"><img src='../images/icons/ico_ampoule.png' width='15' height='25' /></a>";
+			echo "<a href=\"#\" onclick='return false;' onmouseover=\"afficher_div('parametres_communs_html_et_pdf','y',100,100);\"  onmouseout=\"cacher_div('parametres_communs_html_et_pdf');\"><img src='../images/icons/ico_ampoule.png' class='icone15x25' /></a>";
 		?>
         </td>
         <td>
@@ -1007,7 +1047,7 @@ if (getSettingValue("active_module_trombinoscopes")=='y') {
         <td style="font-variant: small-caps;">
         Afficher le numéro de fax de l'établissement&nbsp;:
 		<?php
-			echo "<a href=\"#\" onclick='return false;' onmouseover=\"afficher_div('parametres_communs_html_et_pdf','y',100,100);\"  onmouseout=\"cacher_div('parametres_communs_html_et_pdf');\"><img src='../images/icons/ico_ampoule.png' width='15' height='25' /></a>";
+			echo "<a href=\"#\" onclick='return false;' onmouseover=\"afficher_div('parametres_communs_html_et_pdf','y',100,100);\"  onmouseout=\"cacher_div('parametres_communs_html_et_pdf');\"><img src='../images/icons/ico_ampoule.png' class='icone15x25' /></a>";
 		?>
         </td>
         <td>
@@ -1027,7 +1067,7 @@ if (getSettingValue("active_module_trombinoscopes")=='y') {
         <td style="font-variant: small-caps;">
         Afficher l'adresse email de l'établissement&nbsp;:
 		<?php
-			echo "<a href=\"#\" onclick='return false;' onmouseover=\"afficher_div('parametres_communs_html_et_pdf','y',100,100);\"  onmouseout=\"cacher_div('parametres_communs_html_et_pdf');\"><img src='../images/icons/ico_ampoule.png' width='15' height='25' /></a>";
+			echo "<a href=\"#\" onclick='return false;' onmouseover=\"afficher_div('parametres_communs_html_et_pdf','y',100,100);\"  onmouseout=\"cacher_div('parametres_communs_html_et_pdf');\"><img src='../images/icons/ico_ampoule.png' class='icone15x25' /></a>";
 		?>
         </td>
         <td>
@@ -1109,16 +1149,26 @@ if (getSettingValue("active_module_trombinoscopes")=='y') {
 
 
 <hr />
-<H3>Bloc adresse</H3>
-<center><table border="1" cellpadding="10" width="90%" summary="Tableau des paramètres bloc adresse"><tr><td>
-Ces options contrôlent le positionnement du bloc adresse du responsable de l'élève directement sur le relevé (et non sur la page de garde - voir ci-dessous). L'affichage de ce bloc est contrôlé classe par classe, au niveau du paramétrage de la classe.
-</td></tr></table></center>
+<h3>Bloc adresse</h3>
+<div class="center">
+    <table border="1" cellpadding="10" width="90%" summary="Tableau des paramètres bloc adresse">
+        <tr>
+            <td>
+                Ces options contrôlent le positionnement du bloc adresse du responsable de l'élève 
+                directement sur le relevé (et non sur la page de garde - voir ci-dessous). 
+                L'affichage de ce bloc est contrôlé classe par classe, au niveau du paramétrage 
+                de la classe.
+            </td>
+        </tr>
+    </table>
+</div>
 
-<table cellpadding="8" cellspacing="0" width="100%" border="0" summary="Paramètres du bloc adresse">
+<table cellpadding="8" cellspacing="0" width="100%" border="0">
+    <caption class="invisible">Paramètres du bloc adresse</caption>
 
     <tr <?php if ($nb_ligne % 2) echo "bgcolor=".$bgcolor;;$nb_ligne++;?>>
         <td colspan='2' style="font-variant: small-caps;">
-	<a href="javascript:SetDefaultValues('Adresse')">Rétablir les paramètres par défaut</a>
+            <a href="javascript:SetDefaultValues('Adresse')">Rétablir les paramètres par défaut</a>
         </td>
      </tr>
 

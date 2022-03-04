@@ -152,7 +152,7 @@ $couleur_cellule_gen = "#F6F7EF";
 //les trois variables suivantes vont être remplies par un script de build avec les données svn ou git
 //dans le cas ou les variables ne sont pas remplies (donc pas de script de build), on regarde dans header.inc et header_template.inc
 //si on peut obtenir des informations sur la version dans le répertoire .git
-$gepiVersion = "1.6.1";
+$gepiVersion = "master";
 $gepiSvnRev = "";
 $gepiGitCommit = "";
 $gepiGitBranch = "";
@@ -224,6 +224,11 @@ $type_etablissement2["prive"]["EREA"] = "privé";
 $type_etablissement2["prive"]["tous_niveaux"] = "privé";
 $type_etablissement2["prive"]["aucun"] = "";
 
+# Visibilité des groupes dans tel ou tel module:
+$tab_domaines=array('bulletins', 'cahier_notes', 'cahier_texte');
+$tab_domaines_sigle=array('B', 'CN', 'CDT');
+$tab_domaines_texte=array('Bulletins', 'Cahiers de Notes', 'Cahiers de Textes');
+
 # Make sure notice errors are not reported
 //error_reporting (E_ALL ^ E_NOTICE);
 
@@ -239,5 +244,13 @@ $type_etablissement2["prive"]["aucun"] = "";
 // ses propriétés écrasent les propriétés définies auparavant dans le </head>.
 // Une sécurité... il suffit de passer la variable $style_screen_ajout à 'n' pour désactiver le fichier CSS style_screen_ajout.css et éventuellement rétablir un accès après avoir imposé une couleur noire sur noire
 $style_screen_ajout='y';
+
+$message_cnil_bons_usages="* En conformité avec la CNIL, les utilisateurs s'engagent à ne faire figurer dans Gepi que des commentaires respectueux des élèves, responsables et personnels.<br />";
+$message_cnil_bons_usages.="<br />";
+$message_cnil_bons_usages.="Veillez donc à respecter les préconisations suivantes&nbsp;:<br />";
+$message_cnil_bons_usages.="<strong>Règle n° 1 :</strong> Avoir à l'esprit, quand on renseigne ces zones commentaires, que la personne qui est concernée peut exercer son droit d'accès et lire ces commentaires !<br />";
+$message_cnil_bons_usages.="<strong>Règle n° 2 :</strong> Rédiger des commentaires purement objectifs et jamais excessifs ou insultants.<br />";
+$message_cnil_bons_usages.="<br />";
+$message_cnil_bons_usages.="Pour plus de détails, consultez <a href='http://www.cnil.fr/la-cnil/actualite/article/article/zones-bloc-note-et-commentaires-les-bons-reflexes-pour-ne-pas-deraper/' target='_blank'>l'article de la CNIL</a>?<br /><br />";
 
 ?>

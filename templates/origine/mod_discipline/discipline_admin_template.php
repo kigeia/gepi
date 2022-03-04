@@ -102,6 +102,11 @@ interface discipline_admin {
 	<fieldset class="no_bordure">
 <?php
 echo add_token_field();
+
+$mod_disc_terme_incident=getSettingValue('mod_disc_terme_incident');
+if($mod_disc_terme_incident=="") {$mod_disc_terme_incident="incident";}
+$mod_disc_terme_sanction=getSettingValue('mod_disc_terme_sanction');
+if($mod_disc_terme_sanction=="") {$mod_disc_terme_sanction="sanction";}
 ?>
 	  <legend class="invisible">Activation</legend>
 	  <input type="radio"
@@ -123,6 +128,25 @@ echo add_token_field();
 	  </label>
 	</fieldset>
 
+	<fieldset class="no_bordure">
+	  <legend class="invisible">Choix de termes personnalisés</legend>
+
+	  Terme à utiliser à la place du terme '<strong>incident</strong>' dans le module Discipline&nbsp;: 
+	  <input type="text"
+			 name="mod_disc_terme_incident"
+			 id='mod_disc_terme_incident'
+			 value="<?php echo $mod_disc_terme_incident; ?>" />
+	  <br />
+
+	  Terme à utiliser à la place du terme '<strong>sanction</strong>' dans le module Discipline&nbsp;: 
+	  <input type="text"
+			 name="mod_disc_terme_sanction"
+			 id='mod_disc_terme_sanction'
+			 value="<?php echo $mod_disc_terme_sanction; ?>" />
+	  <br />
+
+	</fieldset>
+
 	<h2>Autoriser l'utilisation d'une zone commentaire dans la gestion des incidents</h2>
 	  <fieldset class="no_bordure">
 		<legend class="invisible">Zone de dialogue</legend>
@@ -142,7 +166,7 @@ echo add_token_field();
 				 value='no'
 			 onchange='changement();'
 			   <?php if (getSettingValue("autorise_commentaires_mod_disc") == "no") echo " checked='checked'";?> />
-		<label for='visa_cdt_inter_modif_notices_visees_n' style='cursor: pointer;'>
+		<label for='autorise_commentaires_mod_disc_n' style='cursor: pointer;'>
 		  Désactiver la zone de dialogue relative à chaque incident.
 		</label>
 	  </fieldset>

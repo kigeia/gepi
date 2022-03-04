@@ -50,6 +50,10 @@ $liste_tables_del_etape_eleves = array(
 //==========================
 "j_eleves_professeurs",
 "j_eleves_regime",
+
+// Logs des mises à jour sconet
+"log_maj_sconet",
+
 // Notes et appréciations
 "matieres_appreciations",
 "matieres_notes",
@@ -116,7 +120,8 @@ $liste_tables_del_etape_eleves = array(
 "s_travail",
 "s_travail_mesure",
 // Table optionnelle pour les fils RSS de CDT
-"rss_users"
+"rss_users",
+"log_maj_sconet"
 );
 
 // Etape de l'import des matières
@@ -149,6 +154,7 @@ $liste_tables_del_etape_matieres = array(
 "cn_notes_conteneurs",
 "cn_notes_devoirs",
 "ct_devoirs_entry",
+"ct_devoirs_faits",
 "ct_documents",
 "ct_entry",
 "ct_devoirs_documents",
@@ -180,7 +186,8 @@ $liste_tables_del_etape_resp = array(
 "resp_pers",
 "resp_adr",
 "tempo2",
-"tempo"
+"tempo",
+"log_maj_sconet"
 );
 
 // Etape de l'import des professeurs

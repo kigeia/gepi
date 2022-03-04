@@ -123,6 +123,27 @@ require_once("../lib/header.inc.php");
  | <a href='matieres_categories.php'<?php echo insert_confirm_abandon();?>>Editer les catégories de matières</a>
  | <a href='matieres_csv.php'<?php echo insert_confirm_abandon();?>>Importer un CSV de la liste des matières</a>
 </p>
+
+<?php
+	$tab_priorites_categories=array();
+	$temoin_pb_ordre_categories="n";
+	$sql="select * from matieres_categories;";
+	$res_cat=mysql_query($sql);
+	if(mysql_num_rows($res_cat)>0) {
+		while($lig_cat=mysql_fetch_object($res_cat)) {
+			$current_priority=$lig_cat->priority;
+			if(in_array($current_priority, $tab_priorites_categories)) {
+				$temoin_pb_ordre_categories="y";
+			}
+			$tab_priorites_categories[]=$current_priority;
+		}
+	}
+
+	if($temoin_pb_ordre_categories=="y") {
+		echo "<p style='color:red; text-indent:-6em;padding-left:6em;'><strong>Anomalie&nbsp;:</strong> Les catégories de matières ne doivent pas avoir le même rang.<br />Cela risque de provoquer des problèmes sur les bulletins.<br />Vous devriez corriger les ordres de catégories de matières dans <a href='matieres_categories.php'".insert_confirm_abandon().">Editer les catégories de matières</a></p>\n";
+	}
+?>
+
 <form enctype="multipart/form-data" action="index.php" method=post>
 <?php
 echo add_token_field();
@@ -191,7 +212,7 @@ while ($i < $nombre_lignes){
     $k='11';
     $j = '1';
     //while ($k < '51'){
-    while ($k < '61'){
+    while ($k < 110){
         echo "<option value=$k"; if ($current_matiere_priorite == $j) {echo " SELECTED";} echo ">$j</option>\n";
         $k++;
         $j = $k - 10;

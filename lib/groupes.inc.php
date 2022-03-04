@@ -71,6 +71,7 @@ function get_groups_for_prof($_login,$mode=NULL,$tab_champs=array()) {
  *          pas les indices profs, eleves, periodes, matieres)
  */
 function get_groups_for_class($_id_classe, $ordre="", $d_apres_categories="n") {
+	global $get_groups_for_class_avec_proflist, $get_groups_for_class_avec_visibilite;
 	// ATTENTION: Avec les catégories, les groupes dans aucune catégorie n'apparaissent pas.
 	// Avec le choix "n" sur les catégories, on reste sur un fonctionnement proche de celui d'origine (cf old_way)
 
@@ -148,6 +149,17 @@ function get_groups_for_class($_id_classe, $ordre="", $d_apres_categories="n") {
 			if($k==0) {$temp[$i]["classlist_string"]="";} else {$temp[$i]["classlist_string"].=", ";}
 			$temp[$i]["classlist_string"].=$c_classe;
 		}
+
+		if($get_groups_for_class_avec_proflist=="y") {
+			$tmp_grp=get_profs_for_group($temp[$i]["id"]);
+			$temp[$i]["proflist_string"]=$tmp_grp['proflist_string'];
+		}
+
+		if($get_groups_for_class_avec_visibilite=="y") {
+			$tmp_grp=get_visibilite_for_group($temp[$i]["id"]);
+			$temp[$i]["visibilite"]=$tmp_grp['visibilite'];
+		}
+
 	}
 
 	return $temp;
@@ -282,7 +294,31 @@ function get_profs_for_group($_id_groupe) {
 		$civilite = mysql_result($get_profs, $i, "civilite");
 		$temp["list"][] = $p_login;
 		$temp["users"][$p_login] = array("login" => $p_login, "nom" => $p_nom, "prenom" => $p_prenom, "civilite" => $civilite);
-		$temp["proflist_string"].=$civilite." ".$p_nom." ".my_strtoupper(mb_substr($p_prenom,0,1));
+		$temp["proflist_string"].=$civilite." ".casse_mot($p_nom,'maj')." ".my_strtoupper(mb_substr($p_prenom,0,1));
+	}
+
+	return $temp;
+}
+
+/** Renvoie un tableau de la visibilité du groupe dans les différents domaines (bulletins, cahier_notes,...)
+ *
+ * @param int $_id_groupe Id du groupe
+ * @return array Le tableau des visibilités
+ */
+function get_visibilite_for_group($_id_groupe) {
+	global $tab_domaines;
+	$temp["visibilite"]=array();
+
+	for($loop=0;$loop<count($tab_domaines);$loop++) {
+		$temp["visibilite"][$tab_domaines[$loop]]="y";
+	}
+
+	$sql="SELECT * FROM j_groupes_visibilite WHERE id_groupe='" . $_id_groupe . "';";
+	$res_vis=mysql_query($sql);
+	if(mysql_num_rows($res_vis)>0) {
+		while($lig_vis=mysql_fetch_object($res_vis)) {
+			$temp["visibilite"][$lig_vis->domaine]=$lig_vis->visible;
+		}
 	}
 
 	return $temp;
@@ -292,7 +328,7 @@ function get_profs_for_group($_id_groupe) {
  * Renvoie les informations sur le groupe demandé
  *
  * @param integer $_id_groupe identifiant du groupe
- * @param array $tab_champs réglages permis par la fonction : all, matieres, classes, eleves, periodes, profs
+ * @param array $tab_champs réglages permis par la fonction : all, matieres, classes, eleves, periodes, profs, visibilite
  * @return array Tableaux imbriques des informations du groupe
  */
 function get_group($_id_groupe,$tab_champs=array('all')) {
@@ -410,8 +446,8 @@ function get_group($_id_groupe,$tab_champs=array('all')) {
 			for ($i=0;$i<$nb;$i++){
 				if($i>0) {$temp["profs"]["proflist_string"].=", ";}
 				$p_login = mysql_result($get_profs, $i, "login");
-				$p_nom = mysql_result($get_profs, $i, "nom");
-				$p_prenom = mysql_result($get_profs, $i, "prenom");
+				$p_nom = casse_mot(mysql_result($get_profs, $i, "nom"),'maj');
+				$p_prenom = casse_mot(mysql_result($get_profs, $i, "prenom"),'majf2');
 				$civilite = mysql_result($get_profs, $i, "civilite");
 				$temp["profs"]["list"][] = $p_login;
 				$temp["profs"]["users"][$p_login] = array("login" => $p_login, "nom" => $p_nom, "prenom" => $p_prenom, "civilite" => $civilite);
@@ -482,7 +518,13 @@ function get_group($_id_groupe,$tab_champs=array('all')) {
 			foreach ($temp["periodes"] as $key => $period) {
 				$temp["eleves"][$key]["list"] = array();
 				$temp["eleves"][$key]["users"] = array();
-				$get_eleves = mysql_query("SELECT distinct j.login, e.nom, e.prenom, e.ele_id, e.elenoet FROM eleves e, j_eleves_groupes j WHERE (" .
+
+				$temp["eleves"][$key]["telle_classe"] = array();
+				foreach($temp["classes"]["list"] as $tmp_id_classe) {
+					$temp["eleves"][$key]["telle_classe"][$tmp_id_classe] = array();
+				}
+
+				$get_eleves = mysql_query("SELECT distinct j.login, e.nom, e.prenom, e.ele_id, e.elenoet, e.sexe FROM eleves e, j_eleves_groupes j WHERE (" .
 											"e.login = j.login and j.id_groupe = '" . $_id_groupe . "' and j.periode = '" . $period["num_periode"] . "') " .
 											"ORDER BY e.nom, e.prenom");
 		
@@ -491,10 +533,12 @@ function get_group($_id_groupe,$tab_champs=array('all')) {
 					$e_login = mysql_result($get_eleves, $i, "login");
 					$e_nom = mysql_result($get_eleves, $i, "nom");
 					$e_prenom = mysql_result($get_eleves, $i, "prenom");
+					$e_sexe = mysql_result($get_eleves, $i, "sexe");
 					$sql="SELECT id_classe FROM j_eleves_classes WHERE (login = '" . $e_login . "' and periode = '" . $key . "')";
 					$res_classe_eleve_periode=mysql_query($sql);
 					if(mysql_num_rows($res_classe_eleve_periode)>0) {
 						$e_classe = mysql_result($res_classe_eleve_periode, 0);
+						$temp["eleves"][$key]["telle_classe"][$e_classe][] = $e_login;
 					}
 					else {
 						$e_classe=-1;
@@ -502,7 +546,7 @@ function get_group($_id_groupe,$tab_champs=array('all')) {
 					$e_sconet_id = mysql_result($get_eleves, $i, "ele_id");
 					$e_elenoet = mysql_result($get_eleves, $i, "elenoet");
 					$temp["eleves"][$key]["list"][] = $e_login;
-					$temp["eleves"][$key]["users"][$e_login] = array("login" => $e_login, "nom" => $e_nom, "prenom" => $e_prenom, "classe" => $e_classe, "sconet_id" => $e_sconet_id, "elenoet" => $e_elenoet);
+					$temp["eleves"][$key]["users"][$e_login] = array("login" => $e_login, "nom" => $e_nom, "prenom" => $e_prenom, "classe" => $e_classe, "sconet_id" => $e_sconet_id, "elenoet" => $e_elenoet, "sexe" => $e_sexe);
 				}
 			}
 		

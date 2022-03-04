@@ -265,6 +265,7 @@ function reactiver(mavar) {
 </script>
 
 <?php
+	//debug_var();
 
 	echo "<form action='".$_SERVER['PHP_SELF']."' name='form1' method='post'>\n";
 
@@ -272,7 +273,11 @@ function reactiver(mavar) {
 	echo " | <a href='trombinoscopes.php'>Effectuer une autre sélection</a>";
 
 	if($_SESSION['statut']=='professeur') {
-		echo " | <a href='plan_de_classe.php'>Plan de classe</a>";
+		echo " | <a href='plan_de_classe.php";
+		if(!empty($groupe)) {
+			echo "?id_groupe=$groupe";
+		}
+		echo "'>Plan de classe</a>";
 	}
 
 	if($_SESSION['statut']=='administrateur') {
@@ -403,7 +408,7 @@ function reactiver(mavar) {
 
 			//=================================================================
 			// CLASSES
-			echo "<span style='margin-left: 15px;'>Par classe</span><br />\n";
+			echo "<label for='classe' style='margin-left: 15px;'>Par classe</label><br />\n";
 			echo "<select name='classe' id='classe' style='margin-left: 15px;'>\n";
 
 			//if ( $_SESSION['statut'] != 'professeur' ) { $classe = 'toutes'; }
@@ -470,7 +475,7 @@ function reactiver(mavar) {
 			//=================================================================
 			// GROUPES
 
-			echo "<span style='margin-left: 15px;'>Par groupe</span><br />\n";
+			echo "<label for='groupe' style='margin-left: 15px;'>Par groupe</label><br />\n";
 			echo "<select name='groupe' id='groupe' style='margin-left: 15px;'>\n";
 
 			//if ( $_SESSION['statut'] != 'professeur' ) { $groupe = 'toutes'; }
@@ -513,7 +518,7 @@ function reactiver(mavar) {
 			if ( empty($classe) ) {
 				echo " selected='selected'";
 			}
-			echo "onclick=\"reactiver('classe,equipepeda,discipline,statusgepi,affdiscipline');\">pas de s&eacute;lection</option>\n";
+			echo " onclick=\"reactiver('classe,equipepeda,discipline,statusgepi,affdiscipline');\">pas de s&eacute;lection</option>\n";
 
 			if (( $groupe != 'toutes' )&&($_SESSION['statut']!='eleve')) {
 				echo "<option value='toutes'>voir tous les groupes</option>\n";
@@ -529,7 +534,7 @@ function reactiver(mavar) {
 
 			echo "<optgroup label='-- Les groupes --'>\n";
 			while ( $donnee_groupe_prof = mysql_fetch_array ($resultat_groupe_prof)) {
-				echo "<option value='".$donnee_groupe_prof['id_groupe']."'  onclick=\"desactiver('classe,equipepeda,discipline,statusgepi,affdiscipline');\">";
+				echo "<option value='".$donnee_groupe_prof['id_groupe']."' onclick=\"desactiver('classe,equipepeda,discipline,statusgepi,affdiscipline');\">";
 
 				//modif ERIC
 				echo ucwords($donnee_groupe_prof['description']);
@@ -544,8 +549,8 @@ function reactiver(mavar) {
 			echo "</select>\n";
 
 			echo "<br />\n";
-			echo "<span style='margin-left: 15px;'><input type='radio' order_by_alpha' name='order_by' value='alpha' checked /><label for='order_by_alpha'> Tri alphabétique</span></label><br />\n";
-			echo "<span style='margin-left: 15px;'><input type='radio' id='order_by_classe' name='order_by' value='classe' /><label for='order_by_classe'> Tri par classe</span></label><br />\n";
+			echo "<span style='margin-left: 15px;'><input type='radio' id='order_by_alpha' name='order_by' value='alpha' checked='checked' /><label for='order_by_alpha'> Tri alphabétique</label></span><br />\n";
+			echo "<span style='margin-left: 15px;'><input type='radio' id='order_by_classe' name='order_by' value='classe' /><label for='order_by_classe'> Tri par classe</label></span><br />\n";
 			echo "<br />";
 
 			echo "<input value='2' name='etape' type='hidden' />\n";
@@ -579,7 +584,7 @@ function reactiver(mavar) {
 
 			//==========================================================
 			// EQUIPES PEDAGOGIQUES
-			echo "<span style='margin-left: 15px;'>Par équipe pédagogique</span><br />\n";
+			echo "<label for='equipepeda' style='margin-left: 15px;'>Par équipe pédagogique</label><br />\n";
 			echo "<select name='equipepeda' id='equipepeda' style='margin-left: 15px;'>\n";
 
 			//if ( $_SESSION['statut'] != 'professeur' ) { $equipepeda = 'toutes'; }
@@ -655,7 +660,7 @@ function reactiver(mavar) {
 				echo "<br />&nbsp;&nbsp;&nbsp;<input type='checkbox' name='affdiscipline' id='affdiscipline' value='oui' />&nbsp;<label for='affdiscipline' style='cursor: pointer; cursor: hand;'>Afficher les disciplines</label>\n";
 				echo "<br /><br />\n";
 
-				echo "<span style='margin-left: 15px;'>Par discipline</span><br />\n";
+				echo "<label for='discipline' style='margin-left: 15px;'>Par discipline</label><br />\n";
 				echo "<select name='discipline' id='discipline' style='margin-left: 15px;'>\n";
 
 				if ( $_SESSION['statut'] != 'professeur' ) { $discipline = 'toutes'; }
@@ -715,7 +720,7 @@ function reactiver(mavar) {
 			echo "<br /><br />\n";
 			//==========================================================
 			// PAR STATUT
-			echo "<span style='margin-left: 15px;'>Par statut (CPE/Professeur/Scolarité)</span><br />\n";
+			echo "<label for='statusgepi' style='margin-left: 15px;'>Par statut (CPE/Professeur/Scolarité)</label><br />\n";
 			echo "<select name='statusgepi' id='statusgepi' style='margin-left: 15px;'>\n";
 
 			if ( $statusgepi == '' ) {

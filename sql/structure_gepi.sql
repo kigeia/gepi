@@ -17,7 +17,7 @@ CREATE TABLE `classes` (`id` smallint(6) unsigned NOT NULL auto_increment, `clas
 DROP TABLE IF EXISTS `cn_cahier_notes`;
 CREATE TABLE `cn_cahier_notes` ( `id_cahier_notes` int(11) NOT NULL auto_increment, `id_groupe` INT(11) NOT NULL, `periode` int(11) NOT NULL default '0', PRIMARY KEY  (`id_cahier_notes`, `id_groupe`, `periode`), INDEX groupe_periode (`id_groupe`, `periode`)) ENGINE=MyISAM CHARACTER SET utf8 COLLATE utf8_general_ci;
 DROP TABLE IF EXISTS `cn_conteneurs`;
-CREATE TABLE `cn_conteneurs` ( `id` int(11) NOT NULL auto_increment, `id_racine` int(11) NOT NULL default '0', `nom_court` varchar(32) NOT NULL default '', `nom_complet` varchar(64) NOT NULL default '', `description` varchar(128) NOT NULL default '', `mode` char(1) NOT NULL default '2', `coef` decimal(3,1) NOT NULL default '1.0', `arrondir` char(2) NOT NULL default 's1', `ponderation` decimal(3,1) NOT NULL default '0.0', `display_parents` char(1) NOT NULL default '0', `display_bulletin` char(1) NOT NULL default '1', `parent` int(11) NOT NULL default '0', PRIMARY KEY  (`id`), INDEX parent_racine (`parent`,`id_racine`), INDEX racine_bulletin (`id_racine`,`display_bulletin`)) ENGINE=MyISAM CHARACTER SET utf8 COLLATE utf8_general_ci;
+CREATE TABLE `cn_conteneurs` ( `id` int(11) NOT NULL auto_increment, `id_racine` int(11) NOT NULL default '0', `nom_court` varchar(32) NOT NULL default '', `nom_complet` varchar(64) NOT NULL default '', `description` varchar(128) NOT NULL default '', `mode` char(1) NOT NULL default '2', `coef` decimal(3,1) NOT NULL default '1.0', `arrondir` char(2) NOT NULL default 's1', `ponderation` decimal(3,1) NOT NULL default '0.0', `display_parents` char(1) NOT NULL default '0', `display_bulletin` char(1) NOT NULL default '1', `parent` int(11) NOT NULL default '0', modele_id_conteneur int(11) NOT NULL default '0', PRIMARY KEY  (`id`), INDEX parent_racine (`parent`,`id_racine`), INDEX racine_bulletin (`id_racine`,`display_bulletin`)) ENGINE=MyISAM CHARACTER SET utf8 COLLATE utf8_general_ci;
 DROP TABLE IF EXISTS `cn_devoirs`;
 CREATE TABLE `cn_devoirs` (`id` int(11) NOT NULL auto_increment, `id_conteneur` int(11) NOT NULL default '0', `id_racine` int(11) NOT NULL default '0', `nom_court` varchar(32) NOT NULL default '', `nom_complet` varchar(64) NOT NULL default '', `description` varchar(128) NOT NULL default '', `facultatif` char(1) NOT NULL default '', `date` datetime NOT NULL default '0000-00-00 00:00:00', `coef` decimal(3,1) NOT NULL default '0.0', `note_sur` int(11) default '20', `ramener_sur_referentiel` char(1) NOT NULL default 'F', `display_parents` char(1) NOT NULL default '', `display_parents_app` char(1) NOT NULL default '0', `date_ele_resp` datetime NOT NULL, PRIMARY KEY  (`id`), INDEX conteneur_date (`id_conteneur`, `date`)) ENGINE=MyISAM CHARACTER SET utf8 COLLATE utf8_general_ci;
 DROP TABLE IF EXISTS `cn_notes_conteneurs`;
@@ -56,9 +56,13 @@ CREATE TABLE eleves
 	ereno VARCHAR(50) NOT NULL COMMENT 'Plus utilise',
 	ele_id VARCHAR(10) DEFAULT '' NOT NULL COMMENT 'cle utilise par Sconet dans ses fichiers xml',
 	email VARCHAR(255) DEFAULT '' NOT NULL COMMENT 'Courriel de l\'eleve',
+	tel_pers varchar(255) DEFAULT '' NOT NULL COMMENT 'Telephone personnel de l\'eleve',
+	tel_port varchar(255) DEFAULT '' NOT NULL COMMENT 'Telephone portable de l\'eleve',
+	tel_prof varchar(255) DEFAULT '' NOT NULL COMMENT 'Telephone professionnel (?) de l\'eleve',
 	id_eleve INTEGER(11) NOT NULL AUTO_INCREMENT COMMENT 'cle primaire autoincremente',
+	date_entree DATETIME COMMENT 'Timestamp d\entrée de l\'élève de l\'établissement (début d\'inscription)',
 	date_sortie DATETIME COMMENT 'Timestamp de sortie de l\'élève de l\'établissement (fin d\'inscription)',
-	mef_code BIGINT(20) COMMENT 'code mef de la formation de l\'eleve',
+	mef_code VARCHAR(50) DEFAULT '' NOT NULL COMMENT 'code mef de la formation de l\'eleve',
 	PRIMARY KEY (id_eleve),
 	INDEX eleves_FI_1 (mef_code),
 	INDEX I_referenced_j_eleves_classes_FK_1_1 (login),
@@ -79,15 +83,17 @@ DROP TABLE IF EXISTS `mef`;
 CREATE TABLE `mef`
 (
 	id INTEGER NOT NULL AUTO_INCREMENT COMMENT 'Cle primaire de la classe',
-	mef_code BIGINT(20) COMMENT 'Numero de la nomenclature officielle (numero MEF)',
+	mef_code VARCHAR(50) DEFAULT '' NOT NULL COMMENT 'Numero de la nomenclature officielle (numero MEF)',
 	libelle_court VARCHAR(50) NOT NULL COMMENT 'libelle de la formation',
 	libelle_long VARCHAR(300) NOT NULL COMMENT 'libelle de la formation',
 	libelle_edition VARCHAR(300) NOT NULL COMMENT 'libelle de la formation pour presentation',
+	code_mefstat varchar(50) NOT NULL default '',
+	mef_rattachement varchar(50) NOT NULL default '',
 	PRIMARY KEY (id)
 ) ENGINE=MyISAM CHARACTER SET utf8 COLLATE utf8_general_ci COMMENT='Module élémentaire de formation';
 
 DROP TABLE IF EXISTS `etablissements`;
-CREATE TABLE `etablissements` ( `id` char(8) NOT NULL default '', `nom` char(50) NOT NULL default '', `niveau` char(50) NOT NULL default '', `type` char(50) NOT NULL default '', `cp` int(10) NOT NULL default '0', `ville` char(50) NOT NULL default '', PRIMARY KEY  (`id`)) ENGINE=MyISAM CHARACTER SET utf8 COLLATE utf8_general_ci;
+CREATE TABLE `etablissements` ( `id` char(8) NOT NULL default '', `nom` char(50) NOT NULL default '', `niveau` char(50) NOT NULL default '', `type` char(50) NOT NULL default '', `cp` varchar(10) NOT NULL default '0', `ville` char(50) NOT NULL default '', PRIMARY KEY  (`id`)) ENGINE=MyISAM CHARACTER SET utf8 COLLATE utf8_general_ci;
 DROP TABLE IF EXISTS `j_aid_eleves`;
 CREATE TABLE `j_aid_eleves` ( `id_aid` varchar(100) NOT NULL default '', `login` varchar(60) NOT NULL default '', `indice_aid` int(11) NOT NULL default '0', PRIMARY KEY  (`id_aid`,`login`)) ENGINE=MyISAM CHARACTER SET utf8 COLLATE utf8_general_ci;
 DROP TABLE IF EXISTS `j_aid_utilisateurs`;
@@ -163,7 +169,7 @@ CREATE TABLE `miseajour` (`id_miseajour` int(11) NOT NULL auto_increment, `fichi
 DROP TABLE IF EXISTS absences_actions;
 CREATE TABLE `absences_actions` (`id_absence_action` int(11) NOT NULL auto_increment, `init_absence_action` char(2) NOT NULL default '', `def_absence_action` varchar(255) NOT NULL default '', PRIMARY KEY  (`id_absence_action`)) ENGINE=MyISAM CHARACTER SET utf8 COLLATE utf8_general_ci;
 DROP TABLE IF EXISTS `responsables2`;
-CREATE TABLE IF NOT EXISTS `responsables2` (`ele_id` varchar(10) NOT NULL, `pers_id` varchar(10) NOT NULL, `resp_legal` varchar(1) NOT NULL, `pers_contact` varchar(1) NOT NULL, INDEX pers_id ( `pers_id` ), INDEX ele_id ( `ele_id` ), INDEX resp_legal ( `resp_legal` )) ENGINE=MyISAM CHARACTER SET utf8 COLLATE utf8_general_ci;
+CREATE TABLE IF NOT EXISTS `responsables2` (`ele_id` varchar(10) NOT NULL, `pers_id` varchar(10) NOT NULL, `resp_legal` varchar(1) NOT NULL, `pers_contact` varchar(1) NOT NULL, `acces_sp` varchar(1) NOT NULL, INDEX pers_id ( `pers_id` ), INDEX ele_id ( `ele_id` ), INDEX resp_legal ( `resp_legal` )) ENGINE=MyISAM CHARACTER SET utf8 COLLATE utf8_general_ci;
 DROP TABLE IF EXISTS `resp_adr`;
 CREATE TABLE IF NOT EXISTS `resp_adr` (`adr_id` varchar(10) NOT NULL,`adr1` varchar(100) NOT NULL,`adr2` varchar(100) NOT NULL,`adr3` varchar(100) NOT NULL,`adr4` varchar(100) NOT NULL,`cp` varchar(6) NOT NULL,`pays` varchar(50) NOT NULL,`commune` varchar(50) NOT NULL,PRIMARY KEY  (`adr_id`)) ENGINE=MyISAM CHARACTER SET utf8 COLLATE utf8_general_ci;
 DROP TABLE IF EXISTS `resp_pers`;
@@ -277,11 +283,11 @@ CREATE TABLE IF NOT EXISTS `commentaires_types` (`id` INT( 11 ) NOT NULL AUTO_IN
 DROP TABLE IF EXISTS commentaires_types_profs;
 CREATE TABLE IF NOT EXISTS commentaires_types_profs (id INT( 11 ) NOT NULL AUTO_INCREMENT PRIMARY KEY ,login VARCHAR( 50 ) NOT NULL ,app TEXT NOT NULL) ENGINE=MyISAM CHARACTER SET utf8 COLLATE utf8_general_ci;
 DROP TABLE IF EXISTS s_incidents;
-CREATE TABLE IF NOT EXISTS s_incidents (id_incident INT( 11 ) NOT NULL AUTO_INCREMENT PRIMARY KEY ,declarant VARCHAR( 50 ) NOT NULL ,date DATE NOT NULL ,heure VARCHAR( 20 ) NOT NULL ,id_lieu INT( 11 ) NOT NULL ,nature VARCHAR( 255 ) NOT NULL , id_categorie INT(11), description TEXT NOT NULL,etat VARCHAR( 20 ) NOT NULL, message_id VARCHAR(50) NOT NULL) ENGINE=MyISAM CHARACTER SET utf8 COLLATE utf8_general_ci;
+CREATE TABLE IF NOT EXISTS s_incidents (id_incident INT( 11 ) NOT NULL AUTO_INCREMENT PRIMARY KEY ,declarant VARCHAR( 50 ) NOT NULL ,date DATE NOT NULL ,heure VARCHAR( 20 ) NOT NULL ,id_lieu INT( 11 ) NOT NULL ,nature VARCHAR( 255 ) NOT NULL , id_categorie INT(11), description TEXT NOT NULL,etat VARCHAR( 20 ) NOT NULL, message_id VARCHAR(50) NOT NULL, primo_declarant VARCHAR(50)) ENGINE=MyISAM CHARACTER SET utf8 COLLATE utf8_general_ci;
 DROP TABLE IF EXISTS s_qualites;
 CREATE TABLE IF NOT EXISTS s_qualites (id INT( 11 ) NOT NULL AUTO_INCREMENT PRIMARY KEY ,qualite VARCHAR( 50 ) NOT NULL) ENGINE=MyISAM CHARACTER SET utf8 COLLATE utf8_general_ci;
-DROP TABLE IF EXISTS s_types_sanctions;
-CREATE TABLE IF NOT EXISTS s_types_sanctions (id_nature INT( 11 ) NOT NULL AUTO_INCREMENT PRIMARY KEY ,nature VARCHAR( 255 ) NOT NULL) ENGINE=MyISAM CHARACTER SET utf8 COLLATE utf8_general_ci;
+DROP TABLE IF EXISTS s_types_sanctions2;
+CREATE TABLE IF NOT EXISTS s_types_sanctions2 (id_nature INT( 11 ) NOT NULL AUTO_INCREMENT PRIMARY KEY ,nature VARCHAR( 255 ) NOT NULL ,type VARCHAR( 255 ) NOT NULL DEFAULT 'autre') ENGINE=MyISAM CHARACTER SET utf8 COLLATE utf8_general_ci;
 DROP TABLE IF EXISTS s_autres_sanctions;
 CREATE TABLE IF NOT EXISTS s_autres_sanctions (id INT( 11 ) NOT NULL AUTO_INCREMENT PRIMARY KEY ,id_sanction INT( 11 ) NOT NULL ,id_nature INT( 11 ) NOT NULL ,description TEXT NOT NULL) ENGINE=MyISAM CHARACTER SET utf8 COLLATE utf8_general_ci;
 DROP TABLE IF EXISTS s_mesures;
@@ -293,13 +299,13 @@ CREATE TABLE IF NOT EXISTS s_lieux_incidents (id INT( 11 ) NOT NULL AUTO_INCREME
 DROP TABLE IF EXISTS s_protagonistes;
 CREATE TABLE IF NOT EXISTS s_protagonistes (id INT( 11 ) NOT NULL AUTO_INCREMENT PRIMARY KEY ,id_incident INT NOT NULL ,login VARCHAR( 50 ) NOT NULL ,statut VARCHAR( 50 ) NOT NULL ,qualite VARCHAR( 50 ) NOT NULL,avertie ENUM('N','O') NOT NULL DEFAULT 'N') ENGINE=MyISAM CHARACTER SET utf8 COLLATE utf8_general_ci;
 DROP TABLE IF EXISTS s_sanctions;
-CREATE TABLE IF NOT EXISTS s_sanctions (id_sanction INT( 11 ) NOT NULL AUTO_INCREMENT PRIMARY KEY ,login VARCHAR( 50 ) NOT NULL ,description TEXT NOT NULL ,nature VARCHAR( 255 ) NOT NULL ,effectuee ENUM( 'N', 'O' ) NOT NULL ,id_incident INT( 11 ) NOT NULL) ENGINE=MyISAM CHARACTER SET utf8 COLLATE utf8_general_ci;
+CREATE TABLE IF NOT EXISTS s_sanctions (id_sanction INT( 11 ) NOT NULL AUTO_INCREMENT PRIMARY KEY ,login VARCHAR( 50 ) NOT NULL ,description TEXT NOT NULL ,nature VARCHAR( 255 ) NOT NULL ,id_nature_sanction INT(11), effectuee ENUM( 'N', 'O' ) NOT NULL ,id_incident INT( 11 ) NOT NULL) ENGINE=MyISAM CHARACTER SET utf8 COLLATE utf8_general_ci;
 DROP TABLE IF EXISTS s_communication;
 CREATE TABLE IF NOT EXISTS s_communication (id_communication INT( 11 ) NOT NULL AUTO_INCREMENT PRIMARY KEY ,id_incident INT( 11 ) NOT NULL ,login VARCHAR( 50 ) NOT NULL ,nature VARCHAR( 255 ) NOT NULL ,description TEXT NOT NULL) ENGINE=MyISAM CHARACTER SET utf8 COLLATE utf8_general_ci;
 DROP TABLE IF EXISTS s_travail;
 CREATE TABLE IF NOT EXISTS s_travail (id_travail INT( 11 ) NOT NULL AUTO_INCREMENT PRIMARY KEY ,id_sanction INT( 11 ) NOT NULL ,date_retour DATE NOT NULL ,heure_retour VARCHAR( 20 ) NOT NULL ,travail TEXT NOT NULL) ENGINE=MyISAM CHARACTER SET utf8 COLLATE utf8_general_ci;
 DROP TABLE IF EXISTS s_retenues;
-CREATE TABLE IF NOT EXISTS s_retenues (id_retenue INT( 11 ) NOT NULL AUTO_INCREMENT PRIMARY KEY ,id_sanction INT( 11 ) NOT NULL ,date DATE NOT NULL ,heure_debut VARCHAR( 20 ) NOT NULL ,duree FLOAT NOT NULL ,travail TEXT NOT NULL ,lieu VARCHAR( 255 ) NOT NULL) ENGINE=MyISAM CHARACTER SET utf8 COLLATE utf8_general_ci;
+CREATE TABLE IF NOT EXISTS s_retenues (id_retenue INT( 11 ) NOT NULL AUTO_INCREMENT PRIMARY KEY ,id_sanction INT( 11 ) NOT NULL ,date DATE NOT NULL ,heure_debut VARCHAR( 20 ) NOT NULL ,duree FLOAT NOT NULL ,travail TEXT NOT NULL ,lieu VARCHAR( 255 ) NOT NULL , materiel VARCHAR( 150 ) NOT NULL) ENGINE=MyISAM CHARACTER SET utf8 COLLATE utf8_general_ci;
 DROP TABLE IF EXISTS s_exclusions;
 CREATE TABLE s_exclusions (id_exclusion int(11) NOT NULL AUTO_INCREMENT,  id_sanction int(11) NOT NULL DEFAULT '0',  date_debut date NOT NULL DEFAULT '0000-00-00',  heure_debut varchar(20) NOT NULL DEFAULT '',  date_fin date NOT NULL DEFAULT '0000-00-00',  heure_fin varchar(20) NOT NULL DEFAULT '',  travail text NOT NULL,  lieu varchar(255) NOT NULL DEFAULT '',  nombre_jours varchar(50) NOT NULL,  qualification_faits text NOT NULL,  num_courrier varchar(50) NOT NULL,  type_exclusion varchar(50) NOT NULL, id_signataire INT NOT NULL,  PRIMARY KEY (id_exclusion)) ENGINE=MyISAM CHARACTER SET utf8 COLLATE utf8_general_ci;
 DROP TABLE IF EXISTS s_reports;
@@ -585,7 +591,7 @@ CREATE TABLE IF NOT EXISTS j_groupes_visibilite (id INT(11) NOT NULL auto_increm
 DROP TABLE IF EXISTS ct_sequences;
 CREATE TABLE IF NOT EXISTS ct_sequences (id INT( 11 ) NOT NULL AUTO_INCREMENT PRIMARY KEY ,titre VARCHAR( 255 ) NOT NULL , description TEXT NOT NULL) ENGINE=MyISAM CHARACTER SET utf8 COLLATE utf8_general_ci;
 DROP TABLE IF EXISTS s_travail_mesure;
-CREATE TABLE IF NOT EXISTS s_travail_mesure (id INT( 11 ) NOT NULL AUTO_INCREMENT PRIMARY KEY ,id_incident INT( 11 ) NOT NULL ,login_ele VARCHAR( 50 ) NOT NULL , travail TEXT NOT NULL) ENGINE=MyISAM CHARACTER SET utf8 COLLATE utf8_general_ci;
+CREATE TABLE IF NOT EXISTS s_travail_mesure (id INT( 11 ) NOT NULL AUTO_INCREMENT PRIMARY KEY ,id_incident INT( 11 ) NOT NULL ,login_ele VARCHAR( 50 ) NOT NULL , travail TEXT NOT NULL , materiel VARCHAR( 150 ) NOT NULL) ENGINE=MyISAM CHARACTER SET utf8 COLLATE utf8_general_ci;
 DROP TABLE IF EXISTS s_natures;
 CREATE TABLE IF NOT EXISTS s_natures ( id INT(11) NOT NULL auto_increment, nature varchar(50) NOT NULL default '', id_categorie int(11) not null default '0', PRIMARY KEY (id)) ENGINE=MyISAM CHARACTER SET utf8 COLLATE utf8_general_ci;
 DROP TABLE IF EXISTS udt_lignes;
@@ -732,7 +738,10 @@ ELEOPT10 varchar(40) NOT NULL default '',
 ELEOPT11 varchar(40) NOT NULL default '',
 ELEOPT12 varchar(40) NOT NULL default '',
 LIEU_NAISSANCE varchar(50) NOT NULL default '',
-MEL varchar(255) NOT NULL default ''
+MEL varchar(255) NOT NULL default '',
+TEL_PERS varchar(255) NOT NULL default '',
+TEL_PORT varchar(255) NOT NULL default '',
+TEL_PROF varchar(255) NOT NULL default ''
 ) ENGINE=MyISAM CHARACTER SET utf8 COLLATE utf8_general_ci ;
 
 DROP TABLE IF EXISTS temp_abs_import;
@@ -759,3 +768,136 @@ statut VARCHAR( 20 ) NOT NULL ,
 auth_mode ENUM('gepi','ldap','sso') NOT NULL default 'gepi',
 date_reserve DATE DEFAULT '0000-00-00',
 temoin VARCHAR( 50 ) NOT NULL) ENGINE=MyISAM CHARACTER SET utf8 COLLATE utf8_general_ci ;
+
+DROP TABLE IF EXISTS t_plan_de_classe;
+CREATE TABLE IF NOT EXISTS t_plan_de_classe (
+id INT( 11 ) NOT NULL AUTO_INCREMENT PRIMARY KEY ,
+id_groupe INT(11) NOT NULL ,
+login_prof VARCHAR(50) NOT NULL ,
+dim_photo INT(11) NOT NULL) ENGINE=MyISAM CHARACTER SET utf8 COLLATE utf8_general_ci;
+
+DROP TABLE IF EXISTS t_plan_de_classe_ele;
+CREATE TABLE IF NOT EXISTS t_plan_de_classe_ele (
+id INT( 11 ) NOT NULL AUTO_INCREMENT PRIMARY KEY ,
+id_plan INT( 11 ) NOT NULL,
+login_ele VARCHAR(50) NOT NULL ,
+x INT(11) NOT NULL ,
+y INT(11) NOT NULL) ENGINE=MyISAM CHARACTER SET utf8 COLLATE utf8_general_ci;
+
+DROP TABLE IF EXISTS rss_users;
+CREATE TABLE rss_users (id int(11) NOT NULL auto_increment, user_login varchar(30) NOT NULL, user_uri varchar(30) NOT NULL, PRIMARY KEY  (id)) ENGINE=MyISAM CHARACTER SET utf8 COLLATE utf8_general_ci;
+
+DROP TABLE IF EXISTS ldap_bx;
+CREATE TABLE ldap_bx (
+id INT( 11 ) NOT NULL AUTO_INCREMENT ,
+login_u VARCHAR( 200 ) NOT NULL ,
+nom_u VARCHAR( 200 ) NOT NULL ,
+prenom_u VARCHAR( 200 ) NOT NULL ,
+statut_u VARCHAR( 50 ) NOT NULL ,
+identite_u VARCHAR( 50 ) NOT NULL ,
+PRIMARY KEY ( id )
+) ENGINE=MyISAM CHARACTER SET utf8 COLLATE utf8_general_ci;
+
+DROP TABLE IF EXISTS droits_acces_fichiers;
+CREATE TABLE IF NOT EXISTS droits_acces_fichiers (
+id INT(11) unsigned NOT NULL auto_increment,
+fichier VARCHAR( 255 ) NOT NULL ,
+identite VARCHAR( 255 ) NOT NULL ,
+type VARCHAR( 255 ) NOT NULL,
+PRIMARY KEY ( id )
+) ENGINE=MyISAM CHARACTER SET utf8 COLLATE utf8_general_ci;
+
+DROP TABLE IF EXISTS log_maj_sconet;
+CREATE TABLE log_maj_sconet (
+id INT( 11 ) NOT NULL AUTO_INCREMENT PRIMARY KEY ,
+login VARCHAR( 50 ) NOT NULL ,
+texte TEXT NOT NULL ,
+date_debut DATETIME NOT NULL ,
+date_fin DATETIME NOT NULL
+) ENGINE = MYISAM CHARACTER SET utf8 COLLATE utf8_general_ci;
+
+DROP TABLE IF EXISTS classes_param;
+CREATE TABLE classes_param (
+id int(11) NOT NULL AUTO_INCREMENT,
+id_classe smallint(6) NOT NULL,
+name varchar(100) NOT NULL,
+value varchar(255) NOT NULL,
+PRIMARY KEY (id),
+UNIQUE KEY id_classe_name (id_classe,name)
+) ENGINE = MYISAM CHARACTER SET utf8 COLLATE utf8_general_ci;
+
+DROP TABLE IF EXISTS messagerie;
+CREATE TABLE IF NOT EXISTS messagerie (
+id int(11) NOT NULL AUTO_INCREMENT,
+in_reply_to int(11) NOT NULL,
+login_src varchar(50) NOT NULL,
+login_dest varchar(50) NOT NULL,
+sujet varchar(100) NOT NULL,
+message text NOT NULL,
+date_msg timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+date_visibilite timestamp NOT NULL,
+vu tinyint(4) NOT NULL,
+date_vu timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
+PRIMARY KEY (id)
+) ENGINE = MYISAM CHARACTER SET utf8 COLLATE utf8_general_ci;
+
+DROP TABLE IF EXISTS acces_cn;
+CREATE TABLE acces_cn (
+id INT( 11 ) NOT NULL AUTO_INCREMENT ,
+id_groupe INT( 11 ) NOT NULL ,
+periode INT( 11 ) NOT NULL ,
+date_limite timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+commentaires text NOT NULL,
+PRIMARY KEY ( id )
+) ENGINE = MYISAM CHARACTER SET utf8 COLLATE utf8_general_ci COMMENT = 'Acces exceptionnel au CN en periode close';
+
+DROP TABLE IF EXISTS acces_exceptionnel_matieres_notes;
+CREATE TABLE acces_exceptionnel_matieres_notes (
+id INT( 11 ) NOT NULL AUTO_INCREMENT ,
+id_groupe INT( 11 ) NOT NULL ,
+periode INT( 11 ) NOT NULL ,
+date_limite timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+commentaires text NOT NULL,
+PRIMARY KEY ( id )
+) ENGINE = MYISAM CHARACTER SET utf8 COLLATE utf8_general_ci COMMENT = 'Acces exceptionnel à la modif de notes du bulletin en periode close';
+
+DROP TABLE IF EXISTS ct_devoirs_faits;
+CREATE TABLE ct_devoirs_faits (
+id INT(11) unsigned NOT NULL auto_increment,
+id_ct INT(11) unsigned NOT NULL,
+login VARCHAR( 255 ) NOT NULL ,
+etat VARCHAR( 50 ) NOT NULL,
+date_initiale DATETIME,
+date_modif DATETIME,
+commentaire VARCHAR( 255 ) NOT NULL,
+PRIMARY KEY ( id )
+) ENGINE=MyISAM CHARACTER SET utf8 COLLATE utf8_general_ci;
+
+DROP TABLE IF EXISTS cn_conteneurs_modele;
+CREATE TABLE cn_conteneurs_modele (
+id_modele int(11) NOT NULL auto_increment, 
+nom_court varchar(32) NOT NULL default '', 
+description varchar(128) NOT NULL default '', 
+PRIMARY KEY  (id_modele)
+) ENGINE=MyISAM CHARACTER SET utf8 COLLATE utf8_general_ci;
+
+DROP TABLE IF EXISTS cn_conteneurs_modele_conteneurs;
+CREATE TABLE cn_conteneurs_modele_conteneurs (
+id int(11) NOT NULL auto_increment, 
+id_modele int(11) NOT NULL default '0', 
+id_racine int(11) NOT NULL default '0', 
+nom_court varchar(32) NOT NULL default '', 
+nom_complet varchar(64) NOT NULL default '', 
+description varchar(128) NOT NULL default '', 
+mode char(1) NOT NULL default '2', 
+coef decimal(3,1) NOT NULL default '1.0', 
+arrondir char(2) NOT NULL default 's1', 
+ponderation decimal(3,1) NOT NULL default '0.0', 
+display_parents char(1) NOT NULL default '0', 
+display_bulletin char(1) NOT NULL default '1', 
+parent int(11) NOT NULL default '0', 
+PRIMARY KEY  (id), 
+INDEX parent_racine (parent,id_racine), 
+INDEX racine_bulletin (id_racine,display_bulletin)
+) ENGINE=MyISAM CHARACTER SET utf8 COLLATE utf8_general_ci;
+

@@ -123,7 +123,7 @@ function redimensionne_image_petit($photo)
 	if ($utilisateur->getStatut() != 'professeur' || (getSettingValue("abs2_saisie_prof_decale")=='y' && getSettingValue("abs2_saisie_prof_decale_journee")=='y')) {
 	    $rand_id = rand(0,10000000);
 		echo '<label class="invisible" for="date_absence_eleve_'.$rand_id.'">date</label>';
-	    echo '<input size="9" id="date_absence_eleve_'.$rand_id.'" name="date_absence_eleve" value="'.$dt_date_absence_eleve->format('d/m/Y').'" />&nbsp;';
+	    echo '<input size="9" id="date_absence_eleve_'.$rand_id.'" name="date_absence_eleve" value="'.$dt_date_absence_eleve->format('d/m/Y').'" onKeyDown="clavier_date(this.id,event);" AutoComplete="off" />&nbsp;';
 	    echo '
 	    <script type="text/javascript">
 		Calendar.setup({
@@ -140,7 +140,7 @@ function redimensionne_image_petit($photo)
  }
  
 $journeePossible = FALSE;
-if ('cpe' == $_SESSION['statut'] || 'scolarite' == $_SESSION['statut']) {
+if ('cpe' == $_SESSION['statut'] || 'scolarite' == $_SESSION['statut'] || 'autre' == $_SESSION['statut']) {
 	$journeePossible = TRUE;
 }
 
@@ -158,6 +158,9 @@ if (isset($_POST["initialise"]) && $_POST["initialise"]==TRUE) {
 }
 
 $_SESSION['showJournee'] = isset($_POST["journee"]) ? $_POST["journee"] : (isset($_SESSION['showJournee']) ? $_SESSION['showJournee'] : FALSE);
+
+// Initialisation de variable:
+$afficher_passer_au_cdt="y";
 
 //récupération des paramètres de la requète
 $id_groupe = isset($_POST["id_groupe"]) ? $_POST["id_groupe"] :(isset($_GET["id_groupe"]) ? $_GET["id_groupe"] :(isset($_SESSION["id_groupe_abs"]) ? $_SESSION["id_groupe_abs"] : NULL));
@@ -215,6 +218,16 @@ if ($utilisateur->getStatut() == 'professeur' && (getSettingValue("abs2_saisie_p
 }
 
 if ($type_selection == 'id_cours') {
+	if(empty($id_cours)) {
+		// On recherche le créneau courant
+		if ($utilisateur->getStatut() == "professeur") {
+			$current_cours = $utilisateur->getEdtEmplacementCours();
+			if ($current_cours != null) {
+				$id_cours = $current_cours->getIdCours();
+			}
+		}
+	}
+
     if ($utilisateur->getStatut() == "professeur") {
 	$current_cours = EdtEmplacementCoursQuery::create()->filterByUtilisateurProfessionnel($utilisateur)->findPk($id_cours);
     } else {
@@ -244,7 +257,7 @@ if ($type_selection == 'id_groupe') {
     $current_aid = AidDetailsQuery::create()->findPk($id_aid);
 } else if ($type_selection == 'id_classe') {
     $current_classe = ClasseQuery::create()->findPk($id_classe);
-} else if ($type_selection != 'id_cours' && getSettingValue("autorise_edt_tous") == 'y'){//rien n'as ete selectionner, on va regarder le cours actuel
+} else if ($type_selection != 'id_cours' && getSettingValue("autorise_edt_tous") == 'y'){//rien n'a ete selectionné, on va regarder le cours actuel
     $current_cours = $utilisateur->getEdtEmplacementCours();
     if ($current_cours != null) {
 	$current_creneau = $current_cours->getEdtCreneau();
@@ -259,6 +272,7 @@ if ($type_selection == 'id_groupe') {
 	}
     }
 }
+
 $id_groupe = null;
 $id_classe = null;
 $id_aid = null;
@@ -288,7 +302,7 @@ if (getSettingValue("abs2_saisie_prof_hors_cours")!='y'
 	//le reglage specifie que le prof n'a pas le droit de saisir autre chose que son cours
 	//donc on affiche pas de selection, le cours est automatiquement selectionné
 } else {
-    if (getSettingValue("GepiAccesAbsTouteClasseCpe")=='yes' && $utilisateur->getStatut() == "cpe") {
+    if ((getSettingValue("GepiAccesAbsTouteClasseCpe")=='yes' && $utilisateur->getStatut() == "cpe")||($utilisateur->getStatut() == "autre")) {
 		$groupe_col = GroupeQuery::create()->orderByName()->useJGroupesClassesQuery()->useClasseQuery()->orderByNom()->endUse()->endUse()
 							->leftJoinWith('Groupe.JGroupesClasses')
 							->leftJoinWith('JGroupesClasses.Classe')
@@ -311,7 +325,7 @@ if (getSettingValue("abs2_saisie_prof_decale_journee")!='y'
 } else {
 	$edt_cours_aff = new PropelCollection();
     //on affiche une boite de selection avec les cours
-    if (getSettingValue("GepiAccesAbsTouteClasseCpe")=='yes' && $utilisateur->getStatut() == "cpe") {
+    if ((getSettingValue("GepiAccesAbsTouteClasseCpe")=='yes' && $utilisateur->getStatut() == "cpe")||($utilisateur->getStatut() == "autre")) {
 		//la collection entière des cours est trop grosse et inexploitable sous la forme d'une liste. ça consomme de la ressource donc c'est désactivé
 		$edt_cours_col = new PropelCollection();
     } else {
@@ -377,12 +391,11 @@ if (getSettingValue("abs2_saisie_prof_decale_journee")!='y'
 }
 
 //**************** CLASSES *****************
-if (getSettingValue("GepiAccesAbsTouteClasseCpe")=='yes' && $utilisateur->getStatut() == "cpe") {
+if ((getSettingValue("GepiAccesAbsTouteClasseCpe")=='yes' && $utilisateur->getStatut() == "cpe")||($utilisateur->getStatut() == "autre")) {
     $classe_col = ClasseQuery::create()->orderByNom()->orderByNomComplet()->find();
 } else {
     $classe_col = $utilisateur->getClasses();
 }
-
 //**************** ELEVES *****************
 //affichage des eleves. Il nous faut au moins un groupe ou une aid
 $eleve_col = new PropelCollection();
@@ -429,6 +442,25 @@ if (isset($current_groupe) && $current_groupe != null) {
             ->distinct();
     $eleve_col = $query->find();
 }
+$eleve_col->uasort(function($a, $b) {
+    $aclasseNom='';
+    $aclasse = $a->getClasse();
+    if ($aclasse != null) {
+        $aclasseNom = $aclasse->getNom();
+    }
+    $bclasseNom='';
+    $bclasse = $b->getClasse();
+    if ($bclasse != null) {
+        $bclasseNom = $bclasse->getNom();
+    }
+
+    if ($aclasseNom != $bclasseNom) {
+        return $aclasseNom > $bclasseNom;
+    } else {
+        //on tri par nom
+        return $a->getNom().''.$a->getPrenom() > $b->getNom().''.$b->getPrenom();
+    }
+});
 
 //l'utilisateurs a-t-il deja saisie ce creneau ?
 $deja_saisie = false;
@@ -479,10 +511,11 @@ if ($current_creneau == null) {
     $eleve_col = new PropelObjectCollection();
 }
 
-
 //**************** TABLEAU DES ELEVES *****************
+// 20120618
 $tab_regimes=array();
 $tab_regimes_eleves=array();
+$tab_types_abs_regimes=array();
 $afficheEleve = array();
 $elv = 0;
 foreach($eleve_col as $eleve) {
@@ -495,35 +528,31 @@ foreach($eleve_col as $eleve) {
 	
 	$Yesterday = date("Y-m-d",mktime(0,0,0,$dt_date_absence_eleve->format("m") ,$dt_date_absence_eleve->format("d")-1,$dt_date_absence_eleve->format("Y")));
 	$abs_hier = false;
-        $traitee_hier = true;//les saisies de la veille ont-elle été traitées intégralement
-        $justifiee_hier = true;//les saisies de la veille ont-elle été justifiées intégralement
-        $afficheEleve[$elv]['bulle_hier'] = '';
-        foreach ($eleve->getAbsenceEleveSaisiesDuJour($Yesterday) as $saisie) {
-            if (!$saisie->getManquementObligationPresence()) continue;
-            $abs_hier = true;
-            $traitee_hier = $traitee_hier && $saisie->getTraitee();
-            $justifiee_hier = $justifiee_hier && $saisie->getJustifiee();
-            $afficheEleve[$elv]['bulle_hier'] .= $saisie->getTypesDescription();
-        }
-        if ($abs_hier) {
-            $afficheEleve[$elv]['class_hier'] = $justifiee_hier ? "justifieeHier" : 'absentHier';
-            $afficheEleve[$elv]['text_hier'] = $traitee_hier ? 'T' : '';
-        } else {
-            $afficheEleve[$elv]['class_hier'] = '';
-            $afficheEleve[$elv]['text_hier'] = '';
-        }
+	$traitee_hier = true;//les saisies de la veille ont-elle été traitées intégralement
+	$justifiee_hier = true;//les saisies de la veille ont-elle été justifiées intégralement
+	$afficheEleve[$elv]['bulle_hier'] = '';
+	foreach ($eleve->getAbsenceEleveSaisiesDuJour($Yesterday) as $saisie) {
+		if (!$saisie->getManquementObligationPresence()) continue;
+		$abs_hier = true;
+		$traitee_hier = $traitee_hier && $saisie->getTraitee();
+		$justifiee_hier = $justifiee_hier && $saisie->getJustifiee();
+		$afficheEleve[$elv]['bulle_hier'] .= $saisie->getTypesDescription();
+	}
+	if ($abs_hier) {
+		$afficheEleve[$elv]['class_hier'] = $justifiee_hier ? "justifieeHier" : 'absentHier';
+		$afficheEleve[$elv]['text_hier'] = $traitee_hier ? 'T' : '';
+	} else {
+		$afficheEleve[$elv]['class_hier'] = '';
+		$afficheEleve[$elv]['text_hier'] = '';
+	}
 	$afficheEleve[$elv]['position'] = $eleve_col->getPosition();
 	$afficheEleve[$elv]['id'] = $eleve->getId();
 	$afficheEleve[$elv]['nom'] = $eleve->getNom();
 	$afficheEleve[$elv]['prenom'] = $eleve->getPrenom();
 	$afficheEleve[$elv]['civilite'] = $eleve->getCivilite();
-	// 20120618
-	//$afficheEleve[$elv]['regime'] = $eleve->getRegime();
 	$afficheEleve[$elv]['regime'] = '';
-	$sql="SELECT regime FROM j_eleves_regime WHERE login='".$eleve->getLogin()."';";
-	$res_regime=mysql_query($sql);
-	if(mysql_num_rows($res_regime)>0) {
-		$afficheEleve[$elv]['regime'] = mysql_result($res_regime, 0, 'regime');
+	if ($eleve->getEleveRegimeDoublant() != null) {
+		$afficheEleve[$elv]['regime'] = $eleve->getEleveRegimeDoublant()->getRegime();
 		if(!in_array($afficheEleve[$elv]['regime'], $tab_regimes)) {
 			$tab_regimes[]=$afficheEleve[$elv]['regime'];
 		}
@@ -574,9 +603,9 @@ foreach($eleve_col as $eleve) {
 			if (getSettingValue("abs2_afficher_saisies_creneau_courant")!='y') {
 				$absences_du_creneau_du_prof = new PropelObjectCollection();
 				foreach ($absences_du_creneau as $abs) {
-						if ($abs->getUtilisateurId() == $utilisateur->getPrimaryKey()) {
-								$absences_du_creneau_du_prof->append($abs);
-						}
+					if ($abs->getUtilisateurId() == $utilisateur->getPrimaryKey()) {
+						$absences_du_creneau_du_prof->append($abs);
+					}
 				}
 				$absences_du_creneau = $absences_du_creneau_du_prof;
 			}
@@ -591,12 +620,25 @@ foreach($eleve_col as $eleve) {
 			//on affiche  les informations pour les crenaux avant la saisie sauf si configuré autrement
 			if (getSettingValue("abs2_montrer_creneaux_precedents")=='y') {
 				$absences_du_creneau = $eleve->getAbsenceEleveSaisiesDuCreneau($edt_creneau, $dt_date_absence_eleve);
+
+/*
+// 20121009
+if(!$absences_du_creneau->isEmpty()) {
+echo "<p>".$eleve->getLogin()."<br />".
+//$absences_du_creneau->get().
+"</p>";
+echo "<pre>";
+print_r($absences_du_creneau);
+echo "</pre>";
+}
+*/
+
 			} else {
 				$absences_du_creneau = new PropelCollection();
 			}
 		}
 		$afficheEleve[$elv]['style'][$i] = "";
-                if ($deja_saisie && $nb_creneau_a_saisir > 0) {
+		if ($deja_saisie && $nb_creneau_a_saisir > 0) {
 			$afficheEleve[$elv]['style'][$i] = "fondVert";
 		}
 		if (!$absences_du_creneau->isEmpty()) {
@@ -604,6 +646,10 @@ foreach($eleve_col as $eleve) {
 				if ($abs_saisie->getManquementObligationPresence()) {
 					$afficheEleve[$elv]['style'][$i] = "fondRouge";
 					break;
+				}
+				// 20121009
+				else {
+					$afficheEleve[$elv]['style'][$i] = "fondJaune";
 				}
 			}
 		}
@@ -616,6 +662,7 @@ foreach($eleve_col as $eleve) {
 		
 		//si il y a des absences de l'utilisateurs on va proposer de les modifier
 		if (getSettingValue("abs2_modification_saisie_une_heure")=='y') {
+			$cpt=0;
 			foreach ($absences_du_creneau as $saisie) {
 				if (in_array($saisie->getPrimaryKey(), $saisie_affiches)) {
 					// on affiche les saisies une seule fois
@@ -630,9 +677,33 @@ foreach($eleve_col as $eleve) {
 					foreach ($saisie->getAbsenceEleveTraitements() as $bou_traitement) {
 						if ($bou_traitement->getAbsenceEleveType() != null) {
 							$afficheEleve[$elv]['saisie'][$i]['traitements'][] = $bou_traitement->getAbsenceEleveType()->getNom();
+							//echo "\$afficheEleve[$elv]['saisie'][$i]['traitements'][] = ".$bou_traitement->getAbsenceEleveType()->getNom()."<br />";
 						}
 					}
 				}
+				// 20121009
+				else {
+					// Peut-être ajouter un test: les autres utilisateurs ont-ils le droit de voir ce qui a été saisi par un collègue?
+					// Pour permettre un affichage en title sur les cellules avec saisie
+					/*
+					echo "<hr />Saisie<pre>";
+					print_r($saisie);
+					echo "</pre>";
+					*/
+					foreach ($saisie->getAbsenceEleveTraitements() as $bou_traitement) {
+						if ($bou_traitement->getAbsenceEleveType() != null) {
+							$commentaire_associe="";
+							if($saisie->getCommentaire()!=null) {$commentaire_associe=" (".$saisie->getCommentaire().")";}
+							$afficheEleve[$elv]['info_saisie'][$i]['traitements'][] = $bou_traitement->getAbsenceEleveType()->getNom().$commentaire_associe;
+							/*
+							echo "<hr />bou_traitement<pre>";
+							print_r($bou_traitement);
+							echo "</pre>";
+							*/
+						}
+					}
+				}
+				$cpt++;
 			}
 		}
 		
@@ -642,6 +713,7 @@ foreach($eleve_col as $eleve) {
 				$txt = $abs_saisie->getTypesDescription();
 				if ($txt != '') {
 					$afficheEleve[$elv]['saisieDescription'][$i][] = $abs_saisie->getTypesDescription();
+					//echo $abs_saisie->getTypesDescription()."<br />";
 				}
 			}
 		}
@@ -675,31 +747,16 @@ foreach($eleve_col as $eleve) {
 }
 
 // 20120618
-$chaine_coche_decoche_regime="";
-$js_var_coche_decoche_regime="var etat_cocher_regime=new Array();\n";
-$js_var_coche_decoche_regime.="var nom_regime=new Array();\n";
+$chaine_effectifs_regimes="";
+$indice_tab_regime=array();
 if(count($tab_regimes)>0) {
-
-	$chaine_coche_decoche_regime.="<span id='effectifs_regimes_js' style='display: none;'>";
+	$chaine_effectifs_regimes.="<span style='font-style: italic'>";
 	for($i=0;$i<count($tab_regimes);$i++) {
-		//$chaine_coche_decoche_regime.="<div style='float:left; width:2em; margin-right: 0.5em;'><a href='#' onclick=\"cocher_decocher_regime($i); return false;\">".$tab_regimes[$i]."</a></div>\n";
-		$chaine_coche_decoche_regime.="<span style='margin-right: 0.2em; margin-left: 0.2em;'><a href='#' onclick=\"cocher_decocher_regime($i); return false;\">".count($tab_regimes_eleves[$tab_regimes[$i]])." ".$tab_regimes[$i]."</a></span>\n";
-		$js_var_coche_decoche_regime.="etat_cocher_regime[$i]=false;\n";
-		$js_var_coche_decoche_regime.="nom_regime[$i]='".$tab_regimes[$i]."';\n";
-		$js_var_coche_decoche_regime.="var ele_regime_$i=new Array(";
-		for($j=0;$j<count($tab_regimes_eleves[$tab_regimes[$i]]);$j++) {
-			if($j>0) {$js_var_coche_decoche_regime.=", ";}
-			$js_var_coche_decoche_regime.=$tab_regimes_eleves[$tab_regimes[$i]][$j];
-		}
-		$js_var_coche_decoche_regime.=");\n";
-	}
-	$chaine_coche_decoche_regime.="</span>";
+		$indice_tab_regime[$tab_regimes[$i]]=$i;
 
-	$chaine_coche_decoche_regime.="<span id='effectifs_regimes_non_js'>";
-	for($i=0;$i<count($tab_regimes);$i++) {
-		$chaine_coche_decoche_regime.="<span style='margin-right: 0.2em; margin-left: 0.2em;'>".count($tab_regimes_eleves[$tab_regimes[$i]])." ".$tab_regimes[$i]."</span>\n";
+		$chaine_effectifs_regimes.="<span style='margin-right: 0.2em; margin-left: 0.2em;'>".count($tab_regimes_eleves[$tab_regimes[$i]])." ".$tab_regimes[$i]."</span>\n";
 	}
-	$chaine_coche_decoche_regime.="</span>";
+	$chaine_effectifs_regimes.="</span>";
 }
 
 //==============================================
@@ -727,6 +784,7 @@ require_once("../lib/header_template.inc.php");
 <head>
 <!-- on inclut l'entête -->
 <?php 
+$themessage  = 'Des informations ont été modifiées. Voulez-vous vraiment quitter sans enregistrer ?';
 include('../templates/origine/header_template.php');
 //include("../templates/origine/bandeau_template.php");
 ?>
@@ -758,11 +816,15 @@ include('../templates/origine/header_template.php');
 <!-- ************************* -->
 <!-- Début du corps de la page -->
 <!-- ************************* -->
+
 <body onload="show_message_deconnexion();<?php if($tbs_charger_observeur) echo $tbs_charger_observeur;?>">
 
 
 <!-- on inclut le bandeau -->
-	<?php include('../templates/origine/bandeau_template.php');?>
+	<?php
+		include('../templates/origine/bandeau_template.php');
+		//debug_var();
+	?>
 
 <div id='container'>
 
@@ -771,9 +833,19 @@ include('../templates/origine/header_template.php');
 
 include('menu_abs2.inc.php');
 //===========================
+//debug_var();
 ?>
 <a name='haut_de_page'></a>
 <div class='css-panes' id='containDiv'>
+
+	<?php
+		if((acces("/groupes/signalement_eleves.php", $_SESSION['statut']))&&(isset($id_groupe))) {
+	?>
+	<!--div style='float:right; width:19px;'><a href='../groupes/signalement_eleves.php?id_groupe=<?php echo $id_groupe;?>' onclick="return confirm_abandon (this, change, '<?php echo $themessage;?>')"><img src='../images/icons/ico_question.png' width='19' height='19' title="Si la liste des élèves du groupe affiché n'est pas correcte, vous pouvez signaler ici les erreurs à l'administrateur." /></a></div-->
+	<div style='float:right; width:22px;'><a href='../groupes/signalement_eleves.php?id_groupe=<?php echo $id_groupe;?>' target="_blank" title="Si la liste des élèves du groupe affiché n'est pas correcte, vous pouvez signaler ici les erreurs à l'administrateur."><img src='../images/icons/ico_attention.png' width='22' height='19' title="Si la liste des élèves du groupe affiché n'est pas correcte, vous pouvez signaler ici les erreurs à l'administrateur." /></a></div>
+	<?php
+		}
+	?>
 
 	<form class="center" action="./saisir_groupe.php" method="post" style="width: 100%;">
 		<p>
@@ -812,11 +884,15 @@ include('menu_abs2.inc.php');
 // ===== Affichage des groupes ======
 if (isset ($groupe_col) && !$groupe_col->isEmpty()) {
 ?>
-		<form class="colonne" action="./saisir_groupe.php" method="post">
+		<form class="colonne" action="./saisir_groupe.php" method="post" name="form_choix_groupe">
 			<p>
 				<input type="hidden" name="type_selection" value="id_groupe"/>
 				<label for="id_groupe">Groupe : </label>
-				<select id="id_groupe" name="id_groupe" class="small">
+				<select id="id_groupe" name="id_groupe" class="small"<?php
+					if(($_SESSION['statut']=='professeur')&&(!getSettingAOui('abs2_saisie_prof_decale'))&&(!getSettingAOui('abs2_saisie_prof_decale_journee'))) {
+						echo " onchange=\"document.forms['form_choix_groupe'].submit();\"";
+					}
+				?>>
 					<option value='-1'>choisissez un groupe</option>
 <?php
 foreach ($groupe_col as $group) {	
@@ -954,6 +1030,13 @@ if (!$classe_col->isEmpty()) {
 
 //**************** ELEVES *****************
 
+$tab_types=array();
+$sql="select * from a_types;";
+$res_types=mysql_query($sql);
+while($lig_type=mysql_fetch_object($res_types)) {
+	$tab_types[$lig_type->id]['manquement_obligation_presence']=$lig_type->manquement_obligation_presence;
+}
+
 if (TRUE == $_SESSION['showJournee']) {
 	include 'lib/saisir_groupe_journee.php';
 } else {
@@ -976,6 +1059,66 @@ if ($eleve_col->isEmpty()) {
 				<input type="hidden" name="id_semaine" value="<?php echo($id_semaine); ?>"/>
 				<input type="hidden" name="date_absence_eleve" value="<?php echo($dt_date_absence_eleve->format('d/m/Y')); ?>"/>
 			</p>
+
+			<?php
+				// Dispositif pour cocher/décocher les radio cachés liés aux régimes des élèves
+				$js_chaine_tab_types_abs_regimes="";
+				$indice_creneau_courant=$afficheEleve['0']['creneau_courant'];
+				if (isset ($afficheEleve['0']['type_autorises'][$indice_creneau_courant])) {
+					echo "<div id='div_coche_decoche_regime' style='float:right; display:none;'>\n";
+					//echo "<table class='boireaus'>\n";
+					echo "<table class='tb_absences'>\n";
+					echo "<tr style='background-color:lightgrey'>\n";
+					echo "   <th></th>\n";
+					for($loop=0;$loop<count($tab_regimes);$loop++) {
+						echo "   <th>".count($tab_regimes_eleves[$tab_regimes[$loop]])." ".$tab_regimes[$loop]."</th>\n";
+					}
+					echo "   <th>Tot.</th>\n";
+					echo "</tr>\n";
+					$alt=1;
+					foreach ($afficheEleve['0']['type_autorises'][$indice_creneau_courant] as $type) {
+						if($type['modeInterface'] == AbsenceEleveType::MODE_INTERFACE_CHECKBOX_HIDDEN_REGIME) {
+							if(!in_array($type['type'], $tab_types_abs_regimes)) {
+								$tab_types_abs_regimes[]=$type['type'];
+								if($js_chaine_tab_types_abs_regimes!="") {
+									$js_chaine_tab_types_abs_regimes.=", ";
+								}
+								$js_chaine_tab_types_abs_regimes.="'".$type['type']."'";
+							}
+							$alt=$alt*(-1);
+							//echo "<tr class='lig$alt'>\n";
+							if($alt==1) {
+								echo "<tr class='impair'>\n";
+							}
+							else {
+								echo "<tr class='pair'>\n";
+							}
+							echo "   <td>".$type['nom']."</td>\n";
+							for($loop=0;$loop<count($tab_regimes);$loop++) {
+								echo "   <td style='text-align:center'>\n";
+								echo "      <a href=\"javascript:cocher_decocher_regime(".$type['type'].", ".$loop.", 'true')\"><img src='../images/enabled.png' width='20' height='20' title=\"Cocher ".$type['nom']." pour les ".$tab_regimes[$loop]."\" /></a> \n";
+								echo "      <a href=\"javascript:cocher_decocher_regime(".$type['type'].", ".$loop.", 'false')\"><img src='../images/disabled.png' width='20' height='20' title=\"Décocher ".$type['nom']." pour les ".$tab_regimes[$loop]."\" /></a> \n";
+								echo "   </td>\n";
+							}
+							echo "   <td id='td_total_regime_".$type['type']."' style='text-align:center'></td>\n";
+							echo "</tr>\n";
+						}
+					}
+					echo "<tr style='background-color:lightgrey'>\n";
+					echo "   <th>Décocher</th>\n";
+					for($loop=0;$loop<count($tab_regimes);$loop++) {
+						echo "   <th>\n";
+						echo "      <a href=\"javascript:cocher_decocher_regime('decoche', ".$loop.", 'false')\"><img src='../images/disabled.png' width='20' height='20' title=\"Décocher tous les ".$tab_regimes[$loop]."\" /></a> \n";
+						echo "</th>\n";
+					}
+					echo "<th></th>\n";
+					echo "</tr>\n";
+					echo "</table>\n";
+					echo "</div>\n";
+					//echo "<div style='clear:both;'></div>\n";
+				}
+			?>
+
 			<p class="expli_page choix_fin center">
 				Saisie des absences du
 				<strong><?php echo strftime  ('%A %d/%m/%Y',  $dt_date_absence_eleve->format('U')); ?></strong>
@@ -1036,9 +1179,34 @@ if ($eleve_col->isEmpty()) {
                                         id ="bouton_changer_horaire">
 					Changer
 				</button>
-				<?php } ?>
+				<?php 
+					}
+
+					if($_SESSION['statut']=='professeur' && isset($id_cours) && is_numeric($id_cours)) {
+						// Récupérer l'id_groupe pour tester s'il y a un plan de classe
+						$sql="SELECT id_groupe FROM edt_cours WHERE id_cours='".$id_cours."';";
+						$res_edt=mysql_query($sql);
+						if(mysql_num_rows($res_edt)>0) {
+							$id_groupe=mysql_result($res_edt, 0, "id_groupe");
+
+							$sql="SELECT 1=1 FROM t_plan_de_classe WHERE id_groupe='".$id_groupe."' AND login_prof='".$_SESSION['login']."';";
+							$test_pdc=mysql_query($sql);
+							if(mysql_num_rows($test_pdc)>0) {
+								echo " <a href='saisir_groupe_plan.php?type_selection=id_cours&amp;id_cours=$id_cours'><img src='../images/icons/trombino.png' width='20' height='20' title='Saisie sur plan de classe' /></a>";
+							}
+						}
+					}
+					elseif($_SESSION['statut']=='professeur' && isset($current_groupe) && $current_groupe != null && $current_creneau != null) {
+						$sql="SELECT 1=1 FROM t_plan_de_classe WHERE id_groupe='".$id_groupe."' AND login_prof='".$_SESSION['login']."';";
+						$test_pdc=mysql_query($sql);
+						if(mysql_num_rows($test_pdc)>0) {
+							echo " <a href='saisir_groupe_plan.php?type_selection=id_groupe&amp;id_groupe=$id_groupe&amp;id_creneau=".$current_creneau->getIdDefiniePeriode()."'><img src='../images/icons/trombino.png' width='20' height='20' title='Saisie sur plan de classe' /></a>";
+						}
+					}
+
+				?>
 				<br/>
-				(les élèves non cochés seront considérés présents)
+				(<em>les élèves non cochés seront considérés présents</em>)
 			</p>
 			<p class="choix_fin center">
 				<input value="Enregistrer" 
@@ -1046,16 +1214,31 @@ if ($eleve_col->isEmpty()) {
 					   type="submit"  
 					   onclick="this.form.submit();this.disabled=true;this.value='En cours'" />
 			</p>
-			<?php if ($utilisateur->getStatut() == 'professeur' && getSettingValue("active_cahiers_texte")=='y') { ?>
+			<?php
+			if ($utilisateur->getStatut() == 'professeur' && getSettingValue("active_cahiers_texte")=='y') { 
+				//$afficher_passer_au_cdt="y";
+				if(isset($id_groupe)) {
+					$sql="SELECT 1=1 FROM j_groupes_visibilite WHERE id_groupe='$id_groupe' AND domaine='cahier_texte' AND visible='n';";
+					//echo "$sql<br />";
+					$test_cdt=mysql_query($sql);
+					if(mysql_num_rows($test_cdt)>0) {
+						$afficher_passer_au_cdt="n";
+					}
+				}
+				if($afficher_passer_au_cdt=="y") {
+			?>
 			<p class="choix_fin center">
 				<input value="Enregistrer et passer au cahier de texte" name="cahier_texte" type="submit"/>
 			</p>
-			<?php } ?>
+			<?php
+				}
+			}
+			?>
 <!-- Afichage du tableau de la liste des élèves -->
 <!-- Legende du tableau-->
-			<p class="center"><?php echo $eleve_col->count(); ?> élèves (<?php echo $chaine_coche_decoche_regime;
-?>).</p>
+			<p class="center"><?php echo $eleve_col->count(); ?> élèves (<?php echo $chaine_effectifs_regimes;?>).</p>
 <!-- Fin de la legende -->
+			<div style='clear:both;'></div>
 			<table class="tb_absences">
 				<caption class="invisible no_print">Absences</caption>
 				<thead>
@@ -1085,9 +1268,7 @@ if ($eleve_col->isEmpty()) {
 							<?php
 								// 20120618
 								if($afficheEleve['0']['creneau_courant'] == $i) {
-									//echo "<a href=\"#\" onclick=\"cocher_decocher_abs_eleves();return false;\">".$edt_creneau->getNomDefiniePeriode()."</a>";
 									echo "<a href=\"javascript:cocher_decocher_abs_eleves();\">".$edt_creneau->getNomDefiniePeriode()."</a>";
-									//echo $chaine_coche_decoche_regime;
 								}
 								else {
 									echo $edt_creneau->getNomDefiniePeriode();
@@ -1101,40 +1282,41 @@ if ($eleve_col->isEmpty()) {
 				</thead>
 				<tbody>
 <?php 
+	//===============================
+	// Boucle sur la liste des élèves
 	$compteur_eleve=0;
 	foreach($afficheEleve as $eleve) {
 		$compteur_eleve++;
 ?>
+<!--tr><td>plop</td></tr-->
 					<tr class='<?php echo $eleve['background'];?>'>
+						<!-- Colonne Veille -->
 						<td class = "<?php echo($eleve['class_hier']);
 							if ($eleve['creneau_courant'] != 0) {
 								echo ' noSmartphone';
 							} ?>">
-                                                        <span class="description" title="<?php echo htmlspecialchars($eleve['bulle_hier']); ?>"><?php echo $eleve['text_hier']; ?></span>
+							<span class="description" title="<?php echo htmlspecialchars($eleve['bulle_hier']); ?>"><?php echo $eleve['text_hier']; ?></span>
 						</td>
+
+						<!-- Colonne Nom prénom de l'élève -->
 						<td class='td_abs_eleves'>
 							<input type="hidden" 
 								   name="id_eleve_absent[<?php echo $eleve['position']; ?>]" 
 								   value="<?php echo $eleve['id']; ?>" />
 							<span class="td_abs_eleves">
-								<?php echo strtoupper($eleve['nom']).' '.ucfirst($eleve['prenom']).' ('.$eleve['civilite'].')'; ?>
+								<label for='active_absence_eleve_<?php echo $eleve['position']; ?>' id='label_nom_prenom_eleve_<?php echo $eleve['position']; ?>'>
+								<?php echo casse_mot($eleve['nom'],'maj').' '.casse_mot($eleve['prenom'],'majf2').' ('.$eleve['civilite'].')'; ?>
 								<?php if (isset ($eleve['classe'])) echo $eleve['classe']; ?>
+								</label>
 							</span>
 <?php if (isset ($eleve['accesFiche'])) { ?>
 							<a href='../eleves/visu_eleve.php?ele_login=<?php echo $eleve['accesFiche']; ?>&amp;onglet=responsables&amp;quitter_la_page=y' target='_blank' >
 								(voir&nbsp;fiche)
 							</a>
-							<?php
-								/*
-								// DEBUG: 20120618
-								echo "<pre>";
-								echo print_r($eleve);
-								echo "</pre>";
-								*/
-							?>
 <?php } ?>
 						</td>
 <?php 
+// Boucle sur les créneaux horaires
 for($i = 0; $i<$eleve['creneaux_possibles']; $i++){ ?>
 						<td colspan="<?php echo $eleve['nb_creneaux_a_saisir'][$i]; ?>" 
 							class="<?php echo $eleve['style'][$i];
@@ -1143,24 +1325,40 @@ for($i = 0; $i<$eleve['creneaux_possibles']; $i++){ ?>
 									&& ($eleve['creneau_courant']  != ($i + 2))) {
 								echo ' noSmartphone';
 							}
-								?>">
-<?php if (isset ($eleve['saisie'][$i]) && !empty ($eleve['saisie'][$i])) { ?>
+								?>"
+							<?php
+								if(isset($eleve['info_saisie'][$i]['traitements'])) {
+									$chaine_info="";
+									foreach($eleve['info_saisie'][$i]['traitements'] as $info_saisie) {
+										if($chaine_info!="") {	$chaine_info.=", ";}
+										$chaine_info.=$info_saisie;
+									}
+									echo " title=\"".preg_replace('/"/',"'",$chaine_info)."\"";
+								}
+							?>>
+<?php if (isset ($eleve['saisie'][$i]) && !empty ($eleve['saisie'][$i])) {
+// 20121009
+/*
+echo "<pre>";
+print_r($eleve['saisie'][$i]);
+echo "</pre>";
+*/
+?>
 							<a class="saisieAnte" href='visu_saisie.php?id_saisie=<?php echo $eleve['saisie'][$i]['primaryKey']; ?>'>
-								Modif.&nbsp;saisie de <?php echo $eleve['saisie'][$i]['createdAt']; ?>
+								Modif.&nbsp;saisie de <?php
+		echo $eleve['saisie'][$i]['createdAt'];
 
-<?php
 		$besoin_echo_virgule = false;
 		if (isset ($eleve['saisie'][$i]['traitements'])) {
-		foreach ($eleve['saisie'][$i]['traitements'] as $bou_traitement) {
-			if ($besoin_echo_virgule) {
-				echo ', ';
-			} 
-?>
-								<?php echo $bou_traitement; ?>
-<?php 
-		$besoin_echo_virgule = true;
-	}
-}
+			foreach ($eleve['saisie'][$i]['traitements'] as $bou_traitement) {
+				if ($besoin_echo_virgule) {
+					echo ', ';
+				} 
+
+				echo $bou_traitement;
+				$besoin_echo_virgule = true;
+			}
+		}
 ?>
 							</a>
 							<br />
@@ -1171,7 +1369,7 @@ for($i = 0; $i<$eleve['creneaux_possibles']; $i++){ ?>
 	}
 ?>
 							<span class="description" title="<?php echo htmlspecialchars($hover); ?>">T</span>
-<?php } 
+<?php }
 if (isset ($eleve['erreurEnregistre'][$i])) { ?>	
 	Erreur : <?php echo $eleve['erreurEnregistre'][$i]; ?>
 <?php }
@@ -1179,7 +1377,8 @@ if (isset ($eleve['type_autorises'][$i])) {
         $radioButtonType = FALSE;
         foreach ($eleve['type_autorises'][$i] as $type) {
                 if ($type['modeInterface'] == AbsenceEleveType::MODE_INTERFACE_CHECKBOX
-                                || $type['modeInterface'] == AbsenceEleveType::MODE_INTERFACE_CHECKBOX_HIDDEN) {
+                                || $type['modeInterface'] == AbsenceEleveType::MODE_INTERFACE_CHECKBOX_HIDDEN
+                                || $type['modeInterface'] == AbsenceEleveType::MODE_INTERFACE_CHECKBOX_HIDDEN_REGIME) {
                         $radioButtonType = TRUE;
                         break;
                 }
@@ -1197,46 +1396,92 @@ if (isset ($eleve['type_autorises'][$i])) {
                         $radioButtonTypeHasHidden = true;
                         break;
                 }
-        } ?>
+        }
+
+		/*
+        foreach ($eleve['type_autorises'][$i] as $type) {
+           echo "<p>\$eleve['type_autorises'][$i]:</p>
+           <pre>";
+           print_r($type);
+           echo "</pre><hr />";
+        }
+		*/
+        ?>
 
                                                     <label class="invisible" for="type_absence_eleve_<?php echo $eleve['position']; ?>">Type d'absence</label>
 						    <select class="selects"
 									onchange="this.form.elements['active_absence_eleve_<?php echo $eleve['position']; ?>'].checked = (this.options[this.selectedIndex].value != -1);
-                                                                                    <?php if ($radioButtonType) {?>this.form.elements['radio_sans_type_absence_eleve_<?php echo $eleve['position']; ?>'].checked = true; <?php } ?>"
+									<?php if ($radioButtonType) {?>this.form.elements['radio_sans_type_absence_eleve_<?php echo $eleve['position']; ?>'].checked = true; <?php } ?>;click_active_absence('<?php echo $eleve['position']; ?>');"
 									name="type_absence_eleve[<?php echo $eleve['position']; ?>]"
 									id="liste_type_absence_eleve_<?php echo $eleve['position']; ?>" >
 								<option class="pc88" value="-1"> </option>
 <?php foreach ($eleve['type_autorises'][$i] as $type) { ?>
-								<option class="pc88" value="<?php echo $type['type']; ?>">
+								<option class="pc88" manquement="<?php
+									if(isset($tab_types[$type['type']]['manquement_obligation_presence'])) {
+										echo $tab_types[$type['type']]['manquement_obligation_presence'];
+									}
+									else {
+										echo 'FAUX';
+									}
+								?>" value="<?php echo $type['type']; ?>">
 								<?php echo $type['nom']; ?> 
 								</option>
 <?php } ?>
 							</select>
 <?php 
 foreach ($eleve['type_autorises'][$i] as $type) {
+	/*
+	echo "<pre>";
+	echo print_r($type);
+	echo "</pre>";
+	*/
+	//echo "\$i=$i<br />"; // Créneau
 	if ($type['modeInterface'] == AbsenceEleveType::MODE_INTERFACE_CHECKBOX
-			|| $type['modeInterface'] == AbsenceEleveType::MODE_INTERFACE_CHECKBOX_HIDDEN) { ?>
+			|| $type['modeInterface'] == AbsenceEleveType::MODE_INTERFACE_CHECKBOX_HIDDEN
+			|| $type['modeInterface'] == AbsenceEleveType::MODE_INTERFACE_CHECKBOX_HIDDEN_REGIME) { ?>
 							<p>
-								<input type="radio"
-                                                                            onchange="this.form.elements['liste_type_absence_eleve_<?php echo $eleve['position']; ?>'].selectedIndex = 0; this.form.elements['active_absence_eleve_<?php echo $eleve['position']; ?>'].checked = true;"
-									   id="radio_<?php if ($type['modeInterface'] == AbsenceEleveType::MODE_INTERFACE_CHECKBOX_HIDDEN) echo 'hidden_'?>type_absence_eleve_<?php echo $type['type']; ?>_<?php echo $eleve['position']; ?>"
+								<input type="radio" <?php // 20120618
+									if($type['modeInterface'] == AbsenceEleveType::MODE_INTERFACE_CHECKBOX_HIDDEN_REGIME) {
+										echo "
+									   class='type_abs_regime_".$type['type']."_".$indice_tab_regime[$eleve['regime']]."'";
+									}
+									// Nom du champ Radio
+									$id_champ_radio="radio_";
+									if (($type['modeInterface'] == AbsenceEleveType::MODE_INTERFACE_CHECKBOX_HIDDEN)||($type['modeInterface'] == AbsenceEleveType::MODE_INTERFACE_CHECKBOX_HIDDEN_REGIME)) {
+										$id_champ_radio.='hidden_';
+									}
+									$id_champ_radio.="type_absence_eleve_";
+									$id_champ_radio.=$type['type'];
+									$id_champ_radio.="_";
+									$id_champ_radio.=$eleve['position'];
+									?>
+									   onchange="this.form.elements['liste_type_absence_eleve_<?php echo $eleve['position']; ?>'].selectedIndex = 0; this.form.elements['active_absence_eleve_<?php echo $eleve['position']; ?>'].checked = true; change_select_type_absence('<?php echo $id_champ_radio;?>', '<?php echo $eleve['position']; ?>');"
+									   id="radio_<?php if (($type['modeInterface'] == AbsenceEleveType::MODE_INTERFACE_CHECKBOX_HIDDEN)||($type['modeInterface'] == AbsenceEleveType::MODE_INTERFACE_CHECKBOX_HIDDEN_REGIME)) echo 'hidden_'?>type_absence_eleve_<?php echo $type['type']; ?>_<?php echo $eleve['position']; ?>"
 									   name="check[<?php echo $eleve['position']; ?>]"
+									   <?php if($type['modeInterface'] == AbsenceEleveType::MODE_INTERFACE_CHECKBOX_HIDDEN_REGIME) {
+											echo "attribut_regime=\"".$eleve['regime']."\" ";
+									   }?>
 									   value="<?php echo $type['type']; ?>"/>
-								<label for ="radio_<?php if ($type['modeInterface'] == AbsenceEleveType::MODE_INTERFACE_CHECKBOX_HIDDEN) echo 'hidden_'?>type_absence_eleve_<?php echo $type['type']; ?>_<?php echo $eleve['position']; ?>">
+								<label for ="radio_<?php if (($type['modeInterface'] == AbsenceEleveType::MODE_INTERFACE_CHECKBOX_HIDDEN)||($type['modeInterface'] == AbsenceEleveType::MODE_INTERFACE_CHECKBOX_HIDDEN_REGIME)) echo 'hidden_'?>type_absence_eleve_<?php echo $type['type']; ?>_<?php echo $eleve['position']; ?>">
 									<?php echo $type['nom']; ?>
 								</label>
 							</p>
 <?php   }
-    }//on affiche une case vide pour saisier un élève sans option
+    }//on affiche une case vide pour saisir un élève sans option
     if ($radioButtonType) {?>
 							<p>
-                                                                <input type="radio"
+                                                                <input type="radio" <?php
+																	echo "
+                                                                        class='type_abs_regime_decoche_".$indice_tab_regime[$eleve['regime']]."'";
+																?>
                                                                         onchange="this.form.elements['active_absence_eleve_<?php echo $eleve['position']; ?>'].checked = false;"
                                                                         id="radio_sans_type_absence_eleve_<?php echo $eleve['position']; ?>"
                                                                         name="check[<?php echo $eleve['position']; ?>]"
                                                                         value="<?php echo false ?>"
                                                                         checked='checked' />
-								<label for ="faux_<?php echo $eleve['position']; ?>">
+								<!--label for ="faux_<?php echo $eleve['position']; ?>"-->
+								<label for ="radio_sans_type_absence_eleve_<?php echo $eleve['position']; ?>">
+								&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 								</label>
                                                         </p>
 <?php 	}
@@ -1259,6 +1504,7 @@ if ($eleve['creneau_courant'] == $i) { ?>
 									   id="heure_debut_absence_eleve_<?php echo $eleve['position']; ?>"
 									   value="<?php echo $heure_debut_appel; ?>"
 									   type="text"
+									   onKeyDown="clavier_heure(this.id, event);" AutoComplete="off"
 									   maxlength="5"
 									   size="4"/>
 								<input class="pc88"
@@ -1272,6 +1518,7 @@ if ($eleve['creneau_courant'] == $i) { ?>
 									   name="heure_fin_absence_eleve[<?php echo $eleve['position']; ?>]"
 									   value="<?php echo $heure_fin_appel ?>"
 									   type="text"
+									   onKeyDown="clavier_heure(this.id, event);" AutoComplete="off"
 									   maxlength="5"
 									   size="4"/>
 								<input class="pc88"
@@ -1286,16 +1533,24 @@ if ($eleve['creneau_courant'] == $i) { ?>
 	}
 	
 } ?>
-<?php if (isset ($eleve['nom_photo'])) { ?>
+<?php
+	// Colonne Photo de l'élève
+	if (isset ($eleve['nom_photo'])) {
+?>
 						<td>
+							<label for='active_absence_eleve_<?php echo $eleve['position']; ?>'>
 							<img src="<?php echo $eleve['nom_photo']; ?>"
 								 class="trombine"
+								 id='img_photo_eleve_<?php echo $eleve['position']; ?>' 
 								 alt="" 
 								 title="" />
-							
+							</label>
 						</td>
-<?php } ?>
-<?php 				if ($current_creneau != null) {
+<?php
+	}
+
+	// Colonne Saisie d'un commentaire
+	if ($current_creneau != null) {
 ?>
 						<td class="commentaire">
 							<label for="commentaire_absence_eleve_<?php echo $eleve['position']; ?>">Commentaire :</label>
@@ -1319,11 +1574,13 @@ if ($eleve['creneau_courant'] == $i) { ?>
 		</p>
 <?php
 if ($utilisateur->getStatut() == 'professeur' && getSettingValue("active_cahiers_texte")=='y') {
+	if($afficher_passer_au_cdt=="y") {
 ?>
     <p class="choix_fin">
 	    <input value="Enregistrer et passer au cahier de texte" name="cahier_texte" type="submit"/>
     </p>
 <?php
+	}
 }
 ?>
 	</form>
@@ -1334,6 +1591,7 @@ if ($utilisateur->getStatut() == 'professeur' && getSettingValue("active_cahiers
 }
 ?>
 </div>
+
 <?php
 // 20120618
 if(isset($compteur_eleve)) {
@@ -1352,51 +1610,126 @@ if(isset($compteur_eleve)) {
 			}
 		}
 	}
-	
-	$js_var_coche_decoche_regime
-	function cocher_decocher_regime(num) {
-		if(etat_cocher_regime[num]==false) {
-			etat_cocher_regime[num]=true;
+";
+/*
+echo '
+	function afficher_radio_hidden() {
+		$$(\'input[type="radio"][id^="radio_sans_type_absence_eleve_"]\').each(Element.show);
+		// 20120622: on affiche aussi le label du bouton radio de désélection
+		$$(\'label[for^="radio_sans_type_absence_eleve_"]\').each(Element.show);
+
+		$$(\'input[type="radio"][id^="radio_hidden_"]\').each(Element.show);
+		$$(\'label[for^="radio_hidden_"]\').each(Element.show);
+	}
+';
+*/
+
+	echo "
+	function cocher_decocher_regime(indice_type_abs_regime, indice_regime, mode) {
+		//afficher_radio_hidden();
+
+		var reg=new RegExp('[_]+', 'g');
+
+		if(mode=='true') {
+			tab=document.getElementsByClassName('type_abs_regime_'+indice_type_abs_regime+'_'+indice_regime);
+			//alert(tab.length)
+			for(i=0;i<tab.length;i++) {
+				champ_courant=tab[i];
+				//champ_courant.checked=mode;
+
+				// On va récupérer le rang de l'élève depuis l'id de la forme: radio_hidden_type_absence_eleve_17_0
+				// Le rang de l'élève est le dernier nombre (0 dans l'exemple)
+
+				id_courant=champ_courant.getAttribute('id');
+				var tab_tmp=id_courant.split(reg);
+				id_check_ele='active_absence_eleve_'+tab_tmp[6];
+
+				if(document.getElementById(id_check_ele)) {
+					// Si le checkbox n'est pas déjà coché, on prend en compte
+					// sinon, c'est un élève qui a déjà une autre saisie, on ne modifie pas.
+					if(document.getElementById(id_check_ele).checked!=true) {
+						// On coche le champ lié au régime
+						champ_courant.checked=mode;
+						// On coche le checkbox
+						document.getElementById(id_check_ele).checked=true;
+					}
+				}
+			}
 		}
 		else {
-			etat_cocher_regime[num]=false;
-		}
+			if(indice_type_abs_regime=='decoche') {
+				tab=document.getElementsByClassName('type_abs_regime_'+indice_type_abs_regime+'_'+indice_regime);
+				for(i=0;i<tab.length;i++) {
+					champ_courant=tab[i];
 
-		tab=eval('ele_regime_'+num);
-		//alert(tab.length);
-		for(i=0;i<tab.length;i++) {
-			if(document.getElementById('active_absence_eleve_'+tab[i])) {
-				document.getElementById('active_absence_eleve_'+tab[i]).checked=etat_cocher_regime[num];
+					id_courant=champ_courant.getAttribute('id');
+					var tab_tmp=id_courant.split(reg);
 
-				if(document.getElementById('liste_type_absence_eleve_'+tab[i])) {
-					if(etat_cocher_regime[num]==false) {
-						document.getElementById('liste_type_absence_eleve_'+tab[i]).selectedIndex=0;
+					// On a: id='radio_sans_type_absence_eleve_0' class='type_abs_regime_decoche_0'
+					id_radio_ele='radio_sans_type_absence_eleve_'+tab_tmp[5];
+					if(document.getElementById(id_radio_ele)) {
+						document.getElementById(id_radio_ele).checked=true;
 					}
-					else {
-						for(j=0;j<document.getElementById('liste_type_absence_eleve_'+tab[i]).options.length;j++) {
-							/*
-							if(i==0) {
-								alert(document.getElementById('liste_type_absence_eleve_'+tab[i]).options[j].innerHTML+' et '+nom_regime[num])
-							}
-							*/
-							if(document.getElementById('liste_type_absence_eleve_'+tab[i]).options[j].innerHTML.replace(/^\s+/g,'').replace(/\s+$/g,'')==nom_regime[num].replace(/^\s+/g,'').replace(/\s+$/g,'')) {
-								//if(i<3) {alert('j='+j)}
-								document.getElementById('liste_type_absence_eleve_'+tab[i]).selectedIndex=j;
-							}
+
+					id_check_ele='active_absence_eleve_'+tab_tmp[5];
+					if(document.getElementById(id_check_ele)) {
+						document.getElementById(id_check_ele).checked=false;
+					}
+				}
+			}
+			else {
+				// On ne decoche que les champs qui étaient cochés à indice_type_abs_regime
+				tab=document.getElementsByClassName('type_abs_regime_'+indice_type_abs_regime+'_'+indice_regime);
+				//alert(tab.length)
+				for(i=0;i<tab.length;i++) {
+					champ_courant=tab[i];
+					if(champ_courant.checked==true) {
+						id_courant=champ_courant.getAttribute('id');
+						var tab_tmp=id_courant.split(reg);
+						id_radio_ele='radio_sans_type_absence_eleve_'+tab_tmp[6];
+						id_check_ele='active_absence_eleve_'+tab_tmp[6];
+
+						if(document.getElementById(id_radio_ele)) {
+							document.getElementById(id_radio_ele).checked=true;
+						}
+
+						if(document.getElementById(id_check_ele)) {
+							document.getElementById(id_check_ele).checked=false;
 						}
 					}
 				}
 			}
 		}
 	}
+";
 
-	if(document.getElementById('effectifs_regimes_non_js')) {
-		document.getElementById('effectifs_regimes_non_js').style.display='none';
+	if((isset($js_chaine_tab_types_abs_regimes))&&($js_chaine_tab_types_abs_regimes!='')&&(count($tab_regimes)>0)) {
+		echo "
+	function rafraichit_totaux_regimes() {
+		var tab_type_abs_regime=new Array($js_chaine_tab_types_abs_regimes);
+		for(i=0;i<tab_type_abs_regime.length;i++) {
+			cpt=0;
+			//if(i<3) {alert('tab_type_abs_regime['+i+']='+tab_type_abs_regime[i]);}
+			if(document.getElementById('td_total_regime_'+tab_type_abs_regime[i])) {
+				for(j=0;j<".count($tab_regimes).";j++) {
+					tab=document.getElementsByClassName('type_abs_regime_'+tab_type_abs_regime[i]+'_'+j);
+					for(k=0;k<tab.length;k++) {
+						champ_courant=tab[k];
+						if(champ_courant.checked==true) {
+							cpt++;
+						}
+					}
+				}
+				document.getElementById('td_total_regime_'+tab_type_abs_regime[i]).innerHTML=cpt;
+			}
+		}
+
+		setTimeout('rafraichit_totaux_regimes()', 1000);
 	}
-	if(document.getElementById('effectifs_regimes_js')) {
-		document.getElementById('effectifs_regimes_js').style.display='';
-	}
+
+	setTimeout('rafraichit_totaux_regimes()', 1000);
 </script>\n";
+	}
 }
 
 if (isset($radioButtonType)) {
@@ -1407,6 +1740,9 @@ if (isset($radioButtonType)) {
     $javascript_footer_texte_specifique .= '$$(\'input[type="radio"][id^="radio_hidden_"]\').each(Element.hide);';
     $javascript_footer_texte_specifique .= '$$(\'label[for^="radio_hidden_"]\').each(Element.hide);';
 
+	// 20120622: on masque aussi le label du bouton radio de désélection
+    $javascript_footer_texte_specifique .= '$$(\'label[for^="radio_sans_type_absence_eleve_"]\').each(Element.hide);';
+
     $javascript_footer_texte_specifique .= '$(\'bouton_changer_horaire\').insert({after : \'';
     $javascript_footer_texte_specifique .= ' 				<button id="bouton_afficher_radio_hidden" onclick="return false;">';
     $javascript_footer_texte_specifique .= ' 					Aff. cases cachées';
@@ -1415,8 +1751,16 @@ if (isset($radioButtonType)) {
     $javascript_footer_texte_specifique .= '$(\'bouton_afficher_radio_hidden\').observe(\'click\', function( event )
     {
     $$(\'input[type="radio"][id^="radio_sans_type_absence_eleve_"]\').each(Element.show);
+    // 20120622: on affiche aussi le label du bouton radio de désélection
+    $$(\'label[for^="radio_sans_type_absence_eleve_"]\').each(Element.show);
+
     $$(\'input[type="radio"][id^="radio_hidden_"]\').each(Element.show);
     $$(\'label[for^="radio_hidden_"]\').each(Element.show);
+    ';
+	if((isset($js_chaine_tab_types_abs_regimes))&&($js_chaine_tab_types_abs_regimes!='')&&(count($tab_regimes)>0)) {
+		$javascript_footer_texte_specifique .= '    document.getElementById(\'div_coche_decoche_regime\').style.display=\'\';';
+	}
+	$javascript_footer_texte_specifique .= '
     });';
     $javascript_footer_texte_specifique .= '</script>';
 }

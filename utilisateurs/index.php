@@ -1,7 +1,7 @@
 <?php
 /*
  *
- * Copyright 2001, 2012 Thomas Belliard, Laurent Delineau, Edouard Hue, Eric Lebrun
+ * Copyright 2001, 2013 Thomas Belliard, Laurent Delineau, Edouard Hue, Eric Lebrun
  *
  * This file is part of GEPI.
  *
@@ -19,6 +19,9 @@
  * along with GEPI; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
+ 
+// On indique qu'il faut creer des variables non protégées (voir fonction cree_variables_non_protegees())
+//$variables_non_protegees = 'yes';
 
 // Initialisations files
 require_once("../lib/initialisations.inc.php");
@@ -38,6 +41,8 @@ if (!checkAccess()) {
 	header("Location: ../logout.php?auto=1");
 	die();
 }
+
+include("../ckeditor/ckeditor.php");
 
 $msg="";
 
@@ -253,6 +258,57 @@ $afficher_statut=isset($_POST['afficher_statut']) ? $_POST['afficher_statut'] : 
 $afficher_auth_mode=isset($_POST['afficher_auth_mode']) ? $_POST['afficher_auth_mode'] : (isset($_GET['afficher_auth_mode']) ? $_GET['afficher_auth_mode'] : "");
 $tab_auth_mode=array('gepi', 'ldap', 'sso');
 
+$afficher_matiere=isset($_POST['afficher_matiere']) ? $_POST['afficher_matiere'] : (isset($_GET['afficher_matiere']) ? $_GET['afficher_matiere'] : "");
+
+if(isset($_POST['enregistrer_MonCompteAfficheInfo'])) {
+	check_token();
+
+	$nb_reg=0;
+	$tab_statuts_MonCompteAfficheInfo=array('administrateur', 'scolarite', 'cpe', 'professeur', 'secours', 'eleve', 'responsable', 'autre');
+	for($loop=0;$loop<count($tab_statuts_MonCompteAfficheInfo);$loop++) {
+		if(isset($_POST['MonCompteAfficheInfo'.ucfirst($tab_statuts_MonCompteAfficheInfo[$loop])])) {
+			$valeur="y";
+		}
+		else {
+			$valeur="n";
+		}
+
+		if(!saveSetting('MonCompteAfficheInfo'.ucfirst($tab_statuts_MonCompteAfficheInfo[$loop]), $valeur)) {
+			$msg.="Erreur lors de l'enregistrement du paramètre 'MonCompteAfficheInfo".ucfirst($tab_statuts_MonCompteAfficheInfo[$loop])."'<br />";
+		}
+		else {
+			$nb_reg++;
+		}
+		/*
+		if (isset($NON_PROTECT['MonCompteInfo'.ucfirst($tab_statuts_MonCompteAfficheInfo[$loop])])) {
+			$info = traitement_magic_quotes(corriger_caracteres($NON_PROTECT['MonCompteInfo'.ucfirst($tab_statuts_MonCompteAfficheInfo[$loop])]));
+
+			if(!saveSetting('MonCompteInfo'.ucfirst($tab_statuts_MonCompteAfficheInfo[$loop]), $info)) {
+				$msg.="Erreur lors de l'enregistrement du paramètre 'MonCompteInfo".ucfirst($tab_statuts_MonCompteAfficheInfo[$loop])."'<br />";
+			}
+			else {
+				$nb_reg++;
+			}
+		}
+		*/
+
+		if(isset($_POST['MonCompteInfo'.ucfirst($tab_statuts_MonCompteAfficheInfo[$loop]).'FCK'])) {
+			$info = html_entity_decode($_POST['MonCompteInfo'.ucfirst($tab_statuts_MonCompteAfficheInfo[$loop]).'FCK']);
+
+			if(!saveSetting('MonCompteInfo'.ucfirst($tab_statuts_MonCompteAfficheInfo[$loop]), $info)) {
+				$msg.="Erreur lors de l'enregistrement du paramètre 'MonCompteInfo".ucfirst($tab_statuts_MonCompteAfficheInfo[$loop])."'<br />";
+			}
+			else {
+				$nb_reg++;
+			}
+		}
+	}
+
+	if($nb_reg>0) {
+		$msg.=$nb_reg." enregistrement(s) effectué(s).<br />";
+	}
+}
+
 //**************** EN-TETE *****************************
 if($mode=='personnels') {
 	$titre_page = "Gestion des personnels";
@@ -271,6 +327,8 @@ else {
 require_once("../lib/header.inc.php");
 //**************** FIN EN-TETE *************************
 
+//debug_var();
+
 //echo "\$total_photo=$total_photo<br />\$nb_succes_photos=$nb_succes_photos<br />\$nb_photos_proposees=$nb_photos_proposees<br />";
 
 unset($display);
@@ -286,7 +344,54 @@ $_SESSION['chemin_retour'] = "../utilisateurs/index.php";
 //unset($mode);
 //$mode = isset($_POST["mode"]) ? $_POST["mode"] : (isset($_GET["mode"]) ? $_GET["mode"] : '');
 
-if ($mode != "personnels") {
+if($mode=="MonCompteAfficheInfo") {
+	echo "<p class='bold'>
+	<a href='./index.php'><img src='../images/icons/back.png' alt='Retour' class='back_link'/> Retour</a>
+</p>
+
+<form action='".$_SERVER['PHP_SELF']."' name='form1' method='post'>
+".add_token_field()."
+<p class='bold'>Vous pouvez définir ici des informations particulières à chaque statut à faire apparaître dans la page 'Gérer mon compte&nbsp;:</p>
+<table class='boireaus boireaus_alt' summary=\"Tableau des informations à afficher ou non selon les statuts\">
+	<tr>
+		<th>Statut</th>
+		<th>Afficher</th>
+		<th>Informations</th>
+	</tr>";
+
+	$tab_statuts_MonCompteAfficheInfo=array('administrateur', 'scolarite', 'cpe', 'professeur', 'secours', 'eleve', 'responsable', 'autre');
+	for($loop=0;$loop<count($tab_statuts_MonCompteAfficheInfo);$loop++) {
+		echo "
+	<tr>
+		<th>".ucfirst($tab_statuts_MonCompteAfficheInfo[$loop])."</th>
+		<td><input type='checkbox' name='MonCompteAfficheInfo".ucfirst($tab_statuts_MonCompteAfficheInfo[$loop])."' value='y' ";
+		if(getSettingAOui('MonCompteAfficheInfo'.ucfirst($tab_statuts_MonCompteAfficheInfo[$loop]))) { echo "checked ";}
+		echo "/></td>
+		<td>";
+
+		//echo "<textarea name='no_anti_inject_MonCompteInfo".ucfirst($tab_statuts_MonCompteAfficheInfo[$loop])."' rows='5' cols='80'>".getSettingValue('MonCompteInfo'.ucfirst($tab_statuts_MonCompteAfficheInfo[$loop]))."</textarea>";
+
+			$oCKeditor = new CKeditor('../ckeditor/');
+			$oCKeditor->editor('MonCompteInfo'.ucfirst($tab_statuts_MonCompteAfficheInfo[$loop]).'FCK',getSettingValue('MonCompteInfo'.ucfirst($tab_statuts_MonCompteAfficheInfo[$loop]))) ;
+
+		echo "
+		</td>
+	</tr>";
+	}
+
+	echo "
+</table>
+<input type='hidden' name='mode' value='MonCompteAfficheInfo' />
+<input type='hidden' name='enregistrer_MonCompteAfficheInfo' value='y' />
+<p><input type='submit' value='Enregistrer' /></p>
+</form>
+
+<p><br /></p>\n";
+
+	require("../lib/footer.inc.php");
+	die();
+}
+elseif ($mode != "personnels") {
 ?>
 <p class="bold">
 <a href="../accueil_admin.php"><img src='../images/icons/back.png' alt='Retour' class='back_link'/> Retour</a>
@@ -296,6 +401,8 @@ if ($mode != "personnels") {
 <p style='padding-left: 10%; margin-top: 15px;'><a href="index.php?mode=personnels"><img src='../images/icons/forward.png' alt='Personnels' class='back_link' /> Personnels de l'établissement (professeurs, scolarité, CPE, administrateurs)</a></p>
 <p style='padding-left: 10%; margin-top: 15px;'><a href="edit_responsable.php"><img src='../images/icons/forward.png' alt='Responsables' class='back_link' /> Responsables d'élèves (parents)</a></p>
 <p style='padding-left: 10%; margin-top: 15px;'><a href="edit_eleve.php"><img src='../images/icons/forward.png' alt='Eleves' class='back_link' /> Élèves</a></p>
+<br/><br/>
+<p><a href="<?php echo $_SERVER['PHP_SELF'].'?mode=MonCompteAfficheInfo';?>">Définir des informations par statut</a> à afficher dans la page 'Gérer mon compte'.</p>
 <?php
 } else {
 ?>
@@ -315,6 +422,7 @@ if ((getSettingValue('use_sso') != "cas" and getSettingValue("use_sso") != "lemo
     		" - <a href=\"reset_passwords.php?mode=csv".add_token_in_url()."\" onclick=\"javascript:return confirm('Êtes-vous sûr de vouloir effectuer cette opération ?\\n Celle-ci est irréversible, et réinitialisera les mots de passe de tous les utilisateurs marqués actifs, avec un mot de passe alpha-numérique généré aléatoirement.\\n En cliquant sur OK, vous lancerez la procédure, qui génèrera un fichier CSV contenant les informations nécessaires à un traitement automatisé.')\" target='_blank'>CSV</a>";
 
 	echo " | <a href='impression_bienvenue.php?mode=personnels'>Fiches bienvenue</a>";
+	echo " | <a href='modif_par_lots.php'>Modif.par lots</a>";
 }
 ?>
  | Affecter les matières aux professeurs&nbsp;: <a href="tab_profs_matieres.php">Mode 1</a>
@@ -329,7 +437,27 @@ if (getSettingValue("statuts_prives") == "y") {
 ?>
 </p>
 <!--p class='small'><a href="import_prof_csv.php">Télécharger le fichier des professeurs au format csv</a>  (nom - prénom - identifiant GEPI)</p-->
-<p class='small'>Télécharger au format csv (<i>nom - prénom - identifiant GEPI</i>) le fichier des <a href="import_prof_csv.php?export_statut=professeur">professeurs</a>, <a href="import_prof_csv.php?export_statut=scolarite">"scolarité"</a>, <a href="import_prof_csv.php?export_statut=cpe">cpe</a>, <a href="import_prof_csv.php?export_statut=secours">secours</a>, <a href="import_prof_csv.php?export_statut=administrateur">administrateurs</a>, <a href="import_prof_csv.php?export_statut=autre">autres</a>, <a href="import_prof_csv.php?export_statut=personnels">personnels</a></p>
+<p class='small'>Télécharger au format csv (<i>nom - prénom - identifiant GEPI - EMAIL</i>) le fichier des 
+
+<a href="import_prof_csv.php?export_statut=professeur" title="Export CSV au format NOM;PRENOM;LOGIN;EMAIL avec ligne d'entête.">professeurs</a> 
+<a href='import_prof_csv.php?export_statut=professeur&amp;sans_entete=y'><img src='../images/disabled.png' width='16' height='16' title='Export CSV professeurs sans entête' alt='CSV professeurs sans entête'></a>, 
+
+<a href="import_prof_csv.php?export_statut=scolarite"title="Export CSV au format NOM;PRENOM;LOGIN;EMAIL avec ligne d'entête.">"scolarité"</a>
+<a href='import_prof_csv.php?export_statut=scolarite&amp;sans_entete=y' title='Export sans entête'><img src='../images/disabled.png' width='16' height='16' title='Export CSV scolarité sans entête' alt='CSV scolarité sans entête'></a>, 
+
+<a href="import_prof_csv.php?export_statut=cpe"title="Export CSV au format NOM;PRENOM;LOGIN;EMAIL avec ligne d'entête.">cpe</a> 
+<a href='import_prof_csv.php?export_statut=cpe&amp;sans_entete=y' title='Export sans entête'><img src='../images/disabled.png' width='16' height='16' title='Export CSV CPE sans entête' alt='CSV sans entête'></a>, 
+
+<a href="import_prof_csv.php?export_statut=secours"title="Export CSV au format NOM;PRENOM;LOGIN;EMAIL avec ligne d'entête.">secours</a> 
+<a href='import_prof_csv.php?export_statut=secours&amp;sans_entete=y' title='Export sans entête'><img src='../images/disabled.png' width='16' height='16' title='Export CSV Secours sans entête' alt='CSV sans entête'></a>, 
+
+<a href="import_prof_csv.php?export_statut=administrateur"title="Export CSV au format NOM;PRENOM;LOGIN;EMAIL avec ligne d'entête.">administrateurs</a> 
+<a href='import_prof_csv.php?export_statut=administrateur&amp;sans_entete=y' title='Export sans entête'><img src='../images/disabled.png' width='16' height='16' title='Export CSV sans entête' alt='CSV Administrateurs sans entête'></a>, 
+
+<a href="import_prof_csv.php?export_statut=autre"title="Export CSV au format NOM;PRENOM;LOGIN;EMAIL avec ligne d'entête.">autres</a> 
+<a href='import_prof_csv.php?export_statut=autre&amp;sans_entete=y' title='Export sans entête'><img src='../images/disabled.png' width='16' height='16' title='Export CSV Autres sans entête' alt='CSV Autres sans entête'></a>, 
+
+<a href="import_prof_csv.php?export_statut=personnels"title="Export CSV au format NOM;PRENOM;LOGIN;EMAIL avec ligne d'entête.">personnels</a> <a href='import_prof_csv.php?export_statut=personnels&amp;sans_entete=y' title='Export sans entête'><img src='../images/disabled.png' width='16' height='16' title='Export CSV sans entête' alt='CSV sans entête'></a></p>
 
 <form enctype="multipart/form-data" action="index.php" name="form1" method="post">
 <?php
@@ -337,7 +465,7 @@ if (getSettingValue("statuts_prives") == "y") {
 ?>
 <table border='0' summary='Tableau de choix'>
 <tr>
-<td><p>Afficher : </p></td>
+<td><p>Afficher&nbsp;: </p></td>
 <td><p><label for='display_tous' style='cursor: pointer;'>tous les utilisateurs</label> <input type="radio" name="display" id='display_tous' value='tous' <?php if ($display=='tous') {echo " checked";} ?> onchange="document.forms['form1'].submit();" /></p></td>
 <td><p>
  &nbsp;&nbsp;<label for='display_actifs' style='cursor: pointer;'>les utilisateurs actifs</label> <input type="radio" id='display_actifs' name="display" value='actifs' <?php if ($display=='actifs') {echo " checked";} ?> onchange="document.forms['form1'].submit();" /></p></td>
@@ -371,6 +499,28 @@ echo ">Autre</option>\n";
 
 ?>
 </select>
+
+<?php
+if($afficher_statut=="professeur") {
+	// Proposer de filtrer par matière
+	$sql="SELECT DISTINCT m.* FROM matieres m, j_professeurs_matieres jpm WHERE jpm.id_matiere=m.matiere ORDER BY matiere, nom_complet";
+	$res_matieres=mysql_query($sql);
+	if(mysql_num_rows($res_matieres)>0) {
+		echo "<select name='afficher_matiere' onchange=\"document.forms['form1'].submit();\">
+	<option value=''>---</option>";
+		while($lig_matiere=mysql_fetch_object($res_matieres)) {
+			echo "
+	<option value='".$lig_matiere->matiere."'";
+			if((isset($afficher_matiere))&&($lig_matiere->matiere==$afficher_matiere)) {
+				echo " selected='true'";
+			}
+			echo ">".$lig_matiere->matiere." (".$lig_matiere->nom_complet.")</option>";
+		}
+		echo "</select>\n";
+	}
+}
+?>
+
 </p>
 </td>
 
@@ -410,7 +560,11 @@ else {
 <input type='hidden' name='order_by' value='<?php echo $order_by; ?>' />
 </form>
 
-
+<?php
+//========================================================
+include("change_auth_mode.inc.php");
+//========================================================
+?>
 
 <form enctype="multipart/form-data" action="index.php" name="form2" method="post">
 <?php
@@ -422,6 +576,9 @@ echo "<input type='hidden' name='display' value='$display' />
 <input type='hidden' name='mode' value='$mode' />
 <input type='hidden' name='order_by' value='$order_by' />\n";
 
+if((isset($afficher_matiere))&&($afficher_matiere!="")) {
+echo "<input type='hidden' name='afficher_matiere' value='$afficher_matiere' />";
+}
 ?>
 
 <?php
@@ -431,14 +588,17 @@ echo "<table class='boireaus' cellpadding='3' summary='Tableau des utilisateurs'
 echo "<tr><th><p class=small><b><a href='index.php?mode=$mode&amp;order_by=login&amp;display=$display";
 if($afficher_statut!="") {echo "&amp;afficher_statut=$afficher_statut";}
 if($afficher_auth_mode!="") {echo "&amp;afficher_auth_mode=$afficher_auth_mode";}
+if((isset($afficher_matiere))&&($afficher_matiere!="")) {echo "&amp;afficher_matiere=$afficher_matiere";}
 echo "'>Nom de login</a></b></p></th>\n";
 echo "<th><p class=small><b><a href='index.php?mode=$mode&amp;order_by=nom,prenom&amp;display=$display";
 if($afficher_statut!="") {echo "&amp;afficher_statut=$afficher_statut";}
 if($afficher_auth_mode!="") {echo "&amp;afficher_auth_mode=$afficher_auth_mode";}
+if((isset($afficher_matiere))&&($afficher_matiere!="")) {echo "&amp;afficher_matiere=$afficher_matiere";}
 echo "'>Nom et prénom</a></b></p></th>\n";
 echo "<th><p class=small><b><a href='index.php?mode=$mode&amp;order_by=statut,nom,prenom&amp;display=$display";
 if($afficher_statut!="") {echo "&amp;afficher_statut=$afficher_statut";}
 if($afficher_auth_mode!="") {echo "&amp;afficher_auth_mode=$afficher_auth_mode";}
+if((isset($afficher_matiere))&&($afficher_matiere!="")) {echo "&amp;afficher_matiere=$afficher_matiere";}
 echo "'>Statut</a></b></p></th>\n";
 echo "<th><p class=small><b>matière(s) si professeur</b></p></th>\n";
 echo "<th><p class=small><b>classe(s)</b></p></th>\n";
@@ -451,13 +611,22 @@ echo "<th><p class=small><b>imprimer fiche bienvenue</b></p></th>\n";
 echo "</tr>\n";
 if(($afficher_statut!="")&&(in_array($afficher_statut,$tab_statuts))) {
 	if(($afficher_auth_mode!="")&&(in_array($afficher_auth_mode,$tab_auth_mode))) {
-		$sql="SELECT * FROM utilisateurs WHERE (statut = '$afficher_statut' AND auth_mode='$afficher_auth_mode')
-			ORDER BY $order_by;";
+		if((isset($afficher_matiere))&&($afficher_matiere!="")) {
+			$sql="SELECT * FROM utilisateurs u, j_professeurs_matieres jpm WHERE (statut = '$afficher_statut' AND auth_mode='$afficher_auth_mode' AND jpm.id_professeur=u.login AND jpm.id_matiere='$afficher_matiere') ";
+		}
+		else {
+			$sql="SELECT * FROM utilisateurs WHERE (statut = '$afficher_statut' AND auth_mode='$afficher_auth_mode')";
+		}
 	}
 	else {
-		$sql="SELECT * FROM utilisateurs WHERE (statut = '$afficher_statut') 
-			ORDER BY $order_by;";
+		if((isset($afficher_matiere))&&($afficher_matiere!="")) {
+			$sql="SELECT * FROM utilisateurs u, j_professeurs_matieres jpm WHERE (statut = '$afficher_statut' AND jpm.id_professeur=u.login AND jpm.id_matiere='$afficher_matiere') ";
+		}
+		else {
+			$sql="SELECT * FROM utilisateurs WHERE (statut = '$afficher_statut') ";
+		}
 	}
+	$sql.=" ORDER BY $order_by;";
 }
 else {
 	if(($afficher_auth_mode!="")&&(in_array($afficher_auth_mode,$tab_auth_mode))) {
@@ -482,6 +651,7 @@ else {
 			ORDER BY $order_by;";
 	}
 }
+//echo "$sql<br />";
 $calldata = mysql_query($sql);
 $nombreligne = mysql_num_rows($calldata);
 $i = 0;
@@ -492,6 +662,7 @@ while ($i < $nombreligne){
     // rajout trombinoscope
     $user_civilite = mysql_result($calldata, $i, "civilite");
     // fin de rajout trombinoscope
+    $user_auth_mode = mysql_result($calldata, $i, "auth_mode");
     $user_statut = mysql_result($calldata, $i, "statut");
     $user_login = mysql_result($calldata, $i, "login");
     $user_pwd = mysql_result($calldata, $i, "password");
@@ -512,6 +683,7 @@ while ($i < $nombreligne){
     // ajout pour le trombinoscope
     $col[$i]['civ'] = $user_civilite;
     // fin ajout
+    $col[$i]['auth_mode'] = $user_auth_mode;
 
 	//echo "<p>Contrôle des matières de $user_login: <br />\n";
     $call_matieres = mysql_query("SELECT * FROM j_professeurs_matieres j WHERE j.id_professeur = '$user_login' ORDER BY ordre_matieres");
@@ -692,7 +864,44 @@ while ($i < $nombreligne){
 	    echo "<tr class='lig$alt' style='background-color: slategray'>\n";
 	}
 
-	echo "<td><p class='small'><span class='bold'>{$col[$i][1]}</span></p></td>\n";
+	echo "<td><p class='small'><span class='bold'>{$col[$i][1]}</span>";
+	echo "<br />";
+
+	echo "<a href='ajax_modif_utilisateur.php?mode=changer_auth_mode2&amp;login_user=".$user_login."&amp;auth_mode_user=".$user_auth_mode."".add_token_in_url()."' onclick=\"afficher_changement_auth_mode('$user_login', '$user_auth_mode') ;return false;\">";
+	echo "<span id='auth_mode_$user_login' title='Auth_mode de $user_login : $user_auth_mode' style='font-size:x-small;'>";
+	echo $user_auth_mode;
+	echo "</span>";
+	echo "</a>";
+
+	echo "</p>\n";
+	if (getSettingValue("active_module_trombino_pers")=='y') {
+		$codephoto = md5(mb_strtolower($col[$i][1]));
+		$photo = $rep_photos.$codephoto.'.jpg';
+		if(file_exists($photo)) {
+			echo "<a href='$photo' target='_blank' onmouseover=\"delais_afficher_div('photo_".$col[$i][1]."','y',20,20,1000,20,20);\"><img src='../mod_trombinoscopes/images/";
+			if($col[$i]['civ'] == 'Mme' or $col[$i]['civ'] == 'Mlle') {
+				echo "photo_f.png";
+			}
+			else {
+				echo "photo_g.png";
+			}
+			echo "' width='32' height='32'  align='middle' border='0' alt='photo présente' title='photo présente' /></a>\n";
+
+			$titre_infobulle_photo=$col[$i][2];
+
+			$texte_infobulle_photo="<div align='center'>\n";
+			$texte_infobulle_photo.="<img src='".$photo."' width='150' alt=\"".$col[$i][2]."\" />";
+			$texte_infobulle_photo.="<br />\n";
+			$texte_infobulle_photo.="</div>\n";
+
+			$temoin_photo="y";
+
+			$tabdiv_infobulle[]=creer_div_infobulle('photo_'.$col[$i][1],$titre_infobulle_photo,"",$texte_infobulle_photo,"",14,0,'y','y','n','n');
+
+		}
+	}
+	echo "</td>\n";
+
 	if ($col[$i][7] == "professeur") {
 		echo "<td><p class='small'><span class='bold'><a href='modify_user.php?user_login=$user_login'>{$col[$i][2]}</a></span></p>\n";
 		//echo "<br /><a href='creer_remplacant.php?login_prof_remplace=$user_login'>Créer un remplaçant</a>";
@@ -701,6 +910,8 @@ while ($i < $nombreligne){
 	} else {
 	  echo "<td><p class='small'><span class='bold'><a href='modify_user.php?user_login=$user_login'>{$col[$i][2]}</a></span></p></td>\n";
 	}
+
+
     echo "<td><p class='small'><span class='bold'>{$col[$i][3]}</span></p></td>\n";
     // Si c'est un professeur : matières si c'est un "autre" alors on affiche son statut personnalisé
     if ($col[$i][7] == "autre" AND getSettingValue("statuts_prives") == "y") {
@@ -738,26 +949,24 @@ while ($i < $nombreligne){
 
     // Affichage du téléchargement pour la photo si le module trombi est activé
 	if (getSettingValue("active_module_trombino_pers")=='y') {
-
-
-        	echo "<td style='white-space: nowrap;'><input name='photo[$i]' type='file' />\n";
-			echo "<input type='hidden' name='quiestce[$i]' value='";
-			$codephoto = md5(mb_strtolower($col[$i][1]));
-			echo $codephoto;
-			echo "' />\n";
-			$photo = $rep_photos.$codephoto.'.jpg';
-			if(file_exists($photo)) {
-				echo "<a href='$photo' target='_blank'><img src='../mod_trombinoscopes/images/";
-				if($col[$i]['civ'] == 'Mme' or $col[$i]['civ'] == 'Mlle') {
-					echo "photo_f.png";
-				}
-				else {
-					echo "photo_g.png";
-				}
-				echo "' width='32' height='32'  align='middle' border='0' alt='photo présente' title='photo présente' /></a>\n";
+		echo "<td style='white-space: nowrap;'><input name='photo[$i]' type='file' />\n";
+		echo "<input type='hidden' name='quiestce[$i]' value='";
+		$codephoto = md5(mb_strtolower($col[$i][1]));
+		echo $codephoto;
+		echo "' />\n";
+		$photo = $rep_photos.$codephoto.'.jpg';
+		if(file_exists($photo)) {
+			echo "<a href='$photo' target='_blank' onmouseover=\"delais_afficher_div('photo_".$col[$i][1]."','y',20,20,1000,20,20);\"><img src='../mod_trombinoscopes/images/";
+			if($col[$i]['civ'] == 'Mme' or $col[$i]['civ'] == 'Mlle') {
+				echo "photo_f.png";
 			}
-			echo "</td>\n";
+			else {
+				echo "photo_g.png";
+			}
+			echo "' width='32' height='32'  align='middle' border='0' alt='photo présente' title='photo présente' /></a>\n";
 		}
+		echo "</td>\n";
+	}
     // Fin de la ligne courante
     echo "</tr>\n";
     }

@@ -111,15 +111,7 @@ if(mysql_num_rows($res_class_tmp)>0){
 $priority_defaut = 5;
 
 //================================
-// Liste de domaines à déplacer par la suite dans global.inc ?
-/*
-$tab_domaines=array('bulletins', 'cahier_notes', 'absences', 'cahier_textes', 'edt');
-$tab_domaines_sigle=array('B', 'CN', 'Abs', 'CDT', 'EDT');
-$tab_domaines_texte=array('Bulletins', 'Cahiers de Notes', 'Absences', 'Cahiers De Textes', 'EDT');
-*/
-$tab_domaines=array('bulletins', 'cahier_notes');
-$tab_domaines_sigle=array('B', 'CN');
-$tab_domaines_texte=array('Bulletins', 'Cahiers de Notes');
+// Liste de domaines de visibilité des groupes déplacé dans global.inc.php
 //================================
 $invisibilite_groupe=array();
 for($loop=0;$loop<count($tab_domaines);$loop++) {
@@ -134,10 +126,125 @@ if(mysql_num_rows($res_jgv)>0) {
 }
 //================================
 
+if (isset($_GET['ajouter_suffixes_noms_groupes'])) {
+	check_token();
+
+	$mode=isset($_GET['mode']) ? $_GET['mode'] : NULL;
+	if(!isset($mode)) {
+		$msg.="Mode de renommage invalide.<br />";
+	}
+	else {
+		$groups = get_groups_for_class($id_classe,"","n");
+
+		$alphabet=array('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z');
+		$nb_renommages=0;
+
+		$tab_grp_id_rech_homonyme=array();
+		$tab_grp_descr_homonyme=array();
+		$tab_grp_name=array();
+
+		// Récup de la liste des élèves de la classe toutes périodes confondues
+		$sql="SELECT DISTINCT login FROM j_eleves_classes WHERE id_classe='$id_classe';";
+		$res_eff_classe=mysql_query($sql);
+		$eff_classe=mysql_num_rows($res_eff_classe);
+
+		foreach ($groups as $group) {
+			if(isset($tab_grp_id_rech_homonyme[$group["description"]])) {
+				$tab_grp_descr_homonyme[]=$group["description"];
+			}
+			$tab_grp_id_rech_homonyme[$group["description"]][]=$group["id"];
+			$tab_grp_name[$group["id"]]=$group["name"];
+		}
+
+		for($i=0;$i<count($tab_grp_descr_homonyme);$i++) {
+			// Y a-t-il aussi des homonymes sur les noms (courts) de ces groupes
+			$tab_grp_name_distincts=array();
+			for($j=0;$j<count($tab_grp_id_rech_homonyme[$tab_grp_descr_homonyme[$i]]);$j++) {
+				if(!in_array($tab_grp_name[$tab_grp_id_rech_homonyme[$tab_grp_descr_homonyme[$i]][$j]], $tab_grp_name_distincts)) {
+					$tab_grp_name_distincts[]=$tab_grp_name[$tab_grp_id_rech_homonyme[$tab_grp_descr_homonyme[$i]][$j]];
+				}
+			}
+
+			$corriger_noms="y";
+			if(count($tab_grp_name_distincts)==count($tab_grp_id_rech_homonyme[$tab_grp_descr_homonyme[$i]])) {
+				$corriger_noms="n";
+			}
+
+			// Ne pas renommer le groupe de plus grand effectif si cela correspond à l'effectif de la classe...
+			$max_eff=-1;
+			$id_grp_max_eff=-1;
+			$tab_eff=array();
+			$tab_eff_grp=array();
+			for($j=0;$j<count($tab_grp_id_rech_homonyme[$tab_grp_descr_homonyme[$i]]);$j++) {
+				$id_groupe_courant=$tab_grp_id_rech_homonyme[$tab_grp_descr_homonyme[$i]][$j];
+				$sql="SELECT DISTINCT login FROM j_eleves_groupes WHERE id_groupe='".$id_groupe_courant."';";
+				$res_eff=mysql_query($sql);
+
+				$eff=mysql_num_rows($res_eff);
+				if(!in_array($eff, $tab_eff)) {$tab_eff[]=$eff;}
+				if($eff>$max_eff) {
+					$max_eff=$eff;
+					$id_grp_max_eff=$id_groupe_courant;
+				}
+				$tab_eff_grp[$id_groupe_courant]=$eff;
+			}
+
+			for($j=0;$j<count($tab_grp_id_rech_homonyme[$tab_grp_descr_homonyme[$i]]);$j++) {
+				$id_groupe_courant=$tab_grp_id_rech_homonyme[$tab_grp_descr_homonyme[$i]][$j];
+
+				$suffixe="";
+				if((count($tab_eff)==1)||
+				($id_groupe_courant!=$id_grp_max_eff)||
+				($tab_eff_grp[$id_groupe_courant]!=$eff_classe)) {
+					if($mode=='alpha') {
+						if(isset($alphabet[$j])) {
+							$suffixe=$alphabet[$j];
+						}
+						else {
+							$suffixe=$j+1;
+						}
+					}
+					elseif($mode=='num') {
+						$suffixe=$j+1;
+					}
+					else {
+						// Renommage d'après le numéro du groupe
+						$suffixe=$id_groupe_courant;
+					}
+					$suffixe="_".$suffixe;
+				}
+
+				$sql="UPDATE groupes SET description='".mysql_real_escape_string($tab_grp_descr_homonyme[$i].$suffixe)."'";
+				if($corriger_noms=="y") {
+					$nom_groupe_courant=$tab_grp_name[$id_groupe_courant];
+					$sql.=", name= '".mysql_real_escape_string($nom_groupe_courant.$suffixe)."'";
+				}
+				$sql.=" WHERE id='".$id_groupe_courant."';";
+				$update=mysql_query($sql);
+				if(!$update) {
+					$msg.="Erreur lors du renommage du groupe n°".$id_groupe_courant."<br />\n";
+				}
+				else {
+					$nb_renommages++;
+				}
+			}
+		}
+
+		if($nb_renommages>0) {
+			$msg.="$nb_renommages renommage(s) effectué(s).<br />\n";
+		}
+
+		unset($tab_grp_id_rech_homonyme);
+		unset($tab_grp_descr_homonyme);
+	}
+}
+
 if (isset($_POST['is_posted'])) {
 	check_token();
 
     $error = false;
+
+	$msg="";
 
 	$tab_id_groupe=array();
 
@@ -255,6 +362,29 @@ if (isset($_POST['is_posted'])) {
 		}
 	}
 	//================================
+
+	if(isset($_POST["name_grp"])) {
+		$name_grp=$_POST["name_grp"];
+		$description_grp=$_POST["description_grp"];
+
+		foreach($name_grp as $id_current_grp => $current_name) {
+			$sql="UPDATE groupes SET name='".html_entity_decode($current_name,ENT_QUOTES,"UTF-8")."' WHERE id='".$id_current_grp."';";
+			//echo "$sql<br />";
+			$update=mysql_query($sql);
+			if(!$update) {
+				$msg.="Erreur lors de la modification du nom court du groupe n°$id_current_grp<br />";
+			}
+		}
+
+		foreach($description_grp as $id_current_grp => $current_description) {
+			$sql="UPDATE groupes SET description='".html_entity_decode($current_description,ENT_QUOTES,"UTF-8")."' WHERE id='".$id_current_grp."';";
+			//echo "$sql<br />";
+			$update=mysql_query($sql);
+			if(!$update) {
+				$msg.="Erreur lors de la modification de la description du groupe n°$id_current_grp<br />";
+			}
+		}
+	}
 
 	$msg="Enregistrement effectué.";
 
@@ -523,11 +653,17 @@ echo " | <a href='../groupes/repartition_ele_grp.php' onclick=\"return confirm_a
 
 echo " | <a href='../init_xml2/init_alternatif.php?cat=classes' onclick=\"return confirm_abandon (this, change, '$themessage')\">Création par lots</a>";
 
+echo " | <a href='../classes/classes_param.php' onclick=\"return confirm_abandon (this, change, '$themessage')\">Paramétrage par lots</a>";
+
 echo "</p>\n";
 echo "</form>\n";
 
 
-echo "<h3>Gestion des enseignements pour la classe :" . $classe["classe"]."</h3>\n";
+echo "<h3>Gestion des enseignements pour la classe&nbsp;: " . $classe["classe"]."<span id='span_asterisque'></span>";
+if(acces("/eleves/index.php", $_SESSION['statut'])) {
+	echo " (<a href='../eleves/index.php?quelles_classes=certaines&amp;id_classe=".$id_classe."' title=\"Voir la liste des élèves de cette classe.\" onclick=\"return confirm_abandon (this, change, '$themessage')\">Élèves</a>)";
+}
+echo "</h3>\n";
 
 echo "</td>\n";
 echo "<td width='60%' align='center'>\n";
@@ -538,7 +674,7 @@ echo "<form enctype='multipart/form-data' action='add_group.php' name='new_group
 //$query = mysql_query("SELECT matiere, nom_complet FROM matieres");
 echo "<fieldset style=\"padding-top: 8px; padding-bottom: 8px;  margin-left: auto; margin-right: auto;\">\n";
 echo "<table border='0' summary='Ajout d enseignement'>\n<tr valign='top'>\n<td>\n";
-echo "Ajouter un enseignement : ";
+echo "Ajouter un enseignement&nbsp;: ";
 echo "</td>\n";
 $query = mysql_query("SELECT matiere, nom_complet FROM matieres ORDER BY matiere");
 //==============================
@@ -546,12 +682,32 @@ $nb_mat = mysql_num_rows($query);
 
 echo "<td>\n";
 echo "<select name='matiere' size='1'>\n";
-echo "<option value='null'>-- Sélectionner matière --</option>\n";
+echo "<option value='null'>-- Sélectionner une matière --</option>\n";
 for ($i=0;$i<$nb_mat;$i++) {
     $matiere = mysql_result($query, $i, "matiere");
     $nom_matiere = mysql_result($query, $i, "nom_complet");
+
+    $sql="SELECT u.nom, u.prenom FROM utilisateurs u, j_professeurs_matieres jpm WHERE jpm.id_professeur=u.login AND jpm.id_matiere='".$matiere."' ORDER BY u.nom, u.prenom;";
+    $res_profs_matiere=mysql_query($sql);
+    if(mysql_num_rows($res_profs_matiere)==0) {
+        $style_opt=" style='color:grey;'";
+        $texte_opt=" - Aucun professeur n'est associé à cette matière.";
+    }
+    else {
+        $style_opt="";
+        $texte_opt=" - Professeurs associés: ";
+        $cpt_prof_opt=0;
+        while($lig_prof_opt=mysql_fetch_object($res_profs_matiere)) {
+            if($cpt_prof_opt>0) {$texte_opt.=", ";}
+            $texte_opt.=casse_mot($lig_prof_opt->prenom, 'majf2')." ".casse_mot($lig_prof_opt->nom, 'maj');
+            $cpt_prof_opt++;
+        }
+    }
+
     //echo "<option value='" . $matiere . "'";
     echo "<option value='" . $matiere . "'";
+    echo " title=\"$matiere ($nom_matiere)$texte_opt\"";
+    echo $style_opt;
     //echo ">" . htmlspecialchars($nom_matiere) . "</option>\n";
     echo ">" . htmlspecialchars($nom_matiere,ENT_QUOTES,"UTF-8") . "</option>\n";
 }
@@ -577,6 +733,9 @@ echo "</tr>\n</table>\n";
 //==============================
 
 echo "<input type='hidden' name='id_classe' value='" . $id_classe . "' />\n";
+
+echo "<div style='float:right; width:15px;'><a href='../classes/classes_param.php' onclick=\"return confirm_abandon (this, change, '$themessage')\"><img src='../images/icons/ico_ampoule.png' width='15' height='25' title=\"Si vous devez créer plusieurs enseignements d'une même matière, vous gagnerez sans doute du temps à effectuer la création via un Paramétrage par lots\" /></a></div>";
+
 echo "<input type='submit' value='Créer' />\n";
 echo "</fieldset>\n";
 echo "</form>\n";
@@ -620,6 +779,12 @@ if(count($groups)==0){
     //echo "</body></html>\n";
     die();
 }
+
+// Pour repérer des groupes homonymes
+$msg_groupes_homonymes="";
+$tab_id_groupe_homonyme=array();
+$tab_description_groupe_homonyme=array();
+
 ?>
 <form enctype="multipart/form-data" action="edit_class.php" name="formulaire" method="post">
 <?php
@@ -637,13 +802,13 @@ echo add_token_field();
 <td width='40%'>
 <fieldset style="padding-top: 8px; padding-bottom: 8px;  margin-left: auto; margin-right: auto;">
 <p>Pour cette classe,
-<input type='button' value="régler les priorités d'affichage" onClick='choix_ordre();' />:</p>
+<input type='button' value="régler les priorités d'affichage" onClick='choix_ordre();' title="N'oubliez pas d'enregistrer ensuite." />:</p>
 <!--ul>
 <li><a href='javascript:ordre_defaut();'>égales aux valeurs définies par défaut</a>,</li>
 <li><a href='javascript:ordre_alpha();'>suivant l'ordre alphabétique des matières.</a></li>
 </ul-->
-<input type='radio' name='ordre' id='ordre_defaut' value='ordre_defaut' /><label for='ordre_defaut' style='cursor: pointer;'> égales aux valeurs définies par défaut,</label><br />
-<input type='radio' name='ordre' id='ordre_alpha' value='ordre_alpha' /><label for='ordre_alpha' style='cursor: pointer;'> suivant l'ordre alphabétique des matières.</label>
+<input type='radio' name='ordre' id='ordre_defaut' value='ordre_defaut' /><label for='ordre_defaut' style='cursor: pointer;' title="Les valeurs par défaut sont définies dans Gestion des bases/Gestion des matières"> égales aux valeurs définies par défaut,</label><br />
+<input type='radio' name='ordre' id='ordre_alpha' value='ordre_alpha' /><label for='ordre_alpha' style='cursor: pointer;'> suivant l'ordre alphabétique des matières</label>
 </fieldset>
 </td>
 
@@ -677,7 +842,7 @@ if($display_rang=='y') {
 
 <fieldset style="padding-top: 8px; padding-bottom: 8px;  margin-left: auto; margin-right: auto;">
 <!--a href='javascript:coeff();'>Mettre tous les coefficients à</a-->
-<input type='button' value='Mettre tous les coefficients à' onClick='coeff(); changement();' />
+<input type='button' value='Mettre tous les coefficients à' onClick='coeff(); changement();' title="N'oubliez pas d'enregistrer ensuite." />
 <select name='coefficient_recop' id='coefficient_recopie' >
 <?php
 for($i=0;$i<10;$i++){
@@ -685,6 +850,21 @@ for($i=0;$i<10;$i++){
 }
 ?>
 </select>
+<?php
+	$temoin_tous_coef_nuls="y";
+	foreach ($groups as $group) {
+		$current_group = get_group($group["id"]);
+		if($current_group["classes"]["classes"][$id_classe]['coef']>0) {
+			$temoin_tous_coef_nuls="n";
+			break;
+		}
+	}
+
+	if($temoin_tous_coef_nuls=="y") {
+		echo "&nbsp;<img src='../images/icons/ico_attention.png' width='22' height='19' title=\"ATTENTION : Tous les coefficients des enseignements sont nuls.
+                    Aucun calcul de moyenne générale n'est alors possible.\" />\n";
+	}
+?>
 <!--input type='button' value='Modifier' onClick='coeff();' /-->
 <!--Mettre tous les coefficients à <input type='button' value='0' onClick='coeff(0);' /> / <input type='button' value='1' onClick='coeff(1);' /-->
 <!--/p-->
@@ -721,10 +901,22 @@ for($i=0;$i<10;$i++){
 		$nom_categories[$row->id]=$row->nom_complet;
 	}
 
+	//============================================================================================================
+
+	$afficher_champs_modif_nom_groupe=isset($_POST['afficher_champs_modif_nom_groupe']) ? $_POST['afficher_champs_modif_nom_groupe'] : (isset($_GET['afficher_champs_modif_nom_groupe']) ? $_GET['afficher_champs_modif_nom_groupe'] : "n");
+
 	echo "<table class='boireaus' summary='Tableau des enseignements'>\n";
 	echo "<tr>\n";
 	echo "<th rowspan='2'>Supprimer</th>\n";
-	echo "<th rowspan='2'>Enseignement</th>\n";
+	echo "<th rowspan='2'>Enseignement<br />\n";
+	// 20130412
+	if($afficher_champs_modif_nom_groupe=="y") {
+		echo "<a href='".$_SERVER['PHP_SELF']."?id_classe=$id_classe&amp;afficher_champs_modif_nom_groupe=n' onclick=\"return confirm_abandon (this, change, '$themessage')\" title=\"Ne pas afficher les champs de modification des noms de groupes\"><img src='../images/icons/visible.png' width='19' height='16' /></a>";
+	}
+	else {
+		echo "<a href='".$_SERVER['PHP_SELF']."?id_classe=$id_classe&amp;afficher_champs_modif_nom_groupe=y' onclick=\"return confirm_abandon (this, change, '$themessage')\" title=\"Afficher les champs de modification des noms de groupes\"><img src='../images/icons/invisible.png' width='19' height='16' /></a>";
+	}
+	echo "</th>\n";
 	echo "<th colspan='".($nb_periode-1)."'><img src='../images/icons/edit_user.png' alt=''/> Elèves inscrits</th>\n";
 	echo "<th rowspan='2'>Priorité<br />d'affichage</th>\n";
 	echo "<th rowspan='2'>Catégorie</th>\n";
@@ -769,6 +961,16 @@ for($i=0;$i<10;$i++){
 		$current_group = get_group($group["id"]);
 		$total = count($group["classes"]);
 
+		if(in_array($current_group['description'], $tab_description_groupe_homonyme)) {
+			$msg_ajout="Plusieurs groupes portent la description <strong>".$current_group['description']."</strong>";
+			if(!preg_match("#$msg_ajout#", $msg_groupes_homonymes)) {
+				$msg_groupes_homonymes.=$msg_ajout."<br />\n";
+			}
+		}
+
+		$tab_id_groupe_homonyme[]=$current_group['id'];
+		$tab_description_groupe_homonyme[]=$current_group['description'];
+
 		//===============================
 		unset($result_matiere);
 		// On récupère l'ordre par défaut des matières dans matieres pour permettre de fixer les priorités d'après les priorités par défaut de matières.
@@ -800,16 +1002,16 @@ for($i=0;$i<10;$i++){
 		echo "<tr id='tr_enseignement_$cpt_grp' class='lig$alt white_hover'>\n";
 		// Suppression
 		echo "<td>";
-		echo "<a href='edit_class.php?id_groupe=". $group["id"] . "&amp;action=delete_group&amp;id_classe=$id_classe".add_token_in_url()."'><img src='../images/icons/delete.png' alt='Supprimer' style='width:13px; heigth: 13px;' /></a>";
+		echo "<a href='edit_class.php?id_groupe=". $group["id"] . "&amp;action=delete_group&amp;id_classe=$id_classe".add_token_in_url()."' onclick=\"return confirm_abandon (this, change, '$themessage')\" title=\"Supprimer cet enseignement\"><img src='../images/icons/delete.png' alt='Supprimer' style='width:13px; heigth: 13px;' /></a>";
 		echo "</td>\n";
 
 		// Enseignement
 		echo "<td class='norme' style='text-align:left;'>";
 		echo "<strong>";
 		if ($total == "1") {
-			echo "<a href='edit_group.php?id_groupe=". $group["id"] . "&amp;id_classe=" . $id_classe . "&amp;mode=groupe'>";
+			echo "<a href='edit_group.php?id_groupe=". $group["id"] . "&amp;id_classe=" . $id_classe . "&amp;mode=groupe' onclick=\"return confirm_abandon (this, change, '$themessage')\" title=\"Modifier l'enseignement\">";
 		} else {
-			echo "<a href='edit_group.php?id_groupe=". $group["id"] . "&amp;id_classe=" . $id_classe . "&amp;mode=regroupement'>";
+			echo "<a href='edit_group.php?id_groupe=". $group["id"] . "&amp;id_classe=" . $id_classe . "&amp;mode=regroupement' onclick=\"return confirm_abandon (this, change, '$themessage')\" title=\"Modifier l'enseignement\">";
 		}
 		echo $group["description"] . "</a></strong>";
 		echo "<input type='hidden' name='enseignement_".$cpt_grp."' id='enseignement_".$cpt_grp."' value=\"".$group["description"]."\" />\n";
@@ -831,13 +1033,28 @@ for($i=0;$i<10;$i++){
 			echo "</em>)";
 		}
 
+		// 20130412
+		if($afficher_champs_modif_nom_groupe=="y") {
+			echo "<br />
+			<input type='hidden' name='afficher_champs_modif_nom_groupe' value='y' />
+			<table>
+				<tr><td style='border:0px; text-align:left;'>Nom court&nbsp;:</td><td style='border:0px'><input type='text' name='name_grp[".$group["id"]."]' value=\"".$group["name"]."\" onchange='changement()' /></td></tr>
+				<tr><td style='border:0px; text-align:left;'>Nom complet&nbsp;:</td><td style='border:0px'><input type='text' name='description_grp[".$group["id"]."]' value=\"".$group["description"]."\" onchange='changement()' /></td></tr>
+			</table>\n";
+		}
+		else {
+			echo "<input type='hidden' name='afficher_champs_modif_nom_groupe' value='n' />\n";
+		}
+
 		$first = true;
 		foreach($current_group["profs"]["list"] as $prof) {
 			if ($first) {echo "<br />";}
 			if (!$first) {echo ", ";}
+			echo "<a href='../utilisateurs/modify_user.php?user_login=".$current_group["profs"]["users"][$prof]["login"]."' onclick=\"return confirm_abandon (this, change, '$themessage')\" title=\"Modification de l'utilisateur\" style='color:black; font-size:small;'>";
 			echo casse_mot($current_group["profs"]["users"][$prof]["prenom"],'majf2');
 			echo " ";
 			echo $current_group["profs"]["users"][$prof]["nom"];
+			echo "</a>";
 	
 			if(in_array($current_group["profs"]["users"][$prof]["login"],$tab_prof_suivi)) {
 				echo " <img src='../images/bulle_verte.png' width='9' height='9' title=\"Professeur principal d'au moins un élève de la classe sur une des périodes.";
@@ -855,7 +1072,7 @@ for($i=0;$i<10;$i++){
 				$inscrits = count($current_group["eleves"][$period["num_periode"]]["list"]);
 
 				echo "<td>";
-				echo "<a href='edit_eleves.php?id_groupe=". $group["id"] . "&amp;id_classe=" . $id_classe . "' onclick=\"return confirm_abandon (this, change, '$themessage')\">" . $inscrits . "</a>";
+				echo "<a href='edit_eleves.php?id_groupe=". $group["id"] . "&amp;id_classe=" . $id_classe . "' onclick=\"return confirm_abandon (this, change, '$themessage')\" title=\"Modifier la liste des élèves inscrits dans cet enseignement\">" . $inscrits . "</a>";
 				echo "</td>\n";
 			}
 		}
@@ -872,7 +1089,7 @@ for($i=0;$i<10;$i++){
 	
 		$k=11;
 		$j = 1;
-		while ($k < 61) {
+		while ($k < 110){
 			echo "<option value=$k";
 			if ($current_group["classes"]["classes"][$id_classe]["priorite"] == $k) {echo " selected";}
 			echo ">".$j;
@@ -909,7 +1126,7 @@ for($i=0;$i<10;$i++){
 
 		if(($display_mat_cat=='y')&&($current_group["classes"]["classes"][$id_classe]["categorie_id"]=="0")) {
 			//echo "<br />\n";
-			$message_categorie_aucune="La matière n apparaitra pas sur les bulletins et relevés de notes. Voir http://www.sylogix.org/gepi/wiki/Enseignement_invisible";
+			$message_categorie_aucune="La matière n apparaitra pas sur les bulletins et relevés de notes. Voir http://www.sylogix.org/projects/gepi/wiki/Enseignement_invisible";
 			//echo "<img src='../images/icons/ico_attention.png' width='22' height='19' alt='$message_categorie_aucune' title='$message_categorie_aucune' />\n";
 
 			echo "<a href='#' onclick=\"afficher_div('enseignement_invisible','y',-100,20);return false;\"";
@@ -1034,6 +1251,22 @@ echo "<input type='hidden' name='id_classe' value='" . $id_classe . "' />\n";
 echo "<p align='center'><input type='submit' value='Enregistrer' /></p>\n";
 echo "</form>\n";
 
+if($msg_groupes_homonymes!='') {
+	echo "<p><br /></p>\n";
+	echo "<a name='groupes_homonymes'></a>\n";
+	echo "<p style='margin-left:6.3em; text-indent:-6.3em;'><span style='font-weight:bold; color:red'>Attention&nbsp;:</span> $msg_groupes_homonymes";
+	echo "Vous devriez renommer ces groupes de façon à ce que vous comme les professeurs,... les distinguent plus facilement.<br />";
+	echo "Vous pouvez par exemple ajouter des suffixes _1, _2,...<br />";
+	echo "ou laisser le nom sans suffixe pour un groupe classe et mettre des suffixes _1, _2,... pour des sous-groupes.<br />";
+	echo "<a href='".$_SERVER['PHP_SELF']."?id_classe=$id_classe&amp;ajouter_suffixes_noms_groupes=y&amp;mode=num".add_token_in_url()."'>Ajouter automatiquement des suffixes _1, _2,...</a> ou des <a href='".$_SERVER['PHP_SELF']."?id_classe=$id_classe&amp;ajouter_suffixes_noms_groupes=y&amp;mode=alpha".add_token_in_url()."'>Ajouter automatiquement des suffixes _A, _B,...</a>";
+	echo "</p>\n";
+	echo "<p><br /></p>\n";
+
+	echo "<script type='text/javascript'>
+document.getElementById('span_asterisque').innerHTML=\" <a href='#groupes_homonymes' title='Plusieurs groupes ont des descriptions identiques'><img src='../images/icons/flag2.gif' width='17' height='18' /></a>\";
+</script>\n";
+}
+
 //================================================
 // AJOUT:boireaus
 echo "<script type='text/javascript' language='javascript'>
@@ -1103,7 +1336,7 @@ echo "}
 <li>Un seul coefficient non nul provoque l'apparition de tous les coefficients sur les bulletins.</li>
 <li>Un/des coefficients non nul(s) est/sont nécessaire(s) pour que la ligne moyenne générale apparaisse sur le bulletin.</li>
 <!--li>Les coefficients réglés ici ne s'appliquent qu'à la classe <?php echo $classe["classe"]?>, même dans le cas des enseignements concernant d'autres classes.</li-->
-<li>Pour les enseignements impliquant plusieurs classes, le coefficient s'applique à tous les élèves de la classe courante et peut être réglé indépendamment d'une classe à l'autre (pour le régler individuellement par élève, voir la liste des élèves inscrits).<br />
+<li>Pour les enseignements impliquant plusieurs classes, le coefficient s'applique à tous les élèves de la classe courante et peut être réglé indépendamment d'une classe à l'autre (<em>pour le régler individuellement par élève, voir la liste des élèves inscrits</em>).<br />
 Les coefficients réglés ici ne s'appliquent donc qu'à la classe
 <?php
     // Bizarre... $classe peut contenir une autre classe que celle en cours???
@@ -1111,6 +1344,7 @@ Les coefficients réglés ici ne s'appliquent donc qu'à la classe
     echo $classe_tmp["classe"];
 ?>
 , même dans le cas des enseignements concernant des regroupements de plusieurs classes.</li>
+<li>En revanche, la visibilité d'un groupe dans tel ou tel domaine (<em>bulletins, carnet de notes, cahiers de textes</em>) est propre au groupe (<em>pour toutes les classes associées au groupe</em>).</li>
 <li>
 	Les modes de prise en compte de la moyenne d'un enseignement dans la moyenne générale sont les suivants&nbsp;:
 	<ul>

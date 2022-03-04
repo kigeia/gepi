@@ -514,7 +514,7 @@ function initWysiwyg() {
 			    ['NumberedList','BulletedList'],
 			    ['JustifyLeft','JustifyCenter','JustifyRight','JustifyBlock'],
 			    ['Outdent','Indent'],
-			    ['Link','Unlink','Table','HorizontalRule','SpecialChar','equation'],
+			    ['Link','Unlink','Table','HorizontalRule','SpecialChar','Equation'],
 			    ['Styles','Format','Font','FontSize'],
 			    ['TextColor','BGColor'],
 			    ['Maximize', 'About','-','Print']
@@ -537,7 +537,7 @@ function initWysiwyg() {
 			    ['JustifyLeft','JustifyCenter','JustifyRight','JustifyBlock'],
 			    '/',
 			    ['Outdent','Indent'],
-			    ['Link','Unlink','Table','HorizontalRule','SpecialChar','equation'],
+			    ['Link','Unlink','Table','HorizontalRule','SpecialChar','Equation'],
 			    ['Styles','Format','Font','FontSize'],
 			    ['TextColor','BGColor'],
 			    ['Maximize', 'About','-','Print']
@@ -1172,6 +1172,11 @@ function insere_image_dans_ckeditor(url, largeur, hauteur) {
 	CKEDITOR.instances['contenu'].insertHtml(texte);
 }
 
+function insere_lien_ggb_dans_ckeditor(titre, url) {
+	//texte="<a href='visionneur_geogebra.php?url="+url+"' target='_blank'>"+url.replace(/\\/g,'/').replace( /.*\//, '' )+"</a>";
+	texte="<a href='visionneur_geogebra.php?url="+url+"' target='_blank'>"+titre+"</a>";
+	CKEDITOR.instances['contenu'].insertHtml(texte);
+}
 
 /**
 *

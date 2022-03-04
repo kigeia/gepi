@@ -181,13 +181,27 @@ function liste_notes_html($tab_rel,$i,$j,$tab_id_conteneur=array()) {
 					}
 	
 					// 20100626
+					/*
 					if($tab_rel['rn_moy_min_max_classe']=='y') {
 						$retour.=" (<i><small>".$tab_rel['eleve'][$i]['groupe'][$j]['devoir'][$m]['min']."|".$tab_rel['eleve'][$i]['groupe'][$j]['devoir'][$m]['moy_classe']."|".$tab_rel['eleve'][$i]['groupe'][$j]['devoir'][$m]['max']."</small></i>)";
 					}
 					elseif($tab_rel['rn_moy_classe']=='y') {
 						$retour.=" (classe:".$tab_rel['eleve'][$i]['groupe'][$j]['devoir'][$m]['moy_classe'].")";
 					}
-	
+					*/
+					if($tab_rel['rn_moy_min_max_classe']=='y') {
+						// 20131002: Mettre des couleurs particulières
+						$retour.=" (";
+						$retour.="<em title=\"".$eleve_nom_court." (".formate_date($eleve_date).")
+Note minimale   : ".$tab_rel['eleve'][$i]['groupe'][$j]['devoir'][$m]['min']."
+Moyenne classe : ".$tab_rel['eleve'][$i]['groupe'][$j]['devoir'][$m]['moy_classe']."
+Note maximale  : ".$tab_rel['eleve'][$i]['groupe'][$j]['devoir'][$m]['max']."\">";
+						$retour.="<span class='cn_moymin'>".$tab_rel['eleve'][$i]['groupe'][$j]['devoir'][$m]['min']."</span>|<span class='cn_moyclasse'>".$tab_rel['eleve'][$i]['groupe'][$j]['devoir'][$m]['moy_classe']."</span>|<span class='cn_moymax'>".$tab_rel['eleve'][$i]['groupe'][$j]['devoir'][$m]['max']."</span></em>)";
+					}
+					elseif($tab_rel['rn_moy_classe']=='y') {
+						$retour.=" (<span class='cn_moyclasse' title=\"".$eleve_nom_court." (".formate_date($eleve_date).")\">classe:".$tab_rel['eleve'][$i]['groupe'][$j]['devoir'][$m]['moy_classe']."</span>)";
+					}
+
 					//====================================================================
 					// Après un tour avec affichage dans la boucle:
 					$tiret = "yes";
@@ -410,6 +424,7 @@ function releve_html($tab_rel,$i,$num_releve_specifie) {
 		$releve_largeurtableau,
 
 		$releve_col_matiere_largeur,
+		$releve_col_moyenne_largeur,
 		//$col_note_largeur,
 		//$col_boite_largeur,
 		//$col_hauteur,		// La hauteur minimale de ligne n'est exploitée que dans les boites/conteneurs
@@ -498,6 +513,8 @@ function releve_html($tab_rel,$i,$num_releve_specifie) {
 		// Pour être pris en compte dans les boites/conteneurs:
 		global $retour_a_la_ligne;
 
+		global $rn_couleurs_alternees;
+
 		$debug_releve="n";
 		$debug_ele_login="ahnjinwon";
 		$debug_id_groupe=237;
@@ -516,6 +533,10 @@ function releve_html($tab_rel,$i,$num_releve_specifie) {
 		$retour_a_la_ligne=$tab_rel['rn_retour_ligne'];
 	}
 
+	//echo "\$releve_largeurtableau=$releve_largeurtableau<br />";
+	//if(!isset($releve_largeurtableau)) {
+	//	$releve_largeurtableau="100%";
+	//}
 
 	/*
 	$affiche_categories
@@ -873,14 +894,14 @@ width:".$releve_addressblock_logo_etab_prop."%;\n";
 				if ($tab_rel['eleve'][$i]['regime'] == "int.") {echo "Interne";}
 				if ($tab_rel['eleve'][$i]['regime'] == "i-e"){
 					echo "Interne&nbsp;externé";
-					if (mb_strtoupper($tab_rel['eleve'][$i]['sexe'])!= "F") {echo "e";}
+					if (mb_strtoupper($tab_rel['eleve'][$i]['sexe'])== "F") {echo "e";}
 				}
 				//Eric Ajout
 				if ($releve_mention_doublant == 'yes'){
 					if ($tab_rel['eleve'][$i]['doublant'] == 'R'){
-					echo "<br />";
-					echo "Redoublant";
-					if (mb_strtoupper($tab_rel['eleve'][$i]['sexe'])!= "F") {echo "e";}
+						echo "<br />";
+						echo "Redoublant";
+						if (mb_strtoupper($tab_rel['eleve'][$i]['sexe'])== "F") {echo "e";}
 					}
 				}
 
@@ -904,12 +925,12 @@ width:".$releve_addressblock_logo_etab_prop."%;\n";
 				if ($tab_rel['eleve'][$i]['regime'] == "int.") {echo ", Interne";}
 				if ($tab_rel['eleve'][$i]['regime'] == "i-e"){
 					echo ", Interne&nbsp;externé";
-					if (mb_strtoupper($tab_rel['eleve'][$i]['sexe'])!= "F") {echo "e";}
+					if (mb_strtoupper($tab_rel['eleve'][$i]['sexe'])== "F") {echo "e";}
 				}
 				if ($releve_mention_doublant == 'yes'){
 					if ($tab_rel['eleve'][$i]['doublant'] == 'R'){
 						echo ", Redoublant";
-						if (mb_strtoupper($tab_rel['eleve'][$i]['sexe'])!= "F") {echo "e";}
+						if (mb_strtoupper($tab_rel['eleve'][$i]['sexe'])== "F") {echo "e";}
 					}
 				}
 				if ($releve_mention_nom_court == 'yes') {
@@ -1012,14 +1033,14 @@ width:".$releve_addressblock_logo_etab_prop."%;\n";
 				if ($tab_rel['eleve'][$i]['regime'] == "int.") {echo "Interne";}
 				if ($tab_rel['eleve'][$i]['regime'] == "i-e"){
 					echo "Interne&nbsp;externé";
-					if (mb_strtoupper($tab_rel['eleve'][$i]['sexe'])!= "F") {echo "e";}
+					if (mb_strtoupper($tab_rel['eleve'][$i]['sexe'])== "F") {echo "e";}
 				}
 				//Eric Ajout
 				if ($releve_mention_doublant == 'yes'){
 					if ($tab_rel['eleve'][$i]['doublant'] == 'R'){
-					echo "<br />";
-					echo "Redoublant";
-					if (mb_strtoupper($tab_rel['eleve'][$i]['sexe'])!= "F") {echo "e";}
+						echo "<br />";
+						echo "Redoublant";
+						if (mb_strtoupper($tab_rel['eleve'][$i]['sexe'])== "F") {echo "e";}
 					}
 				}
 
@@ -1045,13 +1066,13 @@ width:".$releve_addressblock_logo_etab_prop."%;\n";
 				if ($tab_rel['eleve'][$i]['regime'] == "int.") {echo ", Interne";}
 				if ($tab_rel['eleve'][$i]['regime'] == "i-e"){
 					echo ", Interne&nbsp;externé";
-					if (mb_strtoupper($tab_rel['eleve'][$i]['sexe'])!= "F") {echo "e";}
+					if (mb_strtoupper($tab_rel['eleve'][$i]['sexe'])== "F") {echo "e";}
 				}
 				//Eric Ajout
 				if ($releve_mention_doublant == 'yes'){
 					if ($tab_rel['eleve'][$i]['doublant'] == 'R'){
-					echo ", Redoublant";
-					if (mb_strtoupper($tab_rel['eleve'][$i]['sexe'])!= "F") {echo "e";}
+						echo ", Redoublant";
+						if (mb_strtoupper($tab_rel['eleve'][$i]['sexe'])== "F") {echo "e";}
 					}
 				}
 				if ($releve_mention_nom_court == 'yes') {
@@ -1159,23 +1180,35 @@ width:".$releve_addressblock_logo_etab_prop."%;\n";
 		}
 
 		// On initialise le tableau :
-
 		$larg_tab = $releve_largeurtableau;
 		$larg_col1 = $releve_col_matiere_largeur;
-		$larg_col2 = $larg_tab - $larg_col1;
+		if ($tab_rel['rn_col_moy']!="y") {
+			$larg_col2 = $larg_tab - $larg_col1;
+		}
+		else {
+			$larg_col1b=$releve_col_moyenne_largeur;
+			$larg_col2 = $larg_tab - $larg_col1b - $larg_col1;
+		}
 		//echo "<table width=\"$larg_tab\" class='boireaus' border=1 cellspacing=3 cellpadding=3>\n";
-        echo "<div class='center'>\n";
-		echo "<table width=\"$larg_tab\"$releve_class_bordure border='1' cellspacing='3' cellpadding='3'";
-		echo "summary=\"Tableau des notes\" ";
+		echo "<div class='center'>\n";
+		echo "<table width=\"$larg_tab\"$releve_class_bordure border='1' cellspacing='3' cellpadding='3' ";
+		echo "summary=\"Tableau des notes\"";
+		if((isset($rn_couleurs_alternees))&&($rn_couleurs_alternees=="y")) {
+			echo " style='background-color:white;'";
+		}
 		echo ">\n";
 		echo "<tr>\n";
-		echo "<td style=\"width: ".$larg_col1."px\" class='releve'><b>Matière</b><br /><i>Professeur</i></td>\n";
-		echo "<td style=\"width: ".$larg_col2."px\" class='releve'>Notes sur 20</td>\n";
+		echo "<th style=\"width: ".$larg_col1."px\" class='releve'><b>Matière</b><br /><i>Professeur</i></th>\n";
+		if ($tab_rel['rn_col_moy']=="y") {
+			echo "<th style=\"width: ".$larg_col1b."px\" class='releve'>Moy.</th>\n";
+		}
+		echo "<th style=\"width: ".$larg_col2."px\" class='releve'>Notes sur 20</th>\n";
 		echo "</tr>\n";
 
 		// Boucle groupes
 		$j = 0;
 		$prev_cat_id = null;
+		$alt=1;
 		if((isset($tab_rel['eleve'][$i]['groupe']))&&(count($tab_rel['eleve'][$i]['groupe'])>0)) {
 			while ($j < count($tab_rel['eleve'][$i]['groupe'])) {
 	
@@ -1188,7 +1221,8 @@ width:".$releve_addressblock_logo_etab_prop."%;\n";
 							$prev_cat_id = $tab_rel['eleve'][$i]['groupe'][$j]['id_cat'];
 		
 							echo "<tr>\n";
-							echo "<td colspan='2'>\n\n";
+							if ($tab_rel['rn_col_moy']=="y") {$colspan=3;} else {$colspan=2;}
+							echo "<td colspan='$colspan'>\n\n";
 							//echo "<p style='padding: 0; margin:0; font-size: 10px;'>".$tab_rel['categorie'][$prev_cat_id]."</p>\n";
 							echo "<p style='padding: 0; margin:0; font-size: ".$releve_categ_font_size."px;";
 							if($releve_categ_bgcolor!="") {echo "background-color:$releve_categ_bgcolor;";}
@@ -1199,8 +1233,14 @@ width:".$releve_addressblock_logo_etab_prop."%;\n";
 							echo "</tr>\n";
 						}
 					}
-		
-					echo "<tr>\n";
+
+					$alt=$alt*(-1);
+					if((isset($rn_couleurs_alternees))&&($rn_couleurs_alternees=="y")) {
+						echo "<tr class='lig$alt'>\n";
+					}
+					else {
+						echo "<tr>\n";
+					}
 					echo "<td class='releve'>\n";
 					echo "<b>".($tab_rel['eleve'][$i]['groupe'][$j]['matiere_nom_complet'])."</b>";
 					//echo $tab_rel['eleve'][$i]['groupe'][$j]['id_groupe'];
@@ -1213,8 +1253,32 @@ width:".$releve_addressblock_logo_etab_prop."%;\n";
 							$k++;
 						}
 					}
+					//echo "<br />\$tab_rel['rn_col_moy']=".$tab_rel['rn_col_moy'];
 					echo "</td>\n";
-		
+
+					if ($tab_rel['rn_col_moy']=="y") {
+						echo "<td class='releve'>\n";
+						if(!isset($tab_rel['eleve'][$i]['groupe'][$j]['moyenne'])) {
+							echo "&nbsp;";
+						}
+						else {
+							if($tab_rel['verouiller']=='N') {
+								echo "<span title=\"ATTENTION : La période n'est pas close.
+                    La moyenne affichée est susceptible de
+                    changer d'ici à la fin de la période.
+                    Des notes peuvent encore être ajoutées,
+                    des coefficients de devoirs peuvent être
+                    modifiés,...\">";
+								echo $tab_rel['eleve'][$i]['groupe'][$j]['moyenne'];
+								echo "</span>";
+							}
+							else {
+								echo $tab_rel['eleve'][$i]['groupe'][$j]['moyenne'];
+							}
+						}
+						echo "</td>\n";
+					}
+
 					echo "<td class='releve'>\n";
 		
 					// Boucle sur la liste des devoirs
@@ -1446,13 +1510,18 @@ width:".$releve_addressblock_logo_etab_prop."%;\n";
 				
 												// 20100626
 												if($tab_rel['rn_moy_min_max_classe']=='y') {
-													echo " (<i><small>".$tab_rel['eleve'][$i]['groupe'][$j]['devoir'][$m]['min']."|".$tab_rel['eleve'][$i]['groupe'][$j]['devoir'][$m]['moy_classe']."|".$tab_rel['eleve'][$i]['groupe'][$j]['devoir'][$m]['max']."</small></i>)";
+													echo " (<em title=\"".$eleve_nom_court." (".formate_date($eleve_date).")
+Note minimale   : ".$tab_rel['eleve'][$i]['groupe'][$j]['devoir'][$m]['min']."
+Moyenne classe : ".$tab_rel['eleve'][$i]['groupe'][$j]['devoir'][$m]['moy_classe']."
+Note maximale  : ".$tab_rel['eleve'][$i]['groupe'][$j]['devoir'][$m]['max']."\"><small>";
+													//echo $tab_rel['eleve'][$i]['groupe'][$j]['devoir'][$m]['min']."|".$tab_rel['eleve'][$i]['groupe'][$j]['devoir'][$m]['moy_classe']."|".$tab_rel['eleve'][$i]['groupe'][$j]['devoir'][$m]['max'];
+													echo "<span class='cn_moymin'>".$tab_rel['eleve'][$i]['groupe'][$j]['devoir'][$m]['min']."</span>|<span class='cn_moyclasse'>".$tab_rel['eleve'][$i]['groupe'][$j]['devoir'][$m]['moy_classe']."</span>|<span class='cn_moymax'>".$tab_rel['eleve'][$i]['groupe'][$j]['devoir'][$m]['max']."</span>";
+													echo "</small></em>)";
 												}
 												elseif($tab_rel['rn_moy_classe']=='y') {
-													echo " (classe:".$tab_rel['eleve'][$i]['groupe'][$j]['devoir'][$m]['moy_classe'].")";
+													echo " (<em class='cn_moyclasse'>classe:".$tab_rel['eleve'][$i]['groupe'][$j]['devoir'][$m]['moy_classe']."</em>)";
 												}
-				
-				
+
 												//====================================================================
 												// Après un tour avec affichage dans la boucle:
 												$tiret = "yes";
@@ -1558,10 +1627,17 @@ width:".$releve_addressblock_logo_etab_prop."%;\n";
 	
 									// 20100626
 									if($tab_rel['rn_moy_min_max_classe']=='y') {
-										echo " (<i><small>".$tab_rel['eleve'][$i]['groupe'][$j]['devoir'][$m]['min']."|".$tab_rel['eleve'][$i]['groupe'][$j]['devoir'][$m]['moy_classe']."|".$tab_rel['eleve'][$i]['groupe'][$j]['devoir'][$m]['max']."</small></i>)";
+										echo " (<em title=\"".$eleve_nom_court." (".formate_date($eleve_date).")
+Note minimale   : ".$tab_rel['eleve'][$i]['groupe'][$j]['devoir'][$m]['min']."
+Moyenne classe : ".$tab_rel['eleve'][$i]['groupe'][$j]['devoir'][$m]['moy_classe']."
+Note maximale  : ".$tab_rel['eleve'][$i]['groupe'][$j]['devoir'][$m]['max']."\"><small>";
+										//echo $tab_rel['eleve'][$i]['groupe'][$j]['devoir'][$m]['min']."|".$tab_rel['eleve'][$i]['groupe'][$j]['devoir'][$m]['moy_classe']."|".$tab_rel['eleve'][$i]['groupe'][$j]['devoir'][$m]['max'];
+										echo "<span class='cn_moymin'>".$tab_rel['eleve'][$i]['groupe'][$j]['devoir'][$m]['min']."</span>|<span class='cn_moyclasse'>".$tab_rel['eleve'][$i]['groupe'][$j]['devoir'][$m]['moy_classe']."</span>|<span class='cn_moymax'>".$tab_rel['eleve'][$i]['groupe'][$j]['devoir'][$m]['max']."</span>";
+										echo "</small></em>)";
+										//echo " (<i><small>".$tab_rel['eleve'][$i]['groupe'][$j]['devoir'][$m]['min']."|".$tab_rel['eleve'][$i]['groupe'][$j]['devoir'][$m]['moy_classe']."|".$tab_rel['eleve'][$i]['groupe'][$j]['devoir'][$m]['max']."</small></i>)";
 									}
 									elseif($tab_rel['rn_moy_classe']=='y') {
-										echo " (classe:".$tab_rel['eleve'][$i]['groupe'][$j]['devoir'][$m]['moy_classe'].")";
+										echo " (<em>classe:".$tab_rel['eleve'][$i]['groupe'][$j]['devoir'][$m]['moy_classe']."</em>)";
 									}
 	
 	
@@ -1690,6 +1766,9 @@ if ($tab_rel['rn_abs_2'] == 'y') {
 
 			echo "<table$releve_class_bordure border='1' width='$releve_largeurtableau'";
 			echo " summary=\"Tableau des signatures\"";
+			if((isset($rn_couleurs_alternees))&&($rn_couleurs_alternees=="y")) {
+				echo " style='background-color:white;'";
+			}
 			echo ">\n";
 			echo "<tr>\n";
 
@@ -2933,7 +3012,7 @@ function releve_pdf($tab_rel,$i) {
 													if($tab_rel['eleve'][$i]['groupe'][$m]['devoir'][$k]['statut']!='v') {
 
 														if($tab_rel['rn_nomdev']=='y') {
-															$chaine_notes.=$tab_rel['eleve'][$i]['groupe'][$m]['devoir'][$k]['nom_court'].": ";
+															$chaine_notes.=unhtmlentities($tab_rel['eleve'][$i]['groupe'][$m]['devoir'][$k]['nom_court']).": ";
 														}
 
 														if($use_cell_ajustee!="n") {$chaine_notes.="<b>";}
@@ -2986,7 +3065,7 @@ function releve_pdf($tab_rel,$i) {
 													elseif(($tab_rel['rn_app']=='y')&&($tab_rel['eleve'][$i]['groupe'][$m]['devoir'][$k]['display_app']=='1')&&($tab_rel['eleve'][$i]['groupe'][$m]['devoir'][$k]['app']!='')) {
 							
 														if($tab_rel['rn_nomdev']=='y') {
-															$chaine_notes.=" (".$tab_rel['eleve'][$i]['groupe'][$m]['devoir'][$k]['nom_court'].")";
+															$chaine_notes.=" (".unhtmlentities($tab_rel['eleve'][$i]['groupe'][$m]['devoir'][$k]['nom_court']).")";
 														}
 								
 														if($tab_rel['rn_datedev']=='y') {
@@ -3043,7 +3122,7 @@ function releve_pdf($tab_rel,$i) {
 	
 									if($tab_rel['eleve'][$i]['groupe'][$m]['devoir'][$k]['statut']!='v') {
 										if($tab_rel['rn_nomdev']=='y') {
-											$chaine_notes.=$tab_rel['eleve'][$i]['groupe'][$m]['devoir'][$k]['nom_court'].": ";
+											$chaine_notes.=unhtmlentities($tab_rel['eleve'][$i]['groupe'][$m]['devoir'][$k]['nom_court']).": ";
 										}
 
 										if($use_cell_ajustee!="n") {$chaine_notes.="<b>";}
@@ -3094,7 +3173,7 @@ function releve_pdf($tab_rel,$i) {
 									elseif(($tab_rel['rn_app']=='y')&&($tab_rel['eleve'][$i]['groupe'][$m]['devoir'][$k]['display_app']=='1')&&($tab_rel['eleve'][$i]['groupe'][$m]['devoir'][$k]['app']!='')) {
 			
 										if($tab_rel['rn_nomdev']=='y') {
-											$chaine_notes.=" (".$tab_rel['eleve'][$i]['groupe'][$m]['devoir'][$k]['nom_court'].")";
+											$chaine_notes.=" (".unhtmlentities($tab_rel['eleve'][$i]['groupe'][$m]['devoir'][$k]['nom_court']).")";
 										}
 				
 										if($tab_rel['rn_datedev']=='y') {

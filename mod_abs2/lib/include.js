@@ -128,9 +128,59 @@ function postform(the_form){
 
 
 function click_active_absence(elv) {
+	couleur_label="red";
+	class_label="policeRouge";
+	bordure_photo="bord_rouge";
+	if(document.getElementById("liste_type_absence_eleve_"+elv)) {
+		//alert(document.getElementById("liste_type_absence_eleve_"+elv).options[document.getElementById("liste_type_absence_eleve_"+elv).selectedIndex].getAttribute('manquement'));
+		if(document.getElementById("liste_type_absence_eleve_"+elv).options[document.getElementById("liste_type_absence_eleve_"+elv).selectedIndex].getAttribute('manquement')=='FAUX') {
+			couleur_label="yellow";
+			class_label="policeJaune";
+			bordure_photo="bord_jaune";
+		}
+	}
+
 	if (document.getElementById("active_absence_eleve_"+elv).checked) {
-		document.getElementById("label_active_absence_eleve_"+elv).className='policeRouge';
+		if(document.getElementById("label_active_absence_eleve_"+elv)) {
+			document.getElementById("label_active_absence_eleve_"+elv).className=class_label;
+		}
+		//document.getElementById("label_nom_prenom_eleve_"+elv).className='policeRouge';
+		if(document.getElementById("label_nom_prenom_eleve_"+elv)) {
+			document.getElementById("label_nom_prenom_eleve_"+elv).style.color=couleur_label;
+		}
+		if(document.getElementById("img_photo_eleve_"+elv)) {
+			document.getElementById("img_photo_eleve_"+elv).className='trombine '+bordure_photo;
+		}
 	} else {
-		document.getElementById("label_active_absence_eleve_"+elv).className='policeBlack';
+		if(document.getElementById("label_active_absence_eleve_"+elv)) {
+			document.getElementById("label_active_absence_eleve_"+elv).className='policeBlack';
+		}
+		//document.getElementById("label_nom_pren_eleve_"+elv).className='policeBlack';
+		if(document.getElementById("label_nom_prenom_eleve_"+elv)) {
+			document.getElementById("label_nom_prenom_eleve_"+elv).style.color='black';
+		}
+		if(document.getElementById("img_photo_eleve_"+elv)) {
+			document.getElementById("img_photo_eleve_"+elv).className='trombine sans_bord';
+		}
 	}
 }
+
+function change_select_type_absence(id_radio, elv) {
+	if(document.getElementById(id_radio).checked==true) {
+		valeur=document.getElementById(id_radio).value;
+		if(valeur!='') {
+			// Rechercher dans le champ select si on a la même valeur
+			if(document.getElementById('liste_type_absence_eleve_'+elv)) {
+				champ_select=document.getElementById('liste_type_absence_eleve_'+elv);
+				for(i=0;i<champ_select.options.length;i++) {
+					if(champ_select.options[i].value==valeur) {
+						champ_select.selectedIndex=i;
+						click_active_absence(elv);
+						break;
+					}
+				}
+			}
+		}
+	}
+}
+

@@ -4,7 +4,7 @@
  * 
  * $Id$
  *
- * @copyright Copyright 2001, 2011 Thomas Belliard, Laurent Delineau, Edouard Hue, Eric Lebrun
+ * @copyright Copyright 2001, 2013 Thomas Belliard, Laurent Delineau, Edouard Hue, Eric Lebrun
  * @license GNU/GPL,
  * @package General
  * @subpackage mise_a jour
@@ -174,6 +174,9 @@ if (($resultat_session == '0') and ($valid != 'yes')) {
 				</fieldset>
 			</div>
 		</form>
+		<script type="text/javascript">
+			document.getElementById("login").focus();
+		</script>
 	</body>
 </html>
 ');
@@ -239,6 +242,19 @@ if (isset ($_POST['maj'])) {
 
 	if (($force_maj == 'yes') or (quelle_maj("1.6.1"))) {
             require 'updates/160_to_161.inc.php';
+	}
+
+	if (($force_maj == 'yes') or (quelle_maj("1.6.2"))) {
+            require 'updates/161_to_162.inc.php';
+	}
+
+	if (($force_maj == 'yes') or (quelle_maj("1.6.2"))) {
+            require 'updates/162_to_163.inc.php';
+	}
+
+	if (($force_maj == 'yes') or (quelle_maj("1.6.3"))) {
+            require 'updates/163_to_dev.inc.php';
+            //require 'updates/163_to_164.inc.php';
 	}
 
 	// Mise à jour du numéro de version

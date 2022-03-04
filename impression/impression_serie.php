@@ -1,7 +1,7 @@
 <?php
 /*
 *
-* Copyright 2001, 2011 Thomas Belliard, Laurent Delineau, Edouard Hue, Eric Lebrun
+* Copyright 2001, 2013 Thomas Belliard, Laurent Delineau, Edouard Hue, Eric Lebrun
 *
 * This file is part of GEPI.
 *
@@ -49,6 +49,9 @@ require_once("../lib/header.inc.php");
 //debug_var();
 echo "<p class='bold'>";
 echo "<a href='../accueil.php'><img src='../images/icons/back.png' alt='Retour' class='back_link'/> Retour</a>";
+if ($id_choix_periode != 0) {
+	echo " | <a href='./impression_serie.php'>Autre période</a>";
+}
 echo " | <a href='./impression.php'>Impression rapide à l'unité</a>";
 echo " | <a href='./parametres_impression_pdf.php'>Régler les paramètres du PDF</a>";
 if(check_droit_acces('/groupes/mes_listes.php',$_SESSION['statut'])) {
@@ -71,8 +74,13 @@ if ($id_choix_periode != 0) {
 
 if ($id_choix_periode == 0) {
 	echo "<div style=\"text-align: center;\">\n";
-	echo "<fieldset>\n";
-	echo "<legend>Sélectionnez la période pour laquelle vous souhaitez imprimer les listes.</legend>\n";
+	echo "<fieldset style='border: 1px solid grey;";
+	echo "background-image: url(\"../images/background/opacite50.png\"); ";
+	echo "'>\n";
+	echo "<legend style='border: 1px solid grey;";
+	//echo "background-image: url(\"../images/background/opacite50.png\"); ";
+	echo "background-color: white; ";
+	echo "'>Sélectionnez la période pour laquelle vous souhaitez imprimer les listes.</legend>\n";
 	echo "<form method=\"post\" action=\"impression_serie.php\" name=\"imprime_serie\">\n";
 	$requete_periode = "SELECT DISTINCT `num_periode` FROM `periodes`";
 	$resultat_periode = mysql_query($requete_periode) or die('Erreur SQL !'.$requete_periode.'<br />'.mysql_error());
@@ -117,8 +125,14 @@ else {
 
 	if(!isset($_POST['passer_au_choix_des_groupes'])) {
 		echo "<div style=\"text-align: center;\">\n";
-		echo "<fieldset>\n";
-		echo "<legend>Sélectionnez la (ou les) classe(s) pour lesquelles vous souhaitez imprimer les listes.</legend>\n";
+		echo "<fieldset style='border: 1px solid grey;";
+		echo "background-image: url(\"../images/background/opacite50.png\"); ";
+		echo "'>\n";
+
+		echo "<legend style='border: 1px solid grey;";
+		//echo "background-image: url(\"../images/background/opacite50.png\"); ";
+		echo "background-color: white; ";
+		echo "'>Sélectionnez la (ou les) classe(s) pour lesquelles vous souhaitez imprimer les listes.</legend>\n";
 
 		echo "<form method=\"post\" action=\"liste_pdf.php\" target='_blank' name=\"imprime_pdf\">\n";
 		if ($id_choix_periode != 0) {
@@ -194,8 +208,14 @@ else {
 	
 			echo "<h3 align='left'>Liste des enseignements : </h3>\n";
 
-			echo "<fieldset>\n";
-			echo "<legend>Sélectionnez la (ou les) classe(s) dans laquelle/lesquelles rechercher des listes de groupes.</legend>\n";
+			echo "<fieldset style='border: 1px solid grey;";
+			echo "background-image: url(\"../images/background/opacite50.png\"); ";
+			echo "'>\n";
+
+			echo "<legend style='border: 1px solid grey;";
+			//echo "background-image: url(\"../images/background/opacite50.png\"); ";
+			echo "background-color: white; ";
+			echo "'>Sélectionnez la (ou les) classe(s) dans laquelle/lesquelles rechercher des listes de groupes.</legend>\n";
 			//echo "<form method=\"post\" action=\"liste_pdf.php\" target='_blank' name=\"imprime_pdf\">\n";
 			echo "<form method=\"post\" action=\"".$_SERVER['PHP_SELF']."\" name=\"choix_clas_grp\">\n";
 			if ($id_choix_periode != 0) {
@@ -315,7 +335,8 @@ else {
 				// On utilisera les paramètres par défaut
 			}
 
-			echo "<input value=\"".$id_choix_periode."\" name=\"id_choix_periode\" type=\"hidden\" />\n";
+			//echo "<input value=\"".$id_choix_periode."\" name=\"id_choix_periode\" type=\"hidden\" />\n";
+			echo "<input value=\"".$id_choix_periode."\" name=\"id_periode\" type=\"hidden\" />\n";
 			echo "<br /><br /> <input value=\"Valider les enseignements\" name=\"Valider\" type=\"submit\" />\n";
 			echo "</form>\n";
 
@@ -351,8 +372,14 @@ if ($id_choix_periode != 0) {
 		
 		// sélection multiple avec choix de la période
 		echo "<div style=\"text-align: center;\">\n";
-		echo "   <fieldset>\n
-		<legend>Sélectionnez le (ou les) enseignement(s) pour lesquels vous souhaitez imprimer les listes.</legend>\n";
+		echo "<fieldset style='border: 1px solid grey;";
+		echo "background-image: url(\"../images/background/opacite50.png\"); ";
+		echo "'>\n";
+
+		echo "<legend style='border: 1px solid grey;";
+		//echo "background-image: url(\"../images/background/opacite50.png\"); ";
+		echo "background-color: white; ";
+		echo "'>Sélectionnez le (ou les) enseignement(s) pour lesquels vous souhaitez imprimer les listes.</legend>\n";
 		
 		//echo "<form method=\"post\" action=\"liste_pdf.php\" name=\"imprime_pdf\">\n";
 		echo "<form method=\"post\" action=\"liste_pdf.php\" target='_blank' name=\"imprime_pdf2\">\n";
@@ -402,6 +429,12 @@ if ($id_choix_periode != 0) {
 	</fieldset>\n
 	</div>";
 }
+
+echo "<br />
+<p style='text-indent:-4em; margin-left:4em;'><em>NOTE&nbsp;:</em> Vous pouvez définir plusieurs modèles de grille en suivant le lien <a href='./parametres_impression_pdf.php'>Régler les paramètres du PDF</a>.<br />
+Un tableau entièrement quadrillé peut permettre de pointer des oublis, de noter des prises de parole,...<br />
+Un tableau avec deux ou trois colonnes pour par exemple Nom, Moyenne et Avis (<em>avec une colonne large pour l'avis<em>) peut être pratique pour le ".getSettingValue('prof_suivi')." afin de demander à ses collègues un bref compte-rendu avant une rencontre parents/professeurs.</p>\n";
+
 // Fin de sélection multiple avec choix de la période.
 require("../lib/footer.inc.php");
 ?>

@@ -1,7 +1,7 @@
 <?php
 /*
  *
- * Copyright 2001, 2011 Thomas Belliard, Laurent Delineau, Edouard Hue, Eric Lebrun, Gabriel Fischer
+ * Copyright 2001, 2012 Thomas Belliard, Laurent Delineau, Edouard Hue, Eric Lebrun, Gabriel Fischer
  *
  * This file is part of GEPI.
  *
@@ -381,7 +381,22 @@ if (isset($_POST['notes']) and $valide_form=='yes') {
         if ($contenu_cor == '') {$contenu_cor="...";}
 
         if (!isset($msg_error_date)) {
-          if (isset($id_ct))  {
+          if (isset($id_ct)) {
+			// 20130727:
+			$contenu_precedent="";
+			$sql="SELECT * FROM ct_devoirs_entry WHERE id_ct='$id_ct';";
+			//echo "$sql<br />";
+			$req = mysql_query($sql);
+			if(mysql_num_rows($req)>0) {
+				$contenu_precedent=mysql_result($req, 0, 'contenu');
+				if($contenu_precedent!=$contenu_cor) {
+					$date_modif=strftime("%Y-%m-%d %H:%M:%S");
+					$sql="UPDATE ct_devoirs_faits SET etat='', commentaire='Le professeur a modifié la notice de travail à faire ($date_modif).', date_modif='".$date_modif."' WHERE id_ct='$id_ct';";
+					//echo "$sql<br />";
+					$update=mysql_query($sql);
+				}
+			}
+
             // Modification d'un devoir
             $sql="UPDATE ct_devoirs_entry SET contenu = '$contenu_cor', id_login='".$_SESSION['login']."', date_ct='$date_travail_a_faire'";
 			if((isset($date_visibilite_eleve))&&($date_visibilite_mal_formatee=="n")) {$sql.=", date_visibilite_eleve='$date_visibilite_eleve'";}
@@ -476,7 +491,13 @@ if ($test_cahier_texte != 0) {
     // Il s'agit d'une nouvelle notice
     $contenu = '';
 }
-
+/*
+// PB: Cela fait sauter le mini-calendrier...
+$style_specifique[] = "lib/DHTMLcalendar/calendarstyle";
+$javascript_specifique[] = "lib/DHTMLcalendar/calendar";
+$javascript_specifique[] = "lib/DHTMLcalendar/lang/calendar-fr";
+$javascript_specifique[] = "lib/DHTMLcalendar/calendar-setup";
+*/
 // On met le header en petit par défaut
 $_SESSION['cacher_header'] = "y";
 //**************** EN-TETE *****************
@@ -519,33 +540,38 @@ if (empty($groups)) {
 }
 	$a = 1;
 foreach($groups as $group) {
-        //echo "<b>";
-        if ($group["id"] == $current_group["id"]) {
-           echo "<p style=\"background-color: silver; padding: 2px; border: 1px solid black; font-weight: bold;\">" . $group["description"] . "&nbsp;-&nbsp;(";
-            $str = null;
-            foreach ($group["classes"]["classes"] as $classe) {
-                $str .= $classe["classe"] . ", ";
-            }
-            $str = mb_substr($str, 0, -2);
-            echo $str . ")&nbsp;</p>\n";
-        } else {
-        	echo "<span style=\"font-weight: bold;\">";
-           echo "<a href=\"index.php?id_groupe=". $group["id"] ."&amp;year=$year&amp;month=$month&amp;day=$day&amp;edit_devoir=$edit_devoir\">";
-           echo $group["name"] . "&nbsp;-&nbsp;(";
-            $str = null;
-            foreach ($group["classes"]["classes"] as $classe) {
-                $str .= $classe["classe"] . ", ";
-            }
-            $str = mb_substr($str, 0, -2);
-            echo $str . ")</a>&nbsp;</span>\n";
-        }
-        //echo "</b>\n";
-        if ($a == 2) {
-        	echo "<br />\n";
-        	$a = 1;
-        } else {
+	$sql="SELECT 1=1 FROM j_groupes_visibilite WHERE id_groupe='".$group['id']."' AND domaine='cahier_texte' AND visible='n';";
+	//echo "$sql<br />\n";
+	$test_grp_visib=mysql_query($sql);
+	if(mysql_num_rows($test_grp_visib)==0) {
+		//echo "<b>";
+		if ($group["id"] == $current_group["id"]) {
+		   echo "<p style=\"background-color: silver; padding: 2px; border: 1px solid black; font-weight: bold;\">" . $group["description"] . "&nbsp;-&nbsp;(";
+			$str = null;
+			foreach ($group["classes"]["classes"] as $classe) {
+				$str .= $classe["classe"] . ", ";
+			}
+			$str = mb_substr($str, 0, -2);
+			echo $str . ")&nbsp;</p>\n";
+		} else {
+			echo "<span style=\"font-weight: bold;\">";
+		   echo "<a href=\"index.php?id_groupe=". $group["id"] ."&amp;year=$year&amp;month=$month&amp;day=$day&amp;edit_devoir=$edit_devoir\">";
+		   echo $group["name"] . "&nbsp;-&nbsp;(";
+			$str = null;
+			foreach ($group["classes"]["classes"] as $classe) {
+				$str .= $classe["classe"] . ", ";
+			}
+			$str = mb_substr($str, 0, -2);
+			echo $str . ")</a>&nbsp;</span>\n";
+		}
+		//echo "</b>\n";
+		if ($a == 2) {
+			echo "<br />\n";
+			$a = 1;
+		} else {
 			$a = 2;
 		}
+	}
 }
 // Fin Affichage des différents groupes du professeur
 // **********************************************
@@ -578,10 +604,10 @@ if ($id_groupe != null) {
 	if ($delai > 0) {
 		$cr_cours = "<p style=\"border: 1px solid grey; background-color: ".$color_fond_notices["c"]."; font-weight: bold;\">
 			<a href=\"index.php?year=$year&amp;month=$month&amp;day=$day&amp;id_groupe=" . $current_group["id"] ."\" title=\"Cr&eacute;er/modifier les comptes rendus de s&eacute;ance de cours\">
-			Comptes rendus de séance</a></p>\n";
+			Passer à la saisie des<br />Comptes rendus de séance</a></p>\n";
 		$travaux_perso = "<p style=\"border: 1px solid grey; background-color: ".$color_fond_notices["t"]."; font-weight: bold;\">
 			<a href=\"index.php?edit_devoir=yes&amp;year=$year&amp;month=$month&amp;day=$day&amp;id_groupe=". $current_group["id"] ."\" title=\"Cr&eacute;er/modifier les notifications de travaux personnels &agrave; faire\">
-			Travaux personnels à effectuer</a></p>\n";
+			Passer à la saisie des<br />Travaux personnels à effectuer</a></p>\n";
 		// Si la notice d'info est en modification, on affiche les deux liens
 		if (isset($info)) {
 			echo $cr_cours.$travaux_perso;
@@ -1022,7 +1048,7 @@ $appel_cahier_texte_liste = mysql_query("SELECT * FROM ct_entry WHERE (id_groupe
 //if (mysql_num_rows($appel_cahier__liste) > 1) {
 if (mysql_num_rows($appel_cahier_texte_liste) > 1) {
     $cpt_compte_rendu_liste = "1";
-    While ( $appel_cahier_texte_donne = mysql_fetch_array ($appel_cahier_texte_liste)) {
+    while ( $appel_cahier_texte_donne = mysql_fetch_array ($appel_cahier_texte_liste)) {
         if ($appel_cahier_texte_donne['id_ct'] == $id_ct) {$num_notice = $cpt_compte_rendu_liste;}
         $cpt_compte_rendu_liste++;
     }
@@ -1036,6 +1062,10 @@ if (mysql_num_rows($appel_cahier_texte_liste) > 1) {
 	  $contenu ='';
   }
 }
+
+echo "<div style=\"position:absolute;top:310px;left:30%;border:2px solid black;background-color:".$color_fond_notices[$type_couleur].";width:610px;height:20px;text-align:center;\">
+	<span style='font-weight:bold'>Saisie ".(($type_couleur == "t") ? "des Travaux personnels à effectuer" : "du compte-rendu de séance")."</span>
+</div>\n";
 
 // ======================= Correctif Pascal Fautrero : permet d'afficher la fenêtre de saisie dans une fenêtre flottante
 
@@ -1101,8 +1131,9 @@ else if (isset($edit_devoir)) {
     include("../lib/calendrier/calendrier.class.php");
     $cal = new Calendrier("mef", "display_date");
     $temp = "A faire pour le : ";
-    $temp .= "<input type='text' name = 'display_date' size='10' value = \"".date("d",$today)."/".date("m",$today)."/".date("Y",$today)."\" />\n";
+    $temp .= "<input type='text' name = 'display_date' id= 'display_date' size='10' value = \"".date("d",$today)."/".date("m",$today)."/".date("Y",$today)."\" onKeyDown=\"clavier_date(this.id,event);\" AutoComplete=\"off\" />\n";
     $temp .=  "<a href=\"#calend\" onClick=\"".$cal->get_strPopup('../lib/calendrier/pop.calendrier.php', 350, 170)."\"><img src=\"../lib/calendrier/petit_calendrier.gif\" border=\"0\" alt=\"calendrier\"/></a>\n";
+    //$temp .= img_calendrier_js("display_date", "img_bouton_display_date");;
 } else {
     $temp = strftime("%A %d %B %Y", $today);
 } ?>

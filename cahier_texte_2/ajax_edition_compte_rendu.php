@@ -180,11 +180,25 @@ echo ("<select id=\"id_groupe_colonne_droite\" onChange=\"javascript:
 echo "<option value='-1'>choisissez un groupe</option>\n";
 $groups = $utilisateur->getGroupes();
 foreach ($groups as $group_iter) {
-	echo "<option id='colonne_droite_select_group_option_".$group_iter->getId()."' value='".$group_iter->getId()."'";
-	if ($groupe->getId() == $group_iter->getId()) echo " SELECTED ";
-	echo ">";
-	echo $group_iter->getDescriptionAvecClasses();
-	echo "</option>\n";
+	$sql="SELECT 1=1 FROM j_groupes_visibilite WHERE id_groupe='".$group_iter->getId()."' AND domaine='cahier_texte' AND visible='n';";
+	$test_grp_visib=mysql_query($sql);
+	if(mysql_num_rows($test_grp_visib)==0) {
+		echo "<option id='colonne_droite_select_group_option_".$group_iter->getId()."' value='".$group_iter->getId()."'";
+		if ($groupe->getId() == $group_iter->getId()) echo " SELECTED ";
+
+		echo " title=\"".$group_iter->getName()." - ".$group_iter->getDescriptionAvecClasses()." (";
+		$cpt_prof=0;
+		foreach($group_iter->getProfesseurs() as $prof) {
+			if($cpt_prof>0) {echo ", ";}
+			echo casse_mot($prof->getNom(),"maj")." ".casse_mot($prof->getPrenom(),"majf2");
+			$cpt_prof++;
+		}
+		echo ").\"";
+
+		echo ">";
+		echo $group_iter->getDescriptionAvecClasses();
+		echo "</option>\n";
+	}
 }
 echo "</select>&nbsp;&nbsp;\n";
 //fin affichage des groupes
@@ -224,6 +238,20 @@ if(file_exists("./archives.php")) {
 	echo "<button style='background-color:bisque' onclick=\"javascript:
 						getWinArchives().setAjaxContent('./archives.php',{});
 					\">Archives</button>\n";
+}
+
+echo "<a href=\"javascript:insere_texte_dans_ckeditor(document.getElementById('div_tableau_eleves').innerHTML)\" title='Insérer un tableau de la liste des élèves dans le texte de la notice'><img src='../images/icons/tableau.png' width='16' height='16' alt='Insérer un tableau de la liste des élèves dans le texte de la notice' /></a>";
+
+if(getSettingAOui('cdt_afficher_volume_docs_joints')) {
+	$volume_cdt_groupe=volume_docs_joints($groupe->getId());
+	if($volume_cdt_groupe!=0) {
+		$volume_cdt_groupe_cr=volume_docs_joints($groupe->getId(), "compte_rendus");
+		$volume_cdt_groupe_cr_h=volume_human($volume_cdt_groupe_cr);
+		$volume_cdt_groupe_h=volume_human($volume_cdt_groupe);
+		$info_volume=$volume_cdt_groupe_cr_h."/".$volume_cdt_groupe_h;
+		//mb_strlen($info_volume)
+		echo "<div style='float:right; width:10em; text-align:center; background: ".$color_fond_notices[$type_couleur].";' title=\"Les documents joints aux compte-rendus occupent $volume_cdt_groupe_cr_h sur un total de $volume_cdt_groupe_h pour l'enseignement de ".$groupe->getName()." ".$groupe->getDescriptionAvecClasses().".\">".$info_volume."</div>";
+	}
 }
 echo "<br /><br />\n";
 
@@ -472,6 +500,9 @@ if ($succes_modification == 'oui') {$label_enregistrer='Succès';}
 				if(preg_match("/(png|gif|jpg)$/i",$document->getEmplacement())) {
 					echo insere_lien_insertion_image_dans_ckeditor($document->getEmplacement());
 				}
+				elseif(preg_match("/ggb$/i",$document->getEmplacement())) {
+					echo insere_lien_insertion_lien_geogebra_dans_ckeditor($document->getTitre(), $document->getEmplacement());
+				}
 
 				echo "
 							<a href='".$document->getEmplacement()."' target=\"_blank\">".$document->getTitre()."</a>
@@ -584,4 +615,9 @@ echo "<script type='text/javascript'>
 //echo "<a href=\"#\" onclick=\"javascript: document.getElementById('contenu').value=document.getElementById('contenu').value+'TRUC'; return false;\">CLIC</a>";
 //echo "<a href=\"#\" onclick=\"javascript: document.getElementById('contenu').value='TRUC'; return false;\">CLIC</a>";
 //echo "<a href=\"#\" onclick=\"javascript: alert(document.getElementById('contenu').value); return false;\">CLOC</a>";
-			?>
+
+echo "<div id='div_tableau_eleves' style='display:none'>\n";
+echo tableau_html_eleves_du_groupe($id_groupe, 3);
+echo "</div>\n";
+
+?>

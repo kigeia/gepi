@@ -168,21 +168,20 @@ function traiteEleve($eleve,$date_debut, $date_fin, $justifie_col, $donneeBrut, 
 		  $donnees[$eleve_id]['traitement'][] = $traiteEleve_col->distinct()->count();
 		} else {
 		  // Décompte en 1/2 journées
-		  $propel_traitEleveDemi = AbsenceEleveSaisieQuery::create()
-			->filterByEleveId($eleve_id)
-			->filterByPlageTemps($date_debut,$date_fin )
-			->orderByDebutAbs()
-			->useJTraitementSaisieEleveQuery()
-			  ->useAbsenceEleveTraitementQuery()
-				->filterByAJustificationId($justifie->getid())
-						->filterByDeletedAt(NULL)
-			  ->endUse()
-			->endUse()
-			;
-		  $traiteEleveDemi_col = $propel_traitEleveDemi->find();
-		  $traiteEleveDemi = $propel_eleve->getDemiJourneesAbsenceParCollection($traiteEleveDemi_col,$date_debut,$date_fin);
-		  $donnees[$eleve_id]['traitement'][] = $traiteEleveDemi->count();
-		  $totalDemi += $traiteEleveDemi->count();
+                    $abs_saisie_col_filtrees = $eleve->getAbsenceEleveSaisiesDecompteDemiJournees($date_debut, $date_fin);
+                    $justif_collection = new PropelCollection();
+                    foreach ($abs_saisie_col_filtrees as $saisie) {
+                        foreach ($saisie->getAbsenceEleveTraitements() as $traitement) {
+                            if ($traitement->getAJustificationId() == $justifie->getid()) {
+                                $justif_collection->add($saisie);
+                            }
+                        }
+                    }
+
+                    require_once(dirname(__FILE__)."/../orm//helpers/AbsencesEleveSaisieHelper.php");
+                    $dm = AbsencesEleveSaisieHelper::compte_demi_journee($justif_collection, $date_debut, $date_fin);
+                    $donnees[$eleve_id]['traitement'][] = $dm->count();
+                    $totalDemi += $dm->count();
 		}
 	  }
 	  $donnees[$eleve_id]['totalDemi']=$totalDemi;
@@ -604,7 +603,7 @@ include('menu_bilans.inc.php');
 	</fieldset>
   </form>
   
-  <table  class="sortable" style ="border:3px groove #aaaaaa;">
+  <table  class="sortable boireaus boireaus_alt" style ="border:3px groove #aaaaaa;">
 	<caption style ="font-size:larger;" >
 	  Justifications du
 	  <?php echo unserialize($_SESSION['statJustifie']['date_absence_eleve_debut']); ?>
@@ -645,7 +644,7 @@ include('menu_bilans.inc.php');
 	
 <?php if (count($donnees)) {
 foreach ($donnees as $donnee) { ?>
-	<tr>
+	<tr class='white_hover'>
 	  <td style ="border:1px groove #aaaaaa;">
 		<?php echo $donnee['nom']." ".$donnee['prenom']; ?>
 	  </td>

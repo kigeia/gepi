@@ -183,10 +183,7 @@ if ($notifications_col->haveToPaginate()) {
 }
 echo "Voir ";
 echo '<input type="text" name="item_per_page" size="1" value="'.$item_per_page.'"/>';
-echo "par page|  Nombre d'enregistrements : ";
-echo $notifications_col->count();
-
-echo "&nbsp;&nbsp;&nbsp;";
+echo "par page&nbsp;&nbsp;&nbsp;";
 ?>    <div id="action_bouton" dojoType="dijit.form.DropDownButton" style="display: inline">
 	<span>Action</span>
 	<div dojoType="dijit.Menu" style="display: inline">
@@ -375,7 +372,7 @@ echo '<span style="white-space: nowrap;"> ';
 //echo '<nobr>';
 echo 'Entre : <input size="13" id="filter_date_creation_notification_debut_plage" name="filter_date_creation_notification_debut_plage" value="';
 if (isFiltreRechercheParam('filter_date_creation_notification_debut_plage')) {echo getFiltreRechercheParam('filter_date_creation_notification_debut_plage');}
-echo '" />&nbsp;';
+echo '" onKeyDown="clavier_date2(this.id,event);" AutoComplete="off" />&nbsp;';
 echo '<img id="trigger_filter_date_creation_notification_debut_plage" src="../images/icons/calendrier.gif" alt="" />';
 echo '</span>';
 //echo '</nobr>';
@@ -395,7 +392,7 @@ echo '<span style="white-space: nowrap;"> ';
 //echo '<nobr>';
 echo 'Et : <input size="13" id="filter_date_creation_notification_fin_plage" name="filter_date_creation_notification_fin_plage" value="';
 if (isFiltreRechercheParam('filter_date_creation_notification_fin_plage')) {echo getFiltreRechercheParam('filter_date_creation_notification_fin_plage');}
-echo '" />&nbsp;';
+echo '" onKeyDown="clavier_date2(this.id,event);" AutoComplete="off" />&nbsp;';
 echo '<img id="trigger_filter_date_creation_notification_fin_plage" src="../images/icons/calendrier.gif" alt="" />';
 echo '</span>';
 //echo '</nobr>';

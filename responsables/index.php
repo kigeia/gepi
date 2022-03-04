@@ -301,7 +301,7 @@ echo "<p class='bold'>";
 if ($_SESSION['statut'] == 'administrateur') {
 	echo "<a href=\"../accueil_admin.php\"><img src='../images/icons/back.png' alt='Retour' class='back_link'/> Retour</a>";
 	echo " | <a href=\"modify_resp.php\">Ajouter un ".$gepiSettings['denomination_responsable']."</a>\n";
-	if(getSettingValue("import_maj_xml_sconet")==1){
+	if(getSettingValue("import_maj_xml_sconet")==1) {
 		echo " | <a href=\"maj_import.php\">Mettre à jour depuis Sconet</a>\n";
 	}
 
@@ -327,6 +327,10 @@ else{
 if($_SESSION['statut']=="scolarite") {
 	echo " | <a href=\"modify_resp.php\">Ajouter un ".$gepiSettings['denomination_responsable']."</a>\n";
 
+	if((getSettingValue("import_maj_xml_sconet")==1)&&(getSettingAOui('GepiAccesMajSconetScol'))) {
+		echo " | <a href=\"maj_import.php\">Mettre à jour depuis Sconet</a>\n";
+	}
+
 	$sql="SELECT 1=1 FROM utilisateurs WHERE statut='responsable';";
 	$test_resp=mysql_query($sql);
 	if(mysql_num_rows($test_resp)>0) {
@@ -351,11 +355,13 @@ if(!isset($order_by)) {$order_by = "nom,prenom";$num_resp=1;}
 
 $cpt=0;
 
+//debug_var();
+
 unset($chaine_recherche);
 if(!isset($val_rech)) {$val_rech="";}
 //if(isset($val_rech)){
 $chaine_info_recherche="";
-if($val_rech!=""){
+if(($val_rech!="")&&(!isset($_GET['retour_index']))) {
 	//echo "\$val_rech=$val_rech<br />";
 	//$order_by=="nom,prenom";
 	$limit="TOUS";
@@ -383,13 +389,17 @@ if($val_rech!=""){
 				break;
 		}
 
+		// Pour les recherches alternatives proposées quand on ne trouve personne dans la catégorie choisie:
+		$chaine_recherche_resp="rp.$crit_rech LIKE '$valeur_cherchee'";
+		$chaine_recherche_ele="e.$crit_rech LIKE '$valeur_cherchee'";
+
 		switch($champ_rech){
 			case "resp0":
 					$chaine_recherche="rp.$crit_rech LIKE '$valeur_cherchee'";
 					$num_resp=0;
 
 					//$chaine_info_recherche.="le $crit_rech de la personne non responsable $mode_rech $val_rech";
-					$chaine_info_recherche.="le $crit_rech $mode_rech $val_rech";
+					$chaine_info_recherche.="le $crit_rech du responsable non légal $mode_rech $val_rech";
 				break;
 			case "resp1":
 					$chaine_recherche="rp.$crit_rech LIKE '$valeur_cherchee'";
@@ -517,12 +527,166 @@ if($val_rech!=""){
 	}
 
 
+	// Dans le cas où la recherche ne retourne rien:
 	if($cpt==0){
-		echo "<p>Aucun ".$gepiSettings['denomination_responsable']." trouvé.</p>\n";
+		// $gepiSettings['denomination_responsables']
+		// On n'a pas forcément une recherche sur les responsables *légaux*
+
+		echo "
+<h2>Résultat de la recherche</h2>
+
+<div style='margin-left:1em;'>
+	<p style='margin-bottom:1em;'>Aucun responsable trouvé ";
+		if((isset($chaine_info_recherche))&&($chaine_info_recherche!="")) {echo "sur \"<strong>$chaine_info_recherche</strong>\"";}
+		echo ".</p>\n";
+
 		//if($chaine_recherche!="") {
 		if((isset($chaine_recherche))&&($chaine_recherche!="")) {
-			echo "<p><a href='".$_SERVER['PHP_SELF']."'>Retour à l'index ".$gepiSettings['denomination_responsables']."</a></p>\n";
+			// 20130714
+			echo "
+	<p><a href='".$_SERVER['PHP_SELF'];
+			$chaine_rech_retour="";
+			if((isset($_POST['champ_rech']))&&($_POST['champ_rech']!="")&&
+			(isset($_POST['crit_rech']))&&($_POST['crit_rech']!="")&&
+			(isset($_POST['val_rech']))&&($_POST['val_rech']!="")&&
+			(isset($_POST['mode_rech']))&&($_POST['mode_rech']!="")) {
+				$chaine_rech_retour.="?champ_rech=".$_POST['champ_rech'];
+				$chaine_rech_retour.="&amp;crit_rech=".$_POST['crit_rech'];
+				$chaine_rech_retour.="&amp;mode_rech=".$_POST['mode_rech'];
+				$chaine_rech_retour.="&amp;val_rech=".$_POST['val_rech'];
+				$chaine_rech_retour.="&amp;retour_index=y";
+				echo $chaine_rech_retour;
+			}
+			// $gepiSettings['denomination_responsables']
+			// On n'a pas forcément une recherche sur les responsables *légaux*
+			echo "'>Retourner à l'index des responsables</a></p>";
+
+			// Pour le moment, il manque des infos dans le cas où on a fait une recherche sur un resp non légal
+			if($num_resp!='0') {
+				echo "
+	<br />
+	<p>Ou effectuer la même recherche parmi les &nbsp;:</p>
+	<ul>";
+				if($num_resp!="1") {
+					$sql="SELECT DISTINCT r.pers_id FROM resp_pers rp, responsables2 r WHERE
+							rp.pers_id=r.pers_id AND
+							r.resp_legal='1' ";
+					if(isset($chaine_recherche)){
+						$sql.=" AND $chaine_recherche_resp";
+					}
+					$res1=mysql_query($sql);
+					$cpt=mysql_num_rows($res1);
+
+					echo "
+		<li title='$cpt responsable(s) trouvé(s).'><a href='".$_SERVER['PHP_SELF'];
+					$chaine_rech_retour="";
+					if((isset($_POST['champ_rech']))&&($_POST['champ_rech']!="")&&
+					(isset($_POST['crit_rech']))&&($_POST['crit_rech']!="")&&
+					(isset($_POST['val_rech']))&&($_POST['val_rech']!="")&&
+					(isset($_POST['mode_rech']))&&($_POST['mode_rech']!="")) {
+						$chaine_rech_retour.="?champ_rech=resp1";
+						$chaine_rech_retour.="&amp;crit_rech=".$_POST['crit_rech'];
+						$chaine_rech_retour.="&amp;mode_rech=".$_POST['mode_rech'];
+						$chaine_rech_retour.="&amp;val_rech=".$_POST['val_rech'];
+						$chaine_rech_retour.="&amp;debut=0";
+						$chaine_rech_retour.="&amp;limit=20";
+						//$chaine_rech_retour.="&amp;retour_index=y";
+						echo $chaine_rech_retour;
+					}
+					echo "'>responsables légaux 1</a> (<em>$cpt</em>)</li>";
+				}
+
+				if($num_resp!="2") {
+					$sql="SELECT DISTINCT r.pers_id FROM resp_pers rp, responsables2 r WHERE
+							rp.pers_id=r.pers_id AND
+							r.resp_legal='2' ";
+					if(isset($chaine_recherche_resp)){
+						$sql.=" AND $chaine_recherche_resp";
+					}
+					$res1=mysql_query($sql);
+					$cpt=mysql_num_rows($res1);
+
+					echo "
+		<li title='$cpt responsable(s) trouvé(s).'><a href='".$_SERVER['PHP_SELF'];
+					$chaine_rech_retour="";
+					if((isset($_POST['champ_rech']))&&($_POST['champ_rech']!="")&&
+					(isset($_POST['crit_rech']))&&($_POST['crit_rech']!="")&&
+					(isset($_POST['val_rech']))&&($_POST['val_rech']!="")&&
+					(isset($_POST['mode_rech']))&&($_POST['mode_rech']!="")) {
+						$chaine_rech_retour.="?champ_rech=resp2";
+						$chaine_rech_retour.="&amp;crit_rech=".$_POST['crit_rech'];
+						$chaine_rech_retour.="&amp;mode_rech=".$_POST['mode_rech'];
+						$chaine_rech_retour.="&amp;val_rech=".$_POST['val_rech'];
+						$chaine_rech_retour.="&amp;debut=0";
+						$chaine_rech_retour.="&amp;limit=20";
+						//$chaine_rech_retour.="&amp;retour_index=y";
+						echo $chaine_rech_retour;
+					}
+					echo "'>responsables légaux 2</a> (<em>$cpt</em>)</li>";
+				}
+
+				if($num_resp!="0") {
+					$sql="SELECT DISTINCT r.pers_id FROM resp_pers rp, responsables2 r WHERE
+							rp.pers_id=r.pers_id AND
+							r.resp_legal='0' ";
+					if(isset($chaine_recherche_resp)){
+						$sql.=" AND $chaine_recherche_resp";
+					}
+					$res1=mysql_query($sql);
+					$cpt=mysql_num_rows($res1);
+
+					echo "
+		<li title='$cpt responsable(s) trouvé(s).'><a href='".$_SERVER['PHP_SELF'];
+					$chaine_rech_retour="";
+					if((isset($_POST['champ_rech']))&&($_POST['champ_rech']!="")&&
+					(isset($_POST['crit_rech']))&&($_POST['crit_rech']!="")&&
+					(isset($_POST['val_rech']))&&($_POST['val_rech']!="")&&
+					(isset($_POST['mode_rech']))&&($_POST['mode_rech']!="")) {
+						$chaine_rech_retour.="?champ_rech=resp0&amp;num_resp=0";
+						$chaine_rech_retour.="&amp;crit_rech=".$_POST['crit_rech'];
+						$chaine_rech_retour.="&amp;mode_rech=".$_POST['mode_rech'];
+						$chaine_rech_retour.="&amp;val_rech=".$_POST['val_rech'];
+						$chaine_rech_retour.="&amp;debut=0";
+						$chaine_rech_retour.="&amp;limit=20";
+						//$chaine_rech_retour.="&amp;retour_index=y";
+						echo $chaine_rech_retour;
+					}
+					echo "'>responsables non légaux</a> (<em>$cpt</em>)</li>";
+				}
+
+				if($num_resp!="ele") {
+					$sql="SELECT DISTINCT r.ele_id,e.nom,e.prenom,e.login FROM responsables2 r, eleves e WHERE e.ele_id=r.ele_id ";
+					if(isset($chaine_recherche_ele)){
+						$sql.=" AND $chaine_recherche_ele";
+					}
+					$res1=mysql_query($sql);
+					$cpt=mysql_num_rows($res1);
+
+					echo "
+		<li title='$cpt élève(s) trouvé(s).'><a href='".$_SERVER['PHP_SELF'];
+					$chaine_rech_retour="";
+					if((isset($_POST['champ_rech']))&&($_POST['champ_rech']!="")&&
+					(isset($_POST['crit_rech']))&&($_POST['crit_rech']!="")&&
+					(isset($_POST['val_rech']))&&($_POST['val_rech']!="")&&
+					(isset($_POST['mode_rech']))&&($_POST['mode_rech']!="")) {
+						$chaine_rech_retour.="?champ_rech=eleves";
+						$chaine_rech_retour.="&amp;crit_rech=".$_POST['crit_rech'];
+						$chaine_rech_retour.="&amp;mode_rech=".$_POST['mode_rech'];
+						$chaine_rech_retour.="&amp;val_rech=".$_POST['val_rech'];
+						$chaine_rech_retour.="&amp;debut=0";
+						$chaine_rech_retour.="&amp;limit=20";
+						//$chaine_rech_retour.="&amp;retour_index=y";
+						echo $chaine_rech_retour;
+					}
+					echo "'>élèves</a> (<em>$cpt</em>)</li>";
+				}
+
+				echo "
+	</ul>\n";
+			}
 		}
+		echo "
+</div>";
 		require("../lib/footer.inc.php");
 		die();
 	}
@@ -649,7 +813,7 @@ echo "		}
 
 if($num_resp==0){
 	echo "<div style='text-align:center;'>\n";
-	echo "<a href='#' onClick=\"document.getElementById('div_rech').style.display=''; document.getElementById('val_rech').focus(); return false;\">Chercher</a>\n";
+	echo "<a href='#' onClick=\"document.getElementById('div_rech').style.display=''; document.getElementById('val_rech').focus(); return false;\" title='Chercher un responsable'><img src='../images/icons/chercher.png' width='16' height='16' alt='Chercher' />&nbsp;Chercher</a>\n";
 	echo "<div id='div_rech' align='center'>\n";
 	echo "<table border='0' summary='Recherche'><tr><td>les personnnes dont le \n";
 	echo "<input type='hidden' name='champ_rech' value='resp0' />\n";
@@ -723,20 +887,32 @@ if($num_resp==0){
 }
 else{
 	echo "<div style='text-align:center;'>\n";
-	echo "<a href='#' onClick=\"document.getElementById('div_rech').style.display=''; document.getElementById('val_rech').focus(); return false;\">Chercher</a>\n";
+	echo "<a href='#' onClick=\"document.getElementById('div_rech').style.display=''; document.getElementById('val_rech').focus(); return false;\" title='Chercher un responsable'><img src='../images/icons/chercher.png' width='16' height='16' alt='Chercher' />&nbsp;Chercher</a>\n";
 	echo "<div id='div_rech' align='center'>\n";
 	echo "<table border='0' summary='Recherche'><tr><td>parmi les </td>\n";
 	echo "<td>\n";
 	echo "<label for='champ_rech_resp1' style='cursor: pointer;'>\n";
-	echo "<input type='radio' name='champ_rech' id='champ_rech_resp1' value='resp1' checked /> responsables (<i>légal 1</i>)\n";
+	echo "<input type='radio' name='champ_rech' id='champ_rech_resp1' value='resp1' ";
+	if((!isset($champ_rech))||($champ_rech=="")||($champ_rech=="resp1")) {
+		echo "checked ";
+	}
+	echo "/> responsables (<i>légal 1</i>)\n";
 	echo "</label>\n";
 	echo "<br />\n";
 	echo "<label for='champ_rech_resp2' style='cursor: pointer;'>\n";
-	echo "<input type='radio' name='champ_rech' id='champ_rech_resp2' value='resp2' /> responsables (<i>légal 2</i>)\n";
+	echo "<input type='radio' name='champ_rech' id='champ_rech_resp2' value='resp2' ";
+	if((isset($champ_rech))&&($champ_rech=="resp2")) {
+		echo "checked ";
+	}
+	echo "/> responsables (<i>légal 2</i>)\n";
 	echo "</label>\n";
 	echo "<br />\n";
 	echo "<label for='champ_rech_eleves' style='cursor: pointer;'>\n";
-	echo "<input type='radio' name='champ_rech' id='champ_rech_eleves' value='eleves' /> élèves\n";
+	echo "<input type='radio' name='champ_rech' id='champ_rech_eleves' value='eleves' ";
+	if((isset($champ_rech))&&($champ_rech=="eleves")) {
+		echo "checked ";
+	}
+	echo "/> élèves\n";
 	echo "</label>\n";
 	echo "</td>\n";
 	echo "<td>\n";
@@ -939,6 +1115,9 @@ if("$num_resp"=="0"){
 
 		echo "<table class='boireaus' align='center' summary='Responsables'>\n";
 
+		if($_SESSION['statut']=='administrateur') {$avec_lien="y";}
+		else {$avec_lien="n";}
+
 		while($lig1=mysql_fetch_object($res1)){
 			//$sql="SELECT 1=1 FROM responsables2 r WHERE r.pers_id='$lig1->pers_id'";
 			//$test=mysql_query($sql);
@@ -968,8 +1147,11 @@ if("$num_resp"=="0"){
 				echo "$lig1->nom $lig1->prenom</a>\n";
 
 				if($lig1->login!="") {
-					$lien_image_compte_utilisateur=lien_image_compte_utilisateur($lig1->login, "responsable", "", "n");
-					if($lien_image_compte_utilisateur!="") {echo " ".$lien_image_compte_utilisateur;}
+					$lien_image_compte_utilisateur=lien_image_compte_utilisateur($lig1->login, "responsable", "_blank", $avec_lien);
+					if($lien_image_compte_utilisateur!="") {
+						echo " ".$lien_image_compte_utilisateur;
+						echo temoin_compte_sso($lig1->login);
+					}
 				}
 
 				echo "</td>\n";
@@ -1130,6 +1312,8 @@ else{
 		if(mysql_num_rows($res1)){
 			$alt=1;
 			$cpt=0;
+			if($_SESSION['statut']=='administrateur') {$avec_lien="y";}
+			else {$avec_lien="n";}
 			while($lig1=mysql_fetch_object($res1)){
 
 				if($cpt%10==0){
@@ -1178,8 +1362,11 @@ else{
 							echo "$lig2->nom $lig2->prenom</a>\n";
 
 							if($lig2->login!="") {
-								$lien_image_compte_utilisateur=lien_image_compte_utilisateur($lig2->login, "responsable", "", "n");
-								if($lien_image_compte_utilisateur!="") {echo " ".$lien_image_compte_utilisateur;}
+								$lien_image_compte_utilisateur=lien_image_compte_utilisateur($lig2->login, "responsable", "_blank", $avec_lien);
+								if($lien_image_compte_utilisateur!="") {
+									echo " ".$lien_image_compte_utilisateur;
+									echo temoin_compte_sso($lig2->login);
+								}
 							}
 							echo "</td>\n";
 
@@ -1217,8 +1404,11 @@ else{
 									}
 									echo "<td style='text-align:center;'><a href='../eleves/modify_eleve.php?eleve_login=$lig3->login&amp;quelles_classes=toutes&amp;order_type=nom,prenom'>$lig3->nom $lig3->prenom</a>";
 
-									$lien_image_compte_utilisateur=lien_image_compte_utilisateur($lig3->login, "eleve", "", "n");
-									if($lien_image_compte_utilisateur!="") {echo " ".$lien_image_compte_utilisateur;}
+									$lien_image_compte_utilisateur=lien_image_compte_utilisateur($lig3->login, "eleve", "_blank", $avec_lien);
+									if($lien_image_compte_utilisateur!="") {
+										echo " ".$lien_image_compte_utilisateur;
+										echo temoin_compte_sso($lig3->login);
+									}
 
 									echo "<br />".liens_class_from_ele_login($lig3->login);
 									echo "</td>\n";
@@ -1246,8 +1436,11 @@ else{
 											echo "$lig4->nom $lig4->prenom</a>\n";
 
 											if($lig4->login!="") {
-												$lien_image_compte_utilisateur=lien_image_compte_utilisateur($lig4->login, "responsable", "", "n");
-												if($lien_image_compte_utilisateur!="") {echo " ".$lien_image_compte_utilisateur;}
+												$lien_image_compte_utilisateur=lien_image_compte_utilisateur($lig4->login, "responsable", "_blank", $avec_lien);
+												if($lien_image_compte_utilisateur!="") {
+													echo " ".$lien_image_compte_utilisateur;
+													echo temoin_compte_sso($lig4->login);
+												}
 											}
 
 											echo "</td>\n";
@@ -1339,6 +1532,8 @@ else{
 									ORDER BY $order_by";
 				$res2=mysql_query($sql);
 				if(mysql_num_rows($res2)>0){
+					if($_SESSION['statut']=='administrateur') {$avec_lien="y";}
+					else {$avec_lien="n";}
 					while($lig2=mysql_fetch_object($res2)){
 						$sql="SELECT DISTINCT e.ele_id,e.login,e.nom,e.prenom FROM responsables2 r, eleves e WHERE r.pers_id='$lig1->pers_id' AND r.resp_legal='$num_resp' AND r.ele_id=e.ele_id";
 						$res3=mysql_query($sql);
@@ -1372,8 +1567,11 @@ else{
 											echo "$lig4->nom $lig4->prenom</a>\n";
 
 											if($lig4->login!="") {
-												$lien_image_compte_utilisateur=lien_image_compte_utilisateur($lig4->login, "responsable", "", "n");
-												if($lien_image_compte_utilisateur!="") {echo " ".$lien_image_compte_utilisateur;}
+												$lien_image_compte_utilisateur=lien_image_compte_utilisateur($lig4->login, "responsable", "_blank", $avec_lien);
+												if($lien_image_compte_utilisateur!="") {
+													echo " ".$lien_image_compte_utilisateur;
+													echo temoin_compte_sso($lig4->login);
+												}
 											}
 
 											echo "</td>\n";
@@ -1408,8 +1606,11 @@ else{
 
 									echo "<td style='text-align:center;'><a href='../eleves/modify_eleve.php?eleve_login=$lig3->login&amp;quelles_classes=toutes&amp;order_type=nom,prenom'>$lig3->nom $lig3->prenom</a>";
 
-									$lien_image_compte_utilisateur=lien_image_compte_utilisateur($lig3->login, "eleve", "", "n");
-									if($lien_image_compte_utilisateur!="") {echo " ".$lien_image_compte_utilisateur;}
+									$lien_image_compte_utilisateur=lien_image_compte_utilisateur($lig3->login, "eleve", "_blank", $avec_lien);
+									if($lien_image_compte_utilisateur!="") {
+										echo " ".$lien_image_compte_utilisateur;
+										echo temoin_compte_sso($lig3->login);
+									}
 
 									echo "</td>\n";
 
@@ -1427,8 +1628,11 @@ else{
 										echo "$lig2->nom $lig2->prenom</a>\n";
 
 										if($lig2->login!="") {
-											$lien_image_compte_utilisateur=lien_image_compte_utilisateur($lig2->login, "responsable", "", "n");
-											if($lien_image_compte_utilisateur!="") {echo " ".$lien_image_compte_utilisateur;}
+											$lien_image_compte_utilisateur=lien_image_compte_utilisateur($lig2->login, "responsable", "_blank", $avec_lien);
+											if($lien_image_compte_utilisateur!="") {
+												echo " ".$lien_image_compte_utilisateur;
+												echo temoin_compte_sso($lig2->login);
+											}
 										}
 
 										echo "</td>\n";
@@ -1541,6 +1745,8 @@ else{
 		if(mysql_num_rows($res1)>0){
 			$cpt=0;
 			$alt=1;
+			if($_SESSION['statut']=='administrateur') {$avec_lien="y";}
+			else {$avec_lien="n";}
 			while($lig1=mysql_fetch_object($res1)){
 
 				if($cpt%10==0){
@@ -1578,8 +1784,11 @@ else{
 						echo "$lig2->nom $lig2->prenom</a>\n";
 
 						if($lig2->login!="") {
-							$lien_image_compte_utilisateur=lien_image_compte_utilisateur($lig2->login, "responsable", "", "n");
-							if($lien_image_compte_utilisateur!="") {echo " ".$lien_image_compte_utilisateur;}
+							$lien_image_compte_utilisateur=lien_image_compte_utilisateur($lig2->login, "responsable", "_blank", $avec_lien);
+							if($lien_image_compte_utilisateur!="") {
+								echo " ".$lien_image_compte_utilisateur;
+								echo temoin_compte_sso($lig2->login);
+							}
 						}
 
 						echo "</td>\n";
@@ -1607,8 +1816,11 @@ else{
 
 				echo "<td style='text-align:center;'><a href='../eleves/modify_eleve.php?eleve_login=$lig1->login&amp;quelles_classes=toutes&amp;order_type=nom,prenom'>$lig1->nom $lig1->prenom</a>";
 
-				$lien_image_compte_utilisateur=lien_image_compte_utilisateur($lig1->login, "eleve", "", "n");
-				if($lien_image_compte_utilisateur!="") {echo " ".$lien_image_compte_utilisateur;}
+				$lien_image_compte_utilisateur=lien_image_compte_utilisateur($lig1->login, "eleve", "_blank", $avec_lien);
+				if($lien_image_compte_utilisateur!="") {
+					echo " ".$lien_image_compte_utilisateur;
+					echo temoin_compte_sso($lig1->login);
+				}
 
 				echo "</td>\n";
 
@@ -1628,8 +1840,11 @@ else{
 					echo "$lig3->nom $lig3->prenom</a>\n";
 
 					if($lig3->login!="") {
-						$lien_image_compte_utilisateur=lien_image_compte_utilisateur($lig3->login, "responsable", "", "n");
-						if($lien_image_compte_utilisateur!="") {echo " ".$lien_image_compte_utilisateur;}
+						$lien_image_compte_utilisateur=lien_image_compte_utilisateur($lig3->login, "responsable", "_blank", $avec_lien);
+						if($lien_image_compte_utilisateur!="") {
+							echo " ".$lien_image_compte_utilisateur;
+							echo temoin_compte_sso($lig3->login);
+						}
 					}
 
 					echo "</td>\n";

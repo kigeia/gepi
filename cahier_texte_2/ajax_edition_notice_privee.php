@@ -126,11 +126,25 @@ echo ("<select id=\"id_groupe_colonne_droite\" onChange=\"javascript:
 echo "<option value='-1'>choisissez un groupe</option>\n";
 $groups = $utilisateur->getGroupes();
 foreach ($groups as $group_iter) {
-	echo "<option id='colonne_droite_select_group_option_".$group_iter->getId()."' value='".$group_iter->getId()."'";
-	if ($groupe->getId() == $group_iter->getId()) echo " SELECTED ";
-	echo ">";
-	echo $group_iter->getDescriptionAvecClasses();
-	echo "</option>\n";
+	$sql="SELECT 1=1 FROM j_groupes_visibilite WHERE id_groupe='".$group_iter->getId()."' AND domaine='cahier_texte' AND visible='n';";
+	$test_grp_visib=mysql_query($sql);
+	if(mysql_num_rows($test_grp_visib)==0) {
+		echo "<option id='colonne_droite_select_group_option_".$group_iter->getId()."' value='".$group_iter->getId()."'";
+		if ($groupe->getId() == $group_iter->getId()) echo " SELECTED ";
+
+		echo " title=\"".$group_iter->getName()." - ".$group_iter->getDescriptionAvecClasses()." (";
+		$cpt_prof=0;
+		foreach($group_iter->getProfesseurs() as $prof) {
+			if($cpt_prof>0) {echo ", ";}
+			echo casse_mot($prof->getNom(),"maj")." ".casse_mot($prof->getPrenom(),"majf2");
+			$cpt_prof++;
+		}
+		echo ").\"";
+
+		echo ">";
+		echo $group_iter->getDescriptionAvecClasses();
+		echo "</option>\n";
+	}
 }
 echo "</select>\n&nbsp;&nbsp;\n";
 //fin affichage des groupes
@@ -156,6 +170,16 @@ echo " <button style='background-color:".$color_fond_notices['p']."' onclick=\"j
 echo "<button style='background-color:lightblue' onclick=\"javascript:
 						getWinBanqueTexte().setAjaxContent('./ajax_affichage_banque_texte.php',{});
 					\">Banque</button>\n";
+
+if(file_exists("./archives.php")) {
+	// Mon fichier contient juste:
+	/* <?php echo "<iframe src='../documents/archives/index.php' width='100%' height='100%'/>"; ?> */
+	echo "<button style='background-color:bisque' onclick=\"javascript:
+						getWinArchives().setAjaxContent('./archives.php',{});
+					\">Archives</button>\n";
+}
+
+echo "<a href=\"javascript:insere_texte_dans_ckeditor(document.getElementById('div_tableau_eleves').innerHTML)\" title='Insérer un tableau de la liste des élèves dans le texte de la notice'><img src='../images/icons/tableau.png' width='16' height='16' alt='Insérer un tableau de la liste des élèves dans le texte de la notice' /></a>";
 
 // Nombre de notices pour ce jour :
 $num_notice = NULL;
@@ -338,6 +362,9 @@ if ($succes_modification == 'oui') $label_enregistrer='Succès';
 </td>
 </tr>
 </table>
+
+<p style='text-indent:-4em; margin-left:4em;'><em>NOTE&nbsp;:</em> Il ne faut pas saisir en notice privée d'informations concernant des élèves en particulier.<br />
+Comme ces notices ne sont pas rattachées à un élève en particulier, il n'est pas possible d'assurer simplement le droit d'accès des parents/élèves à leurs données si elles sont inscrites en Notices privées.</p>
 <?php echo "</form>";
 echo "</fieldset>";
 
@@ -348,4 +375,9 @@ echo "<script type='text/javascript'>
 	dateChanged(calendarInstanciation);
 </script>\n";
 }
+
+echo "<div id='div_tableau_eleves' style='display:none'>\n";
+echo tableau_html_eleves_du_groupe($id_groupe, 3);
+echo "</div>\n";
+
 ?>

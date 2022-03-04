@@ -38,6 +38,11 @@ if (!checkAccess()) {
 	die();
 }
 
+if(!getSettingAOui('active_bulletins')) {
+	header("Location: ../accueil.php?msg=Module_inactif");
+	die();
+}
+
 //Initialisation
 unset($id_classe);
 $id_classe = isset($_POST["id_classe"]) ? $_POST["id_classe"] : (isset($_GET["id_classe"]) ? $_GET["id_classe"] : NULL);
@@ -47,16 +52,27 @@ $login_eleve = isset($_POST["login_eleve"]) ? $_POST["login_eleve"] : (isset($_G
 $error_login = false;
 // Quelques filtrages de départ pour pré-initialiser la variable qui nous importe ici : $login_eleve
 if ($_SESSION['statut'] == "responsable") {
-	$get_eleves = mysql_query("SELECT e.login " .
-			"FROM eleves e, resp_pers r, responsables2 re " .
-			"WHERE (" .
-			"e.ele_id = re.ele_id AND " .
-			"re.pers_id = r.pers_id AND " .
-			"r.login = '".$_SESSION['login']."' AND (re.resp_legal='1' OR re.resp_legal='2'))");
+	$sql="(SELECT e.login FROM eleves e, resp_pers r, responsables2 re 
+						WHERE (e.ele_id = re.ele_id AND 
+							re.pers_id = r.pers_id AND 
+							r.login = '".$_SESSION['login']."' AND 
+							(re.resp_legal='1' OR re.resp_legal='2')))";
+	if(getSettingAOui('GepiMemesDroitsRespNonLegaux')) {
+		$sql.=" UNION (SELECT e.login FROM eleves e, resp_pers r, responsables2 re 
+						WHERE (e.ele_id = re.ele_id AND 
+							re.pers_id = r.pers_id AND 
+							r.login = '".$_SESSION['login']."' AND 
+							re.resp_legal='0' AND
+							re.acces_sp='y'))";
+	}
+	$sql.=";";
+	//echo "$sql<br />";
+	$get_eleves = mysql_query($sql);
 
 	if (mysql_num_rows($get_eleves) == 1) {
 		// Un seul élève associé : on initialise tout de suite la variable $login_eleve
 		$login_eleve = mysql_result($get_eleves, 0);
+		//echo "$login_eleve<br />";
 	} elseif (mysql_num_rows($get_eleves) == 0) {
 		$error_login = true;
 	}
@@ -199,7 +215,7 @@ if (!isset($id_classe) and $_SESSION['statut'] != "responsable" AND $_SESSION['s
 	}
 	elseif($_SESSION['statut'] == 'professeur' and getSettingValue("GepiAccesBulletinSimpleProfToutesClasses") == "yes") {
 		// C'est un prof et l'accès "a accès aux bulletins simples des élèves de toutes les classes" est donné
-		$sql="SELECT DISTINCT c.* FROM classes c  ORDER BY c.classe";
+		$sql="SELECT DISTINCT c.* FROM classes c ORDER BY c.classe";
 	}
 	//elseif(($_SESSION['statut'] == 'cpe')&&(getSettingValue("GepiAccesReleveCpe")=='yes')){
 	elseif($_SESSION['statut'] == 'cpe' OR $_SESSION['statut'] == 'autre'){
@@ -242,11 +258,22 @@ if (!isset($id_classe) and $_SESSION['statut'] != "responsable" AND $_SESSION['s
 
 	echo "<p class=\"bold\"><a href=\"../accueil.php\"><img src='../images/icons/back.png' alt='Retour' class='back_link'/> Retour accueil</a>";
 
-	$quels_eleves = mysql_query("SELECT e.login, e.nom, e.prenom " .
+	$sql="(SELECT e.login, e.nom, e.prenom " .
 				"FROM eleves e, responsables2 re, resp_pers r WHERE (" .
 				"e.ele_id = re.ele_id AND " .
 				"re.pers_id = r.pers_id AND " .
-				"r.login = '" . $_SESSION['login'] . "' AND (re.resp_legal='1' OR re.resp_legal='2'))");
+				"r.login = '" . $_SESSION['login'] . "' AND (re.resp_legal='1' OR re.resp_legal='2')))";
+	if(getSettingAOui('GepiMemesDroitsRespNonLegaux')) {
+		$sql.=" UNION (SELECT e.login, e.nom, e.prenom FROM eleves e, resp_pers r, responsables2 re 
+						WHERE (e.ele_id = re.ele_id AND 
+							re.pers_id = r.pers_id AND 
+							r.login = '".$_SESSION['login']."' AND 
+							re.resp_legal='0' AND
+							re.acces_sp='y'))";
+	}
+	$sql.=";";
+	$quels_eleves = mysql_query($sql);
+
 
 	echo "<p>Cliquez sur le nom d'un ".$gepiSettings['denomination_eleve']." pour visualiser son bulletin simplifié :</p>";
 	while ($current_eleve = mysql_fetch_object($quels_eleves)) {
@@ -254,7 +281,6 @@ if (!isset($id_classe) and $_SESSION['statut'] != "responsable" AND $_SESSION['s
 	}
 } else if (!isset($choix_edit)) {
 	// ====================
-	// boireaus 20071207
 	// Je ne saisis pas bien comment $choix_edit peut être affecté sans register_globals=on
 	// Nulle part la variable n'a l'air récupérée en POST ou autre...
 	// ====================
@@ -262,6 +288,8 @@ if (!isset($id_classe) and $_SESSION['statut'] != "responsable" AND $_SESSION['s
 	if ($_SESSION['statut'] != "responsable" and $_SESSION['statut'] != "eleve") {
 		//echo " | <a href = \"index3.php\">Choisir une autre classe</a> ";
 
+		// =================================
+		// Formulaire de choix de la classe précédente/suivante
 		echo "<form action='".$_SERVER['PHP_SELF']."' name='form1' method='post'>\n";
 
 		echo "<p class=\"bold\"><a href=\"../accueil.php\"><img src='../images/icons/back.png' alt='Retour' class='back_link'/> Retour accueil</a>";
@@ -271,9 +299,6 @@ if (!isset($id_classe) and $_SESSION['statut'] != "responsable" AND $_SESSION['s
 			$sql = "SELECT DISTINCT c.id,c.classe FROM classes c, periodes p, j_scol_classes jsc WHERE p.id_classe = c.id  AND jsc.id_classe=c.id AND jsc.login='".$_SESSION['login']."' ORDER BY classe";
 		}
 		elseif($_SESSION['statut']=='professeur'){
-
-			//$sql="SELECT DISTINCT c.id,c.classe FROM classes c, periodes p, j_groupes_classes jgc, j_groupes_professeurs jgp WHERE p.id_classe = c.id AND jgc.id_classe=c.id AND jgp.id_groupe=jgc.id_groupe AND jgp.login='".$_SESSION['login']."' ORDER BY c.classe";
-
 			if ((getSettingValue("GepiAccesBulletinSimpleProf") == "yes")||(getSettingValue("GepiAccesBulletinSimpleProfTousEleves") == "yes")) {
 				$sql="SELECT DISTINCT c.id,c.classe FROM classes c, periodes p, j_groupes_classes jgc, j_groupes_professeurs jgp WHERE p.id_classe = c.id AND jgc.id_classe=c.id AND jgp.id_groupe=jgc.id_groupe AND jgp.login='".$_SESSION['login']."' ORDER BY c.classe";
 			}
@@ -309,32 +334,6 @@ if (!isset($id_classe) and $_SESSION['statut'] != "responsable" AND $_SESSION['s
 			$sql="SELECT DISTINCT c.* FROM classes c, periodes p WHERE p.id_classe = c.id  ORDER BY classe";
 
 		}
-		//echo "$sql<br />\n";
-		/*
-		$res_class_tmp=mysql_query($sql);
-		if(mysql_num_rows($res_class_tmp)>0){
-			$id_class_prec=0;
-			$id_class_suiv=0;
-			$temoin_tmp=0;
-			while($lig_class_tmp=mysql_fetch_object($res_class_tmp)){
-				if($lig_class_tmp->id==$id_classe){
-					$temoin_tmp=1;
-					if($lig_class_tmp=mysql_fetch_object($res_class_tmp)){
-						$id_class_suiv=$lig_class_tmp->id;
-					}
-					else{
-						$id_class_suiv=0;
-					}
-				}
-				if($temoin_tmp==0){
-					$id_class_prec=$lig_class_tmp->id;
-				}
-			}
-			if(mysql_num_rows($res_class_tmp)>1){
-				echo " | <a href = \"index3.php\">Choisir une autre classe</a> ";
-			}
-		}
-		*/
 
 		$chaine_options_classes="";
 
@@ -381,11 +380,13 @@ if (!isset($id_classe) and $_SESSION['statut'] != "responsable" AND $_SESSION['s
 		//fin ajout lien classe précédente / classe suivante
 
 		echo "</form>\n";
+		// =================================
 
 
 		$classe_eleve = mysql_query("SELECT * FROM classes WHERE id='$id_classe'");
 		$nom_classe = mysql_result($classe_eleve, 0, "classe");
 		echo "<p class='grand'>Classe de $nom_classe</p>\n";
+		echo "<p>Afficher&nbsp;:</p>\n";
 		echo "<form enctype=\"multipart/form-data\" action=\"edit_limite.php\" method=\"post\" name=\"form_choix_edit\" target=\"_blank\">\n";
 		echo "<table summary='Choix des élèves'>\n";
 		echo "<tr>\n";
@@ -395,8 +396,11 @@ if (!isset($id_classe) and $_SESSION['statut'] != "responsable" AND $_SESSION['s
 		}
 		echo "/></td>\n";
 		echo "<td><label for='choix_edit_1' style='cursor: pointer;'>Les bulletins simplifiés de tous les ".$gepiSettings['denomination_eleves']." de la classe";
-		if ($_SESSION['statut'] == "professeur" AND getSettingValue("GepiAccesBulletinSimpleProfTousEleves") != "yes" AND getSettingValue("GepiAccesBulletinSimpleProfToutesClasses") != "yes") {
-			echo " (uniquement les ".$gepiSettings['denomination_eleves']." que j'ai en cours)";
+		if((getSettingAOui('GepiAccesPPTousElevesDeLaClasse'))&&(is_pp($_SESSION['login'], $id_classe))) {
+			// Tous les élèves vont être affichés
+		}
+		elseif ($_SESSION['statut'] == "professeur" AND getSettingValue("GepiAccesBulletinSimpleProfTousEleves") != "yes" AND getSettingValue("GepiAccesBulletinSimpleProfToutesClasses") != "yes") {
+			echo " (<em>uniquement les ".$gepiSettings['denomination_eleves']." que j'ai en cours ou dont je suis ".getSettingValue('gepi_prof_suivi')."</em>)";
 		}
 		echo "</label></td></tr>\n";
 
@@ -440,7 +444,12 @@ if (!isset($id_classe) and $_SESSION['statut'] != "responsable" AND $_SESSION['s
 		echo "<select size=\"1\" name=\"login_eleve\" onclick=\"active(".$indice.")\">\n";
 
 		//if ($_SESSION['statut'] == "professeur" AND getSettingValue("GepiAccesMoyennesProfTousEleves") != "yes" AND getSettingValue("GepiAccesMoyennesProfToutesClasses") != "yes") {
-		if ($_SESSION['statut'] == "professeur" AND getSettingValue("GepiAccesBulletinSimpleProfTousEleves") != "yes" AND getSettingValue("GepiAccesBulletinSimpleProfToutesClasses") != "yes") {
+		if((getSettingAOui('GepiAccesPPTousElevesDeLaClasse'))&&(is_pp($_SESSION['login'], $id_classe))) {
+			// Tous les élèves vont être affichés
+			$sql="SELECT DISTINCT e.* FROM eleves e, j_eleves_classes j WHERE (j.id_classe = '$id_classe' and j.login=e.login) order by nom, prenom";
+		}
+		elseif ($_SESSION['statut'] == "professeur" AND getSettingValue("GepiAccesBulletinSimpleProfTousEleves") != "yes" AND getSettingValue("GepiAccesBulletinSimpleProfToutesClasses") != "yes") {
+			/*
 			$sql="SELECT DISTINCT e.* " .
 				"FROM eleves e, j_eleves_classes jec, j_eleves_groupes jeg, j_groupes_professeurs jgp " .
 				"WHERE (" .
@@ -450,8 +459,52 @@ if (!isset($id_classe) and $_SESSION['statut'] != "responsable" AND $_SESSION['s
 				"jeg.id_groupe = jgp.id_groupe AND " .
 				"jgp.login = '".$_SESSION['login']."') " .
 				"ORDER BY e.nom,e.prenom";
+			*/
+			if(is_pp($_SESSION['login'], $id_classe)) {
+				if(getSettingAOui('GepiAccesBulletinSimpleProf')) {
+					$sql="(SELECT DISTINCT e.* " .
+						"FROM eleves e, j_eleves_classes jec, j_eleves_groupes jeg, j_groupes_professeurs jgp " .
+						"WHERE (" .
+						"jec.id_classe='$id_classe' AND " .
+						"e.login = jeg.login AND " .
+						"jeg.login = jec.login AND " .
+						"jeg.id_groupe = jgp.id_groupe AND " .
+						"jgp.login = '".$_SESSION['login']."')) " .
+						"UNION (SELECT DISTINCT e.* " .
+						"FROM eleves e, j_eleves_classes jec, j_eleves_professeurs jep " .
+						"WHERE (" .
+						"jec.id_classe='$id_classe' AND " .
+						"e.login = jep.login AND " .
+						"jep.login = jec.login AND " .
+						"jep.professeur = '".$_SESSION['login']."')) ORDER BY nom,prenom;";
+					$appel_liste_eleves = mysql_query($sql);
+				}
+				else {
+					$sql="SELECT DISTINCT e.* " .
+						"FROM eleves e, j_eleves_classes jec, j_eleves_professeurs jep " .
+						"WHERE (" .
+						"jec.id_classe='$id_classe' AND " .
+						"e.login = jep.login AND " .
+						"jep.login = jec.login AND " .
+						"jep.professeur = '".$_SESSION['login']."') ORDER BY e.nom,e.prenom;";
+					$appel_liste_eleves = mysql_query($sql);
+				}
+			}
+			else {
+			    $sql="SELECT DISTINCT e.* " .
+					"FROM eleves e, j_eleves_classes jec, j_eleves_groupes jeg, j_groupes_professeurs jgp " .
+					"WHERE (" .
+					"jec.id_classe='$id_classe' AND " .
+					"e.login = jeg.login AND " .
+					"jeg.login = jec.login AND " .
+					"jeg.id_groupe = jgp.id_groupe AND " .
+					"jgp.login = '".$_SESSION['login']."') " .
+					"ORDER BY e.nom,e.prenom";
+				$appel_liste_eleves = mysql_query($sql);
+			}
+
 		} else {
-			$sql="SELECT DISTINCT e.* FROM eleves e, j_eleves_classes j WHERE (j.id_classe = '$id_classe' and j.login=e.login) order by nom";
+			$sql="SELECT DISTINCT e.* FROM eleves e, j_eleves_classes j WHERE (j.id_classe = '$id_classe' and j.login=e.login) order by nom, prenom";
 		}
 		//echo "$sql<br />\n";
 		$call_eleve = mysql_query($sql);
@@ -476,17 +529,42 @@ if (!isset($id_classe) and $_SESSION['statut'] != "responsable" AND $_SESSION['s
 		echo "</label></td></tr>\n";
 
 		echo "</table>\n";
+
 	} else {
+		// Accès parent ou élève
 		echo "<p class=\"bold\"><a href=\"../accueil.php\"><img src='../images/icons/back.png' alt='Retour' class='back_link'/> Retour accueil</a>";
+
+		if($_SESSION['statut']=='responsable') {
+			$quels_eleves = mysql_query("SELECT e.login, e.nom, e.prenom " .
+						"FROM eleves e, responsables2 re, resp_pers r WHERE (" .
+						"e.ele_id = re.ele_id AND " .
+						"re.pers_id = r.pers_id AND " .
+						"r.login = '" . $_SESSION['login'] . "' AND (re.resp_legal='1' OR re.resp_legal='2') AND e.login!='$login_eleve')");
+			while ($current_eleve = mysql_fetch_object($quels_eleves)) {
+				echo " | <a href='".$_SERVER['PHP_SELF']."?login_eleve=".$current_eleve->login."' title=\"Accéder au bulletin simplifié de ".$current_eleve->prenom." ".$current_eleve->nom."\">".$current_eleve->prenom." ".$current_eleve->nom."</a>";
+			}
+		}
+		echo "</p>\n";
 
 		$eleve = mysql_query("SELECT e.nom, e.prenom FROM eleves e WHERE e.login = '".$login_eleve."'");
 		$prenom_eleve = mysql_result($eleve, 0, "prenom");
 		$nom_eleve = mysql_result($eleve, 0, "nom");
 
-		echo "<p class='grand'>".ucfirst($gepiSettings['denomination_eleve'])." : ".$prenom_eleve." ".$nom_eleve."</p>\n";
+		echo "<p class='grand'>".casse_mot($gepiSettings['denomination_eleve'],'majf')." : ".$prenom_eleve." ".$nom_eleve."</p>\n";
 		echo "<form enctype=\"multipart/form-data\" action=\"edit_limite.php\" method=\"post\" name=\"form_choix_edit\" target=\"_blank\">\n";
-		echo "<input type=\"hidden\" name=\"choix_edit\" value=\"2\" />\n";
+
 		echo "<input type=\"hidden\" name=\"login_eleve\" value=\"".$login_eleve."\" />\n";
+
+		// 20121101: Si le droit est donné, permettre d'accéder au bulletin de la classe
+		if((($_SESSION['statut']=='responsable')&&(getSettingAOui('GepiAccesBulletinSimpleClasseResp')))||
+			(($_SESSION['statut']=='eleve')&&(getSettingAOui('GepiAccesBulletinSimpleClasseEleve')))) {
+			echo "<p>Afficher<br />\n";
+			echo "<input type=\"radio\" name=\"choix_edit\" id=\"choix_edit_2\" value=\"2\" checked /><label for='choix_edit_2'>Le bulletin simplifié de ".$prenom_eleve." ".$nom_eleve."</label><br />\n";
+			echo "<input type=\"radio\" name=\"choix_edit\" id=\"choix_edit_4\" value=\"4\" /><label for='choix_edit_4'>Le bulletin simplifié des appréciations sur le groupe-classe</label><br /><br />\n";
+		}
+		else {
+			echo "<input type=\"hidden\" name=\"choix_edit\" value=\"2\" />\n";
+		}
 	}
 	echo "<p>Choisissez la(les) période(s) : </p>\n";
 	include "../lib/periodes.inc.php";
@@ -595,9 +673,82 @@ if (!isset($id_classe) and $_SESSION['statut'] != "responsable" AND $_SESSION['s
 	}
 	echo " />\n";
 
+	if(($_SESSION['statut']!='eleve')&&($_SESSION['statut']!='responsable')) {
+		echo "<br />\n";
+		echo "<label for='pas_de_colonne_moy_classe' style='cursor:pointer;'>\n";
+		echo "Ne pas afficher la colonne Moyenne de la classe&nbsp;: \n";
+		echo "</label>\n";
+		echo "<input type=\"checkbox\" name=\"pas_de_colonne_moy_classe\" id=\"pas_de_colonne_moy_classe\" value='y' ";
+		echo " />\n";
+	}
 
 	echo "<br /><br /><center><input type=submit value=Valider /></center>\n";
 	echo "</form>\n";
+
+	//=================================
+	// 20121118
+	if(($_SESSION['statut']!='eleve')&&($_SESSION['statut']!='responsable')&&
+	((getSettingAOui('GepiAccesBulletinSimpleParent'))||
+	(getSettingAOui('GepiAccesGraphParent'))||
+	(getSettingAOui('GepiAccesBulletinSimpleEleve'))||
+	(getSettingAOui('GepiAccesGraphEleve')))) {
+		echo "<p><em>Note&nbsp;:</em> ";
+
+		$date_du_jour=strftime("%d/%m/%Y");
+		// Si les parents ont accès aux bulletins ou graphes,... on va afficher un témoin
+		$tab_acces_app_classe=array();
+		// L'accès est donné à la même date pour parents et responsables.
+		// On teste seulement pour les parents
+		$date_ouverture_acces_app_classe=array();
+		$tab_acces_app_classe[$id_classe]=acces_appreciations(1, $nb_periode-1, $id_classe, 'responsable');
+
+		$acces_app_ele_resp=getSettingValue('acces_app_ele_resp');
+		if($acces_app_ele_resp=='manuel') {
+			$msg_acces_app_ele_resp="Les appréciations seront visibles après une intervention manuelle d'un compte de statut 'scolarité'.";
+		}
+		elseif($acces_app_ele_resp=='date') {
+			$chaine_date_ouverture_acces_app_classe="";
+			for($loop=0;$loop<count($date_ouverture_acces_app_classe);$loop++) {
+				if($loop>0) {
+					$chaine_date_ouverture_acces_app_classe.=", ";
+				}
+				$chaine_date_ouverture_acces_app_classe.=$date_ouverture_acces_app_classe[$loop];
+			}
+			if($chaine_date_ouverture_acces_app_classe=="") {$chaine_date_ouverture_acces_app_classe="Aucune date n'est encore précisée.
+		Peut-être devriez-vous en poser la question à l'administration de l'établissement.";}
+			$msg_acces_app_ele_resp="Les appréciations seront visibles soit à une date donnée (".$chaine_date_ouverture_acces_app_classe.").";
+		}
+		elseif($acces_app_ele_resp=='periode_close') {
+			$delais_apres_cloture=getSettingValue('delais_apres_cloture');
+			$msg_acces_app_ele_resp="Les appréciations seront visibles ".$delais_apres_cloture." jour(s) après la clôture de la période.";
+		}
+		else{
+			$msg_acces_app_ele_resp="???";
+		}
+
+		/*
+		echo "<pre>";
+		print_r($tab_acces_app_classe);
+		echo "</pre>";
+		*/
+
+		echo "A la date du jour (".$date_du_jour.")&nbsp;:</p>\n";
+		echo "<ul>\n";
+		foreach($tab_acces_app_classe[$id_classe] as $periode_num => $value) {
+			echo "<li> les appréciations de la période ".$periode_num." ";
+			if($value=="y") {
+				echo "sont visibles des parents/élèves.";
+			}
+			else {
+				echo "ne sont pas encore visibles des parents/élèves.<br />";
+				echo $msg_acces_app_ele_resp;
+			}
+			echo "</li>\n";
+		}
+		echo "</ul>\n";
+	}
+	//=================================
+
 }
 require("../lib/footer.inc.php");
 ?>

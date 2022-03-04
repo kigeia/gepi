@@ -335,7 +335,7 @@ function ajoutTypesParDefaut() {
 	$type->setJustificationExigible(false);
 	$type->setSousResponsabiliteEtablissement(AbsenceEleveType::SOUS_RESP_ETAB_NON_PRECISE);
 	$type->setManquementObligationPresence(AbsenceEleveType::MANQU_OBLIG_PRESE_NON_PRECISE);
-	$type->setModeInterface(AbsenceEleveType::MODE_INTERFACE_CHECKBOX_HIDDEN);
+	$type->setModeInterface(AbsenceEleveType::MODE_INTERFACE_CHECKBOX_HIDDEN_REGIME);
     $type->setIdLieu($id_lieu_etab);
 
 	$statut = new AbsenceEleveTypeStatutAutorise();
@@ -357,9 +357,9 @@ function ajoutTypesParDefaut() {
     }
 
     $type = new AbsenceEleveType();
-    $type->setNom("Dispensé (élève présent)");
+    $type->setNom("Inapte (élève présent)");
     if (AbsenceEleveTypeQuery::create()->filterByNom($type->getNom())->find()->isEmpty()) {
-	$type->setCommentaire("L'élève est dispensé mais présent physiquement lors de la séance.");
+	$type->setCommentaire("L'élève est inapte mais présent physiquement lors de la séance.");
 	$type->setJustificationExigible(true);
 	$type->setSousResponsabiliteEtablissement(AbsenceEleveType::SOUS_RESP_ETAB_VRAI);
 	$type->setManquementObligationPresence(AbsenceEleveType::MANQU_OBLIG_PRESE_FAUX);
@@ -379,9 +379,9 @@ function ajoutTypesParDefaut() {
     }
 
     $type = new AbsenceEleveType();
-    $type->setNom("Dispensé (élève non présent)");
+    $type->setNom("Inapte (élève non présent)");
     if (AbsenceEleveTypeQuery::create()->filterByNom($type->getNom())->find()->isEmpty()) {
-	$type->setCommentaire("L'élève est dispensé et non présent physiquement lors de la séance.");
+	$type->setCommentaire("L'élève est inapte et non présent physiquement lors de la séance.");
 	$type->setJustificationExigible(true);
 	$type->setSousResponsabiliteEtablissement(AbsenceEleveType::SOUS_RESP_ETAB_FAUX);
 	$type->setManquementObligationPresence(AbsenceEleveType::MANQU_OBLIG_PRESE_FAUX);
@@ -452,5 +452,21 @@ function ajoutTypesParDefaut() {
 	$type->save();
     }
 
+}
+
+function check_sortable_rank_trouble($table, $type) {
+	$retour="";
+
+	$sql="SELECT 1=1 FROM $table;";
+	$res_tot=mysql_query($sql);
+
+	$sql="SELECT DISTINCT sortable_rank FROM $table;";
+	$res_sr=mysql_query($sql);
+
+	if(mysql_num_rows($res_sr)!=mysql_num_rows($res_tot)) {
+		$retour="<p style='text-align:center;'><span style='color:red;'><strong>Anomalie&nbsp;:</strong> L'ordre d'affichage des $type dans la table '$table' est incohérent <br />(<em>plusieurs enregistrements ont le même rang</em>)</span><br />\n";
+		$retour.="<a href='".$_SERVER['PHP_SELF']."?corriger=y".add_token_in_url()."'>Corriger</a></p>\n";
+	}
+	return $retour;
 }
 ?>

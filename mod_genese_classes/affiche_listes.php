@@ -388,19 +388,29 @@ if(!isset($afficher_listes)) {
 
 	if((isset($_GET['editer_requete']))&&(isset($_GET['id_req'])&&($_GET['id_req']!="")&&(mb_strlen(my_ereg_replace("[0-9]","",$_GET['id_req']))==0))) {
 		$id_req=$_GET['id_req'];
-		echo "<p class='bold'>Modification de la requête n°$id_req</p>\n";
-		echo "<input type='hidden' name='modifier_requete' value='y' />\n";
+		echo "<p class='bold'>Modification de la requête n°$id_req";
 
 		$tab_ed_req=array();
 		$sql="SELECT * FROM gc_affichages WHERE projet='$projet' AND id_aff='$id_aff' AND id_req='$id_req';";
 		//echo "$sql<br />\n";
 		$res_edit_req=mysql_query($sql);
 		if(mysql_num_rows($res_edit_req)>0) {
+			$tmp_tab_nom_requete=array();
 			while($lig_edit_req=mysql_fetch_object($res_edit_req)) {
 				$tab_ed_req[$lig_edit_req->type][]=$lig_edit_req->valeur;
 				//echo "\$tab_ed_req[$lig_edit_req->type][]=$lig_edit_req->valeur<br />";
+
+				if($lig_edit_req->nom_requete!="") {
+					if(!in_array($lig_edit_req->nom_requete, $tmp_tab_nom_requete)) {
+						echo " (<em>".$lig_edit_req->nom_requete."</em>)";
+						$tmp_tab_nom_requete[]=$lig_edit_req->nom_requete;
+					}
+				}
 			}
 		}
+
+		echo "</p>\n";
+		echo "<input type='hidden' name='modifier_requete' value='y' />\n";
 	}
 
 	if(isset($id_aff)) {
@@ -691,7 +701,14 @@ if(!isset($afficher_listes)) {
 				$txt_requete.="</td>\n";
 				$txt_requete.="<td>\n";
 				//$txt_requete.="<b><label for='suppr_$lig->id_req'>Requête n°$lig->id_req</label></b>";
-				$txt_requete.="<b><label for='suppr_$lig->id_req'>Requête n°$lig->id_req</label> <a href='".$_SERVER['PHP_SELF']."?editer_requete=y&amp;id_aff=$id_aff&amp;id_req=$lig->id_req&amp;projet=$projet'><img src ='../images/edit16.png'
+				$txt_requete.="<b><label for='suppr_$lig->id_req'>Requête n°$lig->id_req";
+				$sql="SELECT DISTINCT nom_requete FROM gc_affichages WHERE projet='$projet' AND id_aff='$id_aff' AND id_req='".$lig->id_req."' AND nom_requete!='';";
+				//$txt_requete.="<br />".$sql."<br />";
+				$res_tmp=mysql_query($sql);
+				while($lig_tmp=mysql_fetch_object($res_tmp)) {
+					$txt_requete.=" (<em>".$lig_tmp->nom_requete."</em>)";
+				}
+				$txt_requete.="</label> <a href='".$_SERVER['PHP_SELF']."?editer_requete=y&amp;id_aff=$id_aff&amp;id_req=$lig->id_req&amp;projet=$projet'><img src ='../images/edit16.png'
 width='16' height='16' alt='Editer les paramètres de la requête' /></a></b>";
 
 				//===========================================
@@ -990,7 +1007,7 @@ else {
 			$sql="SELECT opt_exclue FROM gc_options_classes WHERE projet='$projet' AND classe_future='$lig->classe';";
 			$res_opt_exclues=mysql_query($sql);
 			while($lig_opt_exclue=mysql_fetch_object($res_opt_exclues)) {
-				$tab_opt_exclue["$lig->classe"][]=$lig_opt_exclue->opt_exclue;
+				$tab_opt_exclue["$lig->classe"][]=mb_strtoupper($lig_opt_exclue->opt_exclue);
 			}
 			//=========================
 
@@ -1142,12 +1159,41 @@ else {
 	echo "<input type='hidden' name='profil_courant' id='profil_courant' value='-1' />\n";
 
 	// Colorisation
+	/*
+		echo "<select name='colorisation' id='colorisation' onchange=\"lance_colorisation();document.getElementById('colorisation_chgt_classe').value=document.forms[0].elements['colorisation'].options[document.forms[0].elements['colorisation'].selectedIndex].value\">
+	*/
+	$colorisation_courante="classe_fut";
+	$classe_fut_checked_ou_pas="";
+	$lv1_checked_ou_pas="";
+	$lv2_checked_ou_pas="";
+	$profil_checked_ou_pas="";
+	$aucune_checked_ou_pas="";
+	if((isset($_POST['colorisation_chgt_classe']))&&($_POST['colorisation_chgt_classe']!="")) {
+		$colorisation_courante=$_POST['colorisation_chgt_classe'];
+
+		if($colorisation_courante=='classe_fut') {
+			$classe_fut_checked_ou_pas=" selected";
+		}
+		elseif($colorisation_courante=='lv1') {
+			$lv1_checked_ou_pas=" selected";
+		}
+		elseif($colorisation_courante=='lv2') {
+			$lv2_checked_ou_pas=" selected";
+		}
+		elseif($colorisation_courante=='profil') {
+			$profil_checked_ou_pas=" selected";
+		}
+		elseif($colorisation_courante=='aucune') {
+			$aucune_fut_checked_ou_pas=" selected";
+		}
+	}
 	echo "<p>Colorisation&nbsp;: ";
-	echo "<select name='colorisation' onchange='lance_colorisation()'>
-	<option value='classe_fut' selected>Classe future</option>
-	<option value='lv1'>LV1</option>
-	<option value='lv2'>LV2</option>
-	<option value='profil'>Profil</option>
+	echo "<select name='colorisation' id='colorisation' onchange=\"lance_colorisation();update_champs_colorisation_chgt_classe();\">
+	<option value='classe_fut'$classe_fut_checked_ou_pas>Classe future</option>
+	<option value='lv1'$lv1_checked_ou_pas>LV1</option>
+	<option value='lv2'$lv2_checked_ou_pas>LV2</option>
+	<option value='profil'$profil_checked_ou_pas>Profil</option>
+	<option value='aucune'$aucune_checked_ou_pas>Aucune</option>
 	</select>\n";
 	echo "</p>\n";
 
@@ -1682,7 +1728,7 @@ else {
 						$contenu_affichage_requete_courante.="<td>\n";
 						if(($fut_classe!='Red')&&($fut_classe!='Dep')&&($fut_classe!='')) {
 							for($i=0;$i<count($tab_ele_opt);$i++) {
-								if(in_array($tab_ele_opt[$i],$tab_opt_exclue["$fut_classe"])) {
+								if(in_array(mb_strtoupper($tab_ele_opt[$i]),$tab_opt_exclue["$fut_classe"])) {
 									$contenu_affichage_requete_courante.="<span style='color:red;'>ERREUR: L'option $tab_ele_opt[$i] est exclue en $fut_classe</span>";
 								}
 							}
@@ -1703,6 +1749,7 @@ else {
 						$texte_chgt_classe.="<input type='hidden' name='chgt_classe' value='y' >\n";
 						$texte_chgt_classe.="<input type='hidden' name='projet' value='$projet' >\n";
 						$texte_chgt_classe.="<input type='hidden' name='id_aff' value='$id_aff' >\n";
+						$texte_chgt_classe.="<input type='hidden' name='colorisation_chgt_classe' id='colorisation_chgt_classe_$cpt' value='$colorisation_courante' >\n";
 						$texte_chgt_classe.="<input type='hidden' name='afficher_listes' value='y' >\n";
 						$texte_chgt_classe.="<input type='submit' value='Valider' />\n";
 						$texte_chgt_classe.="</div>\n";
@@ -1970,32 +2017,37 @@ echo "
 
 		for(i=0;i<$cpt;i++) {
 			if(mode!='profil') {
-				if(document.getElementById(mode+'_'+i)) {
-					for(k=0;k<n;k++) {
-						if(mode=='classe_fut') {
-							if(document.getElementById(mode+'_'+i).value==tab_classes_fut[k]) {
-								document.getElementById('tr_eleve_'+i).style.backgroundColor=couleur_classe_fut[k];
+				if(mode!='aucune') {
+					if(document.getElementById(mode+'_'+i)) {
+						for(k=0;k<n;k++) {
+							if(mode=='classe_fut') {
+								if(document.getElementById(mode+'_'+i).value==tab_classes_fut[k]) {
+									document.getElementById('tr_eleve_'+i).style.backgroundColor=couleur_classe_fut[k];
+								}
 							}
-						}
 	
-						if(mode=='lv1') {
-							if(document.getElementById(mode+'_'+i).value==tab_lv1[k]) {
-								document.getElementById('tr_eleve_'+i).style.backgroundColor=couleur_lv1[k];
+							if(mode=='lv1') {
+								if(document.getElementById(mode+'_'+i).value==tab_lv1[k]) {
+									document.getElementById('tr_eleve_'+i).style.backgroundColor=couleur_lv1[k];
+								}
 							}
-						}
 	
-						if(mode=='lv2') {
-							if(document.getElementById(mode+'_'+i).value==tab_lv2[k]) {
-								document.getElementById('tr_eleve_'+i).style.backgroundColor=couleur_lv2[k];
+							if(mode=='lv2') {
+								if(document.getElementById(mode+'_'+i).value==tab_lv2[k]) {
+									document.getElementById('tr_eleve_'+i).style.backgroundColor=couleur_lv2[k];
+								}
 							}
-						}
 	
-						if(mode=='lv3') {
-							if(document.getElementById(mode+'_'+i).value==tab_lv3[k]) {
-								document.getElementById('tr_eleve_'+i).style.backgroundColor=couleur_lv3[k];
+							if(mode=='lv3') {
+								if(document.getElementById(mode+'_'+i).value==tab_lv3[k]) {
+									document.getElementById('tr_eleve_'+i).style.backgroundColor=couleur_lv3[k];
+								}
 							}
 						}
 					}
+				}
+				else {
+					document.getElementById('tr_eleve_'+i).style.backgroundColor='white';
 				}
 			}
 			else {
@@ -2028,9 +2080,22 @@ echo "
 		if(cat=='profil') {
 			colorise(cat,".count($tab_profil).");
 		}
+		if(cat=='aucune') {
+			colorise(cat,0);
+		}
 	}
 
-	</script>\n";
+	function update_champs_colorisation_chgt_classe() {
+		colorisation_courante=document.forms[0].elements['colorisation'].options[document.forms[0].elements['colorisation'].selectedIndex].value;
+		for(i=0;i<$cpt;i++) {
+			if(document.getElementById('colorisation_chgt_classe_'+i)){
+				document.getElementById('colorisation_chgt_classe_'+i).value=colorisation_courante;
+			}
+		}
+	}
+
+	//document.getElementById('colorisation_chgt_classe').value='$colorisation_courante';
+</script>\n";
 
 	// A METTRE DANS UNE INFOBULLE?
 	echo "<p style='bold'>Récapitulatif des effectifs&nbsp;:</p>\n";
